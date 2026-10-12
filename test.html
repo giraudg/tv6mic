@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Test d'affichage 6MIC</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #1e3a8a; color: #fff; font-family: Arial, Helvetica, sans-serif; }
+  .wrap { padding: 60px 80px; font-size: 44px; line-height: 64px; }
+  .ok { color: #86efac; } .ko { color: #fca5a5; } .small { font-size: 26px; line-height: 38px; color: #dbeafe; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ok">1. Page chargée : le HTML s'affiche.</div>
+  <div id="js" class="ko">2. JavaScript : ne s'est pas exécuté.</div>
+  <div id="info" class="small"></div>
+  <div id="err" class="ko small"></div>
+  <p class="small">Si vous voyez ce fond bleu, l'écran ouvre bien l'adresse. Prenez une photo et revenez au diagnostic : …/index.html</p>
+</div>
+<script>
+window.onerror = function (msg, src, line) {
+  document.getElementById('err').appendChild(document.createTextNode('Erreur : ' + msg + ' (ligne ' + line + ') '));
+};
+var js = document.getElementById('js');
+js.className = 'ok';
+js.innerHTML = '';
+js.appendChild(document.createTextNode('2. JavaScript : OK.'));
+var d = new Date();
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+var lines = [
+  'Adresse : ' + location.href,
+  'Taille de la page : ' + window.innerWidth + ' × ' + window.innerHeight + ' px, densité x' + (window.devicePixelRatio || 1),
+  'Heure de l\'écran : ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + ' le ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(),
+  'Navigateur : ' + navigator.userAgent
+];
+var info = document.getElementById('info');
+for (var i = 0; i < lines.length; i++) { info.appendChild(document.createTextNode(lines[i])); info.appendChild(document.createElement('br')); }
+</script>
+</body>
+</html>
