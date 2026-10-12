@@ -119,13 +119,14 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
   <div id="summary"></div>
   <div id="errorbox"></div>
 </div>
+<div id="boot" style="position:fixed;right:6px;bottom:6px;z-index:99999;background:#facc15;color:#111;font:bold 18px Arial,Helvetica,sans-serif;line-height:24px;padding:6px 12px;border-radius:6px;max-width:900px;">1/3 · HTML chargé. Si ce message reste seul, le script n'a pas démarré.</div>
 
 <script>
 /* ======================================================================
    Outils généraux (ES5 uniquement)
    ====================================================================== */
 var STAGE_W = 1920, STAGE_H = 1080;
-var VERSION = 'v2';
+var VERSION = 'v3';
 var results = [];
 var errors = [];
 var startedAt = new Date();
@@ -135,6 +136,7 @@ var params = parseParams();
 
 window.onerror = function (msg, src, line) {
   errors.push(String(msg) + ' (ligne ' + line + ')');
+  try { if (typeof boot === 'function') { boot(bootStage); } } catch (e0) {}
   try {
     var box = document.getElementById('errorbox');
     box.style.display = 'block';
@@ -174,14 +176,25 @@ function add(group, key, label, value, status) {
   results.push({ group: group, key: key, label: label, value: String(value), status: status || 'info' });
 }
 
+/* Témoin de démarrage, placé hors de la scène : il reste lisible même si la scène ne s'affiche pas. */
+var bootEl = document.getElementById('boot'), bootStage = '';
+function boot(text) {
+  bootStage = text;
+  try { bootEl.innerHTML = ''; bootEl.appendChild(document.createTextNode(text + (errors.length ? ' · ERREUR : ' + errors[errors.length - 1] : ''))); } catch (e) {}
+}
+
 /* Met la scène 1920x1080 à l'échelle de la fenêtre, comme le fera le lecteur. */
+var lastScale = 1;
 function fitStage() {
   var w = window.innerWidth || document.documentElement.clientWidth || STAGE_W;
   var h = window.innerHeight || document.documentElement.clientHeight || STAGE_H;
   var s = Math.min(w / STAGE_W, h / STAGE_H);
-  var x = Math.round((w - STAGE_W * s) / 2), y = Math.round((h - STAGE_H * s) / 2);
+  if (!(s > 0.2 && s < 5)) { s = 1; }
+  if (params.noscale !== undefined) { stage.style.transform = 'none'; stage.style.webkitTransform = 'none'; lastScale = 1; return 1; }
+  var x = Math.max(0, Math.round((w - STAGE_W * s) / 2)), y = Math.max(0, Math.round((h - STAGE_H * s) / 2));
   stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
   stage.style.webkitTransform = stage.style.transform;
+  lastScale = s;
   return s;
 }
 window.addEventListener('resize', fitStage);
@@ -881,6 +894,7 @@ function drawQr(canvas, text) {
 }
 
 function showSummary() {
+  boot('Terminé · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2));
   clearNode(testArea); testArea.style.display = 'none';
   document.getElementById('progress').style.width = '100%';
   document.getElementById('stepLabel').innerHTML = '';
@@ -961,6 +975,8 @@ function run(i) {
   var s = STEPS[i];
   clearNode(testArea);
   setStep(i + 1, STEPS.length, s[0]);
+  fitStage();
+  boot('3/3 · scène affichée · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2) + ' · étape ' + (i + 1) + '/' + STEPS.length);
   var next = once(function () { setTimeout(function () { run(i + 1); }, 250); });
   var guard = setTimeout(function () {
     add('Écran et moteur', 'timeout' + i, 'Étape bloquée', s[0] + ' (délai dépassé)', 'warn');
@@ -981,8 +997,10 @@ document.addEventListener('keydown', function (e) {
   if (e.keyCode === 13 && document.getElementById('summary').style.display === 'block') { location.reload(); }
 });
 
+boot('2/3 · script démarré · page ' + window.innerWidth + '×' + window.innerHeight);
 document.getElementById('screenName').appendChild(document.createTextNode(params.ecran ? 'Écran ' + params.ecran : ''));
 fitStage();
+setTimeout(fitStage, 200); setTimeout(fitStage, 1000); setTimeout(fitStage, 3000);
 setTimeout(function () { run(0); }, 300);
 </script>
 <script>
