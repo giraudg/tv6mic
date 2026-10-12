@@ -126,7 +126,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
    Outils généraux (ES5 uniquement)
    ====================================================================== */
 var STAGE_W = 1920, STAGE_H = 1080;
-var VERSION = 'v3';
+var VERSION = 'v4';
 var results = [];
 var errors = [];
 var startedAt = new Date();
@@ -183,17 +183,29 @@ function boot(text) {
   try { bootEl.innerHTML = ''; bootEl.appendChild(document.createTextNode(text + (errors.length ? ' · ERREUR : ' + errors[errors.length - 1] : ''))); } catch (e) {}
 }
 
-/* Met la scène 1920x1080 à l'échelle de la fenêtre, comme le fera le lecteur. */
+/* Met la scène 1920x1080 à l'échelle de la fenêtre.
+   Par défaut avec la propriété CSS zoom : le navigateur Samsung (Tizen 4) n'a pas affiché
+   la scène réduite par transform. ?mode=transform reprend l'ancienne méthode, ?mode=none n'en applique aucune. */
 var lastScale = 1;
+var SCALE_MODE = params.mode || (params.noscale !== undefined ? 'none' : 'zoom');
 function fitStage() {
   var w = window.innerWidth || document.documentElement.clientWidth || STAGE_W;
   var h = window.innerHeight || document.documentElement.clientHeight || STAGE_H;
   var s = Math.min(w / STAGE_W, h / STAGE_H);
   if (!(s > 0.2 && s < 5)) { s = 1; }
-  if (params.noscale !== undefined) { stage.style.transform = 'none'; stage.style.webkitTransform = 'none'; lastScale = 1; return 1; }
   var x = Math.max(0, Math.round((w - STAGE_W * s) / 2)), y = Math.max(0, Math.round((h - STAGE_H * s) / 2));
-  stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
-  stage.style.webkitTransform = stage.style.transform;
+  stage.style.transform = 'none'; stage.style.webkitTransform = 'none'; stage.style.zoom = '';
+  stage.style.left = '0px'; stage.style.top = '0px';
+  if (SCALE_MODE === 'none') { lastScale = 1; return 1; }
+  if (SCALE_MODE === 'transform') {
+    stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + s + ')';
+    stage.style.webkitTransform = stage.style.transform;
+  } else {
+    /* Avec zoom, les positions de l'élément sont elles aussi multipliées : on les divise d'autant. */
+    stage.style.zoom = String(s);
+    stage.style.left = Math.round(x / s) + 'px';
+    stage.style.top = Math.round(y / s) + 'px';
+  }
   lastScale = s;
   return s;
 }
@@ -245,7 +257,7 @@ function stepIdent(done) {
   add(G, 'viewport', 'Taille page', iw + ' × ' + ih + ' px', iw >= 1900 ? 'ok' : (iw >= 1280 ? 'warn' : 'fail'));
   add(G, 'screen', 'Écran annoncé', screen.width + ' × ' + screen.height, 'info');
   add(G, 'dpr', 'Densité', 'x' + round(dpr, 2) + (dpr >= 2 ? ' (rendu 4K)' : ' (rendu ' + Math.round(iw * dpr) + ' px de large)'), 'info');
-  add(G, 'scale', 'Échelle scène', 'x' + round(fitStage(), 3), 'info');
+  add(G, 'scale', 'Échelle scène', 'x' + round(fitStage(), 3) + ' (' + SCALE_MODE + ')', 'info');
   add(G, 'cpu', 'Cœurs', navigator.hardwareConcurrency || 'inconnu', 'info');
   if (window.performance && performance.memory && performance.memory.jsHeapSizeLimit) {
     add(G, 'heap', 'Mémoire JS max', Math.round(performance.memory.jsHeapSizeLimit / 1048576) + ' Mo', 'info');
@@ -976,7 +988,7 @@ function run(i) {
   clearNode(testArea);
   setStep(i + 1, STEPS.length, s[0]);
   fitStage();
-  boot('3/3 · scène affichée · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2) + ' · étape ' + (i + 1) + '/' + STEPS.length);
+  boot('3/3 · scène affichée (' + SCALE_MODE + ') · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2) + ' · étape ' + (i + 1) + '/' + STEPS.length);
   var next = once(function () { setTimeout(function () { run(i + 1); }, 250); });
   var guard = setTimeout(function () {
     add('Écran et moteur', 'timeout' + i, 'Étape bloquée', s[0] + ' (délai dépassé)', 'warn');
