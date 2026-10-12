@@ -125,7 +125,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
    Outils généraux (ES5 uniquement)
    ====================================================================== */
 var STAGE_W = 1920, STAGE_H = 1080;
-var VERSION = 'v1';
+var VERSION = 'v2';
 var results = [];
 var errors = [];
 var startedAt = new Date();
@@ -135,6 +135,12 @@ var params = parseParams();
 
 window.onerror = function (msg, src, line) {
   errors.push(String(msg) + ' (ligne ' + line + ')');
+  try {
+    var box = document.getElementById('errorbox');
+    box.style.display = 'block';
+    box.appendChild(document.createTextNode('Erreur JavaScript : ' + msg + ' (ligne ' + line + ')'));
+    box.appendChild(document.createElement('br'));
+  } catch (e) {}
   return false;
 };
 
@@ -223,7 +229,7 @@ function stepIdent(done) {
   add(G, 'context', 'Contexte', ctx, 'info');
 
   var iw = window.innerWidth, ih = window.innerHeight, dpr = window.devicePixelRatio || 1;
-  add(G, 'viewport', 'Taille page', iw + ' × ' + ih + ' px', iw >= 1920 ? 'ok' : (iw >= 1280 ? 'warn' : 'fail'));
+  add(G, 'viewport', 'Taille page', iw + ' × ' + ih + ' px', iw >= 1900 ? 'ok' : (iw >= 1280 ? 'warn' : 'fail'));
   add(G, 'screen', 'Écran annoncé', screen.width + ' × ' + screen.height, 'info');
   add(G, 'dpr', 'Densité', 'x' + round(dpr, 2) + (dpr >= 2 ? ' (rendu 4K)' : ' (rendu ' + Math.round(iw * dpr) + ' px de large)'), 'info');
   add(G, 'scale', 'Échelle scène', 'x' + round(fitStage(), 3), 'info');
@@ -632,6 +638,10 @@ function videoTest(opt, cb) {
       if (q0 && q1 && q1.decoded > q0.decoded) {
         dropPct = 100 * (q1.dropped - q0.dropped) / (q1.decoded - q0.decoded);
         if (dropPct >= 0.5) { dropTxt = ' · ' + round(dropPct, 1) + ' % images perdues'; }
+      }
+      if (!v.videoWidth || (q0 && q1 && q1.decoded <= q0.decoded)) {
+        fin('fail', 'image non décodée (seul le son avance)');
+        return;
       }
       var status = (ratio >= 0.95 && stalls === 0 && dropPct <= 5) ? 'ok' : (ratio >= 0.8 ? 'warn' : 'fail');
       fin(status, 'vitesse ' + Math.round(ratio * 100) + ' % · démarrage ' + Math.round(tPlay - t0) + ' ms' + (stalls ? ' · ' + stalls + ' coupure(s)' : '') + dropTxt);
