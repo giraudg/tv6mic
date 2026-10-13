@@ -41,9 +41,9 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
 .panel p { margin: 0 0 18px 0; color: #c7cfdb; }
 
 /* Vidéos */
-.fullvideo { position: absolute; left: 0; top: 0; width: 1920px; height: 984px; background: #000; }
+.fullvideo { position: absolute; left: 56px; top: 30px; width: 1280px; height: 720px; background: #000; }
 .overlay-band {
-  position: absolute; left: 0; top: 64px; width: 1920px; height: 110px; z-index: 30;
+  position: absolute; left: 56px; top: 94px; width: 1280px; height: 110px; z-index: 30;
   background: rgba(220, 38, 38, 0.88); overflow: hidden; white-space: nowrap;
 }
 .overlay-band .crawl { position: absolute; left: 0; top: 24px; font-size: 54px; font-weight: bold; color: #fff; animation: crawl 9s linear infinite; }
@@ -126,7 +126,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
    Outils généraux (ES5 uniquement)
    ====================================================================== */
 var STAGE_W = 1920, STAGE_H = 1080;
-var VERSION = 'v6';
+var VERSION = 'v7';
 var results = [];
 var errors = [];
 var startedAt = new Date();
@@ -177,10 +177,28 @@ function add(group, key, label, value, status) {
 }
 
 /* Témoin de démarrage, placé hors de la scène : il reste lisible même si la scène ne s'affiche pas. */
-var bootEl = document.getElementById('boot'), bootStage = '';
-function boot(text) {
-  bootStage = text;
-  try { bootEl.innerHTML = ''; bootEl.appendChild(document.createTextNode(text + (errors.length ? ' · ERREUR : ' + errors[errors.length - 1] : ''))); } catch (e) {}
+var bootEl = document.getElementById('boot'), bootStage = '', bootEvents = '', bootStepStart = 0, bootTicking = false;
+function renderBoot() {
+  var t = bootStage + (bootEvents ? ' · ' + bootEvents : '');
+  if (bootTicking) { t += ' · ' + Math.round((now() - bootStepStart) / 1000) + ' s'; }
+  if (errors.length) { t += ' · ERREUR : ' + errors[errors.length - 1]; }
+  try { bootEl.innerHTML = ''; bootEl.appendChild(document.createTextNode(t)); } catch (e) {}
+}
+function boot(text) { bootStage = text; renderBoot(); }
+/* Le compteur de secondes prouve que le JavaScript tourne : s'il se fige, le script est bloqué. */
+setInterval(renderBoot, 1000);
+/* Journal des événements d'une vidéo, affiché dans le cadre jaune. */
+function trackVideo(v, label) {
+  var evts = [];
+  var names = { loadstart: 'chargement', loadedmetadata: 'infos', canplay: 'prête', playing: 'lecture', waiting: 'attente', ended: 'fin', error: 'erreur', pause: 'pause' };
+  function on(type) {
+    v.addEventListener(type, function () {
+      evts.push(names[type]);
+      bootEvents = label + ' : ' + evts.slice(-6).join(' › ');
+      renderBoot();
+    });
+  }
+  for (var k in names) { if (names.hasOwnProperty(k)) { on(k); } }
 }
 
 /* Met la scène 1920x1080 à l'échelle de la fenêtre.
@@ -636,6 +654,13 @@ function playbackQuality(v) {
   } catch (e) {}
   return null;
 }
+/* Arrête et retire toute vidéo restante : sur certains lecteurs, une vidéo retirée de la page continue de jouer. */
+function killVideos() {
+  var list = document.getElementsByTagName('video'), arr = [], i;
+  for (i = 0; i < list.length; i++) { arr.push(list[i]); }
+  for (i = 0; i < arr.length; i++) { cleanupVideo(arr[i]); }
+  return arr.length;
+}
 function cleanupVideo(v) {
   try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
   remove(v);
@@ -651,7 +676,8 @@ function videoTest(opt, cb) {
   });
   v.className = 'fullvideo';
   v.muted = true; v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-  v.loop = true; v.preload = 'auto';
+  v.loop = false; v.preload = 'auto';
+  trackVideo(v, opt.label);
   v.addEventListener('error', function () { fin('fail', 'erreur : ' + mediaError(v)); });
   v.addEventListener('waiting', function () { if (tPlay !== null) { stalls++; } });
   v.addEventListener('playing', function () {
@@ -714,6 +740,7 @@ function stepChainSingle(done) {
   var G = 'Vidéo', v = document.createElement('video'), tEnd = null, aStarted = false;
   var fin = once(function (status, value) { clearTimeout(timer); cleanupVideo(v); add(G, 'chain1', 'Enchaînement (1 lecteur)', value, status); done(); });
   v.className = 'fullvideo'; v.muted = true; v.setAttribute('muted', ''); v.preload = 'auto';
+  trackVideo(v, 'A puis B');
   v.addEventListener('error', function () { fin('fail', (tEnd === null ? 'vidéo A' : 'vidéo B') + ' illisible : ' + mediaError(v)); });
   v.addEventListener('playing', function () {
     if (tEnd === null) { aStarted = true; return; }
@@ -751,6 +778,7 @@ function stepChain(done) {
   for (i = 0; i < list.length; i++) {
     list[i].className = 'fullvideo'; list[i].muted = true; list[i].setAttribute('muted', ''); list[i].preload = 'auto';
   }
+  trackVideo(a, 'A'); trackVideo(b, 'B');
   b.style.visibility = 'hidden';
   a.addEventListener('error', function () { fin('fail', 'vidéo A illisible : ' + mediaError(a)); });
   b.addEventListener('error', function () { fin(tEnd === null ? 'warn' : 'fail', 'vidéo B refusée' + (tEnd === null ? ' pendant le préchargement (un seul décodeur ?)' : '') + ' : ' + mediaError(b)); });
@@ -806,6 +834,7 @@ function stepSound(done) {
   var G = 'Vidéo', v = document.createElement('video');
   var fin = once(function (status, value) { clearTimeout(timer); cleanupVideo(v); add(G, 'sound', 'Lecture auto avec son', value, status); done(); });
   v.className = 'fullvideo'; v.preload = 'auto'; v.volume = 0.3; v.muted = false;
+  trackVideo(v, 'son');
   v.addEventListener('error', function () { fin('fail', 'erreur : ' + mediaError(v)); });
   v.addEventListener('playing', function () {
     setTimeout(function () { fin(v.muted ? 'warn' : 'ok', v.muted ? 'démarrée mais coupée' : 'autorisée'); }, 1800);
@@ -942,6 +971,8 @@ function drawQr(canvas, text) {
 }
 
 function showSummary() {
+  bootTicking = false; bootEvents = '';
+  killVideos();
   boot('Terminé · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2));
   clearNode(testArea); testArea.style.display = 'none';
   document.getElementById('progress').style.width = '100%';
@@ -1018,14 +1049,22 @@ var STEPS = [
   ['Son', stepSound, 10000],
   ['Réseau', stepNetwork, 150000]
 ];
+/* ?video=0 : diagnostic sans les étapes vidéo. */
+if (params.video === '0') {
+  var VIDEO_STEPS = ['Formats vidéo', 'Vidéo 1080p', 'Vidéo 4K', 'Vidéo 60 i/s', 'Vidéo HEVC', 'Enchaînement', 'Deux lecteurs', 'Vidéo en mémoire', 'Son'];
+  STEPS = STEPS.filter(function (st) { return VIDEO_STEPS.indexOf(st[0]) < 0; });
+}
 
 function run(i) {
   if (i >= STEPS.length) { showSummary(); return; }
   var s = STEPS[i];
+  var leftover = killVideos();
+  if (leftover) { add('Vidéo', 'leftover' + i, 'Vidéo restée active', leftover + ' avant l\'étape ' + s[0], 'warn'); }
   clearNode(testArea);
   setStep(i + 1, STEPS.length, s[0]);
   fitStage();
-  boot('3/3 · scène affichée (' + SCALE_MODE + ') · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2) + ' · étape ' + (i + 1) + '/' + STEPS.length);
+  bootStepStart = now(); bootEvents = ''; bootTicking = true;
+  boot('3/3 · scène affichée (' + SCALE_MODE + ') · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2) + ' · étape ' + (i + 1) + '/' + STEPS.length + ' ' + s[0]);
   var next = once(function () { setTimeout(function () { run(i + 1); }, 250); });
   var guard = setTimeout(function () {
     add('Écran et moteur', 'timeout' + i, 'Étape bloquée', s[0] + ' (délai dépassé)', 'warn');

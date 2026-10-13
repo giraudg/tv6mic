@@ -76,7 +76,7 @@ if (location.search.indexOf('stay=1') < 0) {
   var tick = function () {
     go.innerHTML = '';
     go.appendChild(document.createTextNode('Lancement du diagnostic complet dans ' + left + ' s…'));
-    if (left <= 0) { location.href = 'index.html?ecran=magicinfo&v=6' + (inFrame ? '&cadre=1' : ''); return; }
+    if (left <= 0) { location.href = 'index.html?ecran=magicinfo&v=7' + (inFrame ? '&cadre=1' : ''); return; }
     left--;
     setTimeout(tick, 1000);
   };
