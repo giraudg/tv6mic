@@ -126,10 +126,27 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
    Outils généraux (ES5 uniquement)
    ====================================================================== */
 var STAGE_W = 1920, STAGE_H = 1080;
-var VERSION = 'v7';
+var VERSION = 'v8';
+function VERSION_KEY() { return VERSION + '|' + (params.ecran || '') + '|' + (params.video || ''); }
 var results = [];
 var errors = [];
 var startedAt = new Date();
+var PAGE_LOAD = Date.now();
+var STATE_KEY = 'diag6mic_state', ALIVE_KEY = 'diag6mic_alive';
+var reloads = 0, reloadLog = [], fromStored = false;
+function loadState() { try { return JSON.parse(localStorage.getItem(STATE_KEY) || 'null'); } catch (e) { return null; } }
+function saveState(nextStep, completed) {
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({
+      ver: VERSION_KEY(), startedAt: startedAt.getTime(), nextStep: nextStep, results: results,
+      errors: errors.slice(0, 10), pageLoadAt: PAGE_LOAD, reloads: reloads, reloadLog: reloadLog,
+      completedAt: completed ? Date.now() : 0
+    }));
+  } catch (e) {}
+}
+/* Signal de vie toutes les 2 s : au rechargement suivant, il dit combien de temps la page précédente a vécu. */
+function alive() { try { localStorage.setItem(ALIVE_KEY, String(Date.now())); } catch (e) {} }
+setInterval(alive, 2000);
 var stage = document.getElementById('stage');
 var testArea = document.getElementById('test');
 var params = parseParams();
@@ -973,6 +990,12 @@ function drawQr(canvas, text) {
 function showSummary() {
   bootTicking = false; bootEvents = '';
   killVideos();
+  if (!fromStored) {
+    var lives = [], r;
+    for (r = 0; r < reloadLog.length; r++) { lives.push(reloadLog[r].life + ' s'); }
+    add('Écran et moteur', 'reloads', 'Rechargements', reloads ? reloads + ' · page relancée après ' + lives.join(', ') : 'aucun', reloads ? 'warn' : 'ok');
+    saveState(STEPS.length, true);
+  }
   boot('Terminé · page ' + window.innerWidth + '×' + window.innerHeight + ' · échelle ' + round(lastScale, 2));
   clearNode(testArea); testArea.style.display = 'none';
   document.getElementById('progress').style.width = '100%';
@@ -985,7 +1008,7 @@ function showSummary() {
   var head = el('div', 'head');
   head.appendChild(el('b', null, 'Résumé du diagnostic'));
   head.appendChild(document.createElement('br'));
-  head.appendChild(document.createTextNode(counts.ok + ' OK · ' + counts.warn + ' à surveiller (LIMITE) · ' + counts.fail + ' échec(s) (NON) · lancé le ' + fmtDate(startedAt) + ' à ' + fmtTime(startedAt) + (params.ecran ? ' · écran ' + params.ecran : '')));
+  head.appendChild(document.createTextNode(counts.ok + ' OK · ' + counts.warn + ' à surveiller (LIMITE) · ' + counts.fail + ' échec(s) (NON) · lancé le ' + fmtDate(startedAt) + ' à ' + fmtTime(startedAt) + (params.ecran ? ' · écran ' + params.ecran : '') + (fromStored ? ' · résultat enregistré' : '')));
   S.appendChild(head);
 
   var cols = el('div', 'cols'), colEls = [el('div', 'col'), el('div', 'col'), el('div', 'col')], g, row, dot, uaLine = '';
@@ -1058,6 +1081,7 @@ if (params.video === '0') {
 function run(i) {
   if (i >= STEPS.length) { showSummary(); return; }
   var s = STEPS[i];
+  saveState(i, false);
   var leftover = killVideos();
   if (leftover) { add('Vidéo', 'leftover' + i, 'Vidéo restée active', leftover + ' avant l\'étape ' + s[0], 'warn'); }
   clearNode(testArea);
@@ -1089,7 +1113,27 @@ boot('2/3 · script démarré · page ' + window.innerWidth + '×' + window.inne
 document.getElementById('screenName').appendChild(document.createTextNode(params.ecran ? 'Écran ' + params.ecran : ''));
 fitStage();
 setTimeout(fitStage, 200); setTimeout(fitStage, 1000); setTimeout(fitStage, 3000);
-setTimeout(function () { run(0); }, 300);
+(function start() {
+  var st = params.fresh === '1' ? null : loadState(), startIndex = 0, lastAlive = 0;
+  try { lastAlive = parseInt(localStorage.getItem(ALIVE_KEY) || '0', 10); } catch (e) {}
+  if (st && st.ver === VERSION_KEY()) {
+    if (st.completedAt && Date.now() - st.completedAt < 2 * 3600 * 1000) {
+      results = st.results || []; errors = st.errors || []; startedAt = new Date(st.startedAt);
+      reloads = st.reloads || 0; fromStored = true;
+      setTimeout(showSummary, 300);
+      return;
+    }
+    if (!st.completedAt && st.nextStep < STEPS.length && Date.now() - lastAlive < 15 * 60 * 1000) {
+      results = st.results || []; errors = st.errors || []; startedAt = new Date(st.startedAt);
+      reloads = (st.reloads || 0) + 1;
+      reloadLog = st.reloadLog || [];
+      reloadLog.push({ step: st.nextStep + 1, life: Math.round((lastAlive - st.pageLoadAt) / 1000) });
+      startIndex = st.nextStep;
+      boot('2/3 · reprise après rechargement n° ' + reloads + ' · étape ' + (startIndex + 1));
+    }
+  }
+  setTimeout(function () { run(startIndex); }, 300);
+})();
 </script>
 <script>
 /* qrcode-generator 2.0.4, Kazuhiko Arase, licence MIT (https://github.com/kazuhikoarase/qrcode-generator) */

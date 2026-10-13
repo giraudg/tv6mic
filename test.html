@@ -60,11 +60,21 @@ try {
   var n = parseInt(localStorage.getItem('diag6mic_boots') || '0', 10) + 1;
   var first = localStorage.getItem('diag6mic_first') || stamp(d);
   var last = localStorage.getItem('diag6mic_last') || '';
+  var lastMs = parseInt(localStorage.getItem('diag6mic_last_ms') || '0', 10);
   localStorage.setItem('diag6mic_boots', String(n));
   localStorage.setItem('diag6mic_first', first);
   localStorage.setItem('diag6mic_last', stamp(d));
+  localStorage.setItem('diag6mic_last_ms', String(d.getTime()));
   line(count, 'Ouvertures de cette page enregistrées : ' + n + ' (première le ' + first + (last ? ', précédente le ' + last : '') + ')', n > 1 ? 'ok small' : 'warn small');
+  if (lastMs) { line(count, 'Précédente ouverture il y a ' + Math.round((d.getTime() - lastMs) / 1000) + ' s.', 'small'); }
   if (n === 1) { line(count, 'Éteignez puis rallumez l\'écran : ce compteur doit passer à 2.', 'small'); }
+  var st = null;
+  try { st = JSON.parse(localStorage.getItem('diag6mic_state') || 'null'); } catch (e3) {}
+  if (st && st.completedAt) {
+    line(count, 'Diagnostic terminé à ' + stamp(new Date(st.completedAt)) + (st.reloads ? ', après ' + st.reloads + ' rechargement(s) de la page' : '') + '.', 'ok small');
+  } else if (st) {
+    line(count, 'Diagnostic en cours : reprise à l\'étape ' + (st.nextStep + 1) + (st.reloads ? ' (' + st.reloads + ' rechargement(s) déjà)' : '') + '.', 'warn small');
+  }
 } catch (e2) {
   line(count, 'Stockage local indisponible : ' + (e2 && e2.name), 'ko small');
 }
@@ -73,10 +83,11 @@ try {
 var go = document.getElementById('go');
 if (location.search.indexOf('stay=1') < 0) {
   var left = 15;
+  try { if (localStorage.getItem('diag6mic_state')) { left = 4; } } catch (e4) {}
   var tick = function () {
     go.innerHTML = '';
     go.appendChild(document.createTextNode('Lancement du diagnostic complet dans ' + left + ' s…'));
-    if (left <= 0) { location.href = 'index.html?ecran=magicinfo&v=7' + (inFrame ? '&cadre=1' : ''); return; }
+    if (left <= 0) { location.href = 'index.html?ecran=magicinfo&v=8' + (inFrame ? '&cadre=1' : ''); return; }
     left--;
     setTimeout(tick, 1000);
   };
