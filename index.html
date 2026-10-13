@@ -126,7 +126,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
    Outils généraux (ES5 uniquement)
    ====================================================================== */
 var STAGE_W = 1920, STAGE_H = 1080;
-var VERSION = 'v5';
+var VERSION = 'v6';
 var results = [];
 var errors = [];
 var startedAt = new Date();
@@ -251,6 +251,9 @@ function stepIdent(done) {
   add(G, 'engine', 'Moteur', chrome ? 'Chromium ' + chrome : 'inconnu', chrome >= 56 ? 'ok' : (chrome >= 47 ? 'warn' : 'fail'));
   add(G, 'tizen', 'Tizen', tizen || 'non indiqué', tizen ? 'info' : 'warn');
   var ctx = location.protocol === 'file:' ? 'application installée' : 'page web (' + location.protocol.replace(':', '') + ')';
+  var framed = false;
+  try { framed = window.self !== window.top; } catch (eF) { framed = true; }
+  if (framed) { ctx += ', dans un cadre (iframe)'; }
   add(G, 'context', 'Contexte', ctx, 'info');
 
   var iw = window.innerWidth, ih = window.innerHeight, dpr = window.devicePixelRatio || 1;
