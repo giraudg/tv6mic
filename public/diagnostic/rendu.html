@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Test de rendu 6MIC</title>
+<!-- Compare plusieurs techniques d'affichage. Notez les lettres des cadres visibles. -->
+<style>
+  html, body { margin: 0; padding: 0; background: #1f2937; color: #fff; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
+  .t { position: absolute; width: 330px; height: 150px; font-size: 22px; line-height: 28px; padding: 10px 14px; box-sizing: border-box; color: #111; font-weight: bold; }
+  .t small { display: block; font-weight: normal; font-size: 17px; line-height: 22px; }
+  #head { position: absolute; left: 20px; top: 10px; font-size: 22px; line-height: 30px; color: #e5e7eb; }
+
+  /* A : bloc simple */
+  #a { left: 20px; top: 90px; background: #86efac; }
+  /* B : transform scale sur un petit bloc */
+  #b { left: 380px; top: 90px; background: #93c5fd; transform: scale(0.9); transform-origin: 0 0; }
+  /* C : grand bloc 1920x1080 réduit par transform, comme la scène du diagnostic */
+  #c { position: absolute; left: 740px; top: 90px; width: 1920px; height: 1080px; overflow: hidden; background: #fca5a5; transform: scale(0.17); transform-origin: 0 0; }
+  #c div { font-size: 150px; line-height: 180px; font-weight: bold; color: #111; padding: 60px; }
+  /* D : même grand bloc, réduit par zoom au lieu de transform */
+  /* avec zoom, left et top sont aussi multipliés par 0,17 : 6470 × 0,17 ≈ 1100 px, 530 × 0,17 ≈ 90 px */
+  #d { position: absolute; left: 6470px; top: 530px; width: 1920px; height: 1080px; overflow: hidden; background: #fde68a; zoom: 0.17; }
+  #d div { font-size: 150px; line-height: 180px; font-weight: bold; color: #111; padding: 60px; }
+  /* E : couche composée forcée (translateZ) */
+  #e { left: 20px; top: 290px; background: #c4b5fd; transform: translateZ(0); }
+  /* F : animation CSS de transform */
+  @keyframes slide { from { transform: translateX(0); } to { transform: translateX(160px); } }
+  #f { left: 380px; top: 290px; width: 200px; background: #f9a8d4; animation: slide 2s ease-in-out infinite alternate; }
+  /* G : animation CSS d'opacité */
+  @keyframes blink { from { opacity: 1; } to { opacity: 0.25; } }
+  #g { left: 740px; top: 290px; background: #a5f3fc; animation: blink 1.5s ease-in-out infinite alternate; }
+  /* H : grand bloc 1920x1080 SANS réduction, en grande partie hors de l'écran */
+  #h { position: absolute; left: 1100px; top: 290px; width: 1920px; height: 1080px; overflow: hidden; background: #fdba74; }
+  #h div { font-size: 22px; line-height: 28px; font-weight: bold; color: #111; padding: 10px 14px; }
+  /* I : grand bloc réduit par transform, SANS overflow hidden */
+  #i { position: absolute; left: 20px; top: 490px; width: 1920px; height: 1080px; background: #bef264; transform: scale(0.17); transform-origin: 0 0; }
+  #i div { font-size: 150px; line-height: 180px; font-weight: bold; color: #111; padding: 60px; }
+  /* J : petit bloc avec transform translate + scale, comme le diagnostic */
+  #j { left: 380px; top: 490px; background: #fcd34d; transform: translate(10px, 0) scale(0.95); transform-origin: 0 0; }
+</style>
+</head>
+<body>
+  <div id="head">Test de rendu · notez les LETTRES des cadres visibles (A à J). <span id="vp"></span></div>
+  <div class="t" id="a">A · bloc simple<small>doit toujours s'afficher</small></div>
+  <div class="t" id="b">B · transform: scale<small>petit bloc réduit</small></div>
+  <div id="c"><div>C · grand bloc réduit par transform (comme le diagnostic)</div></div>
+  <div id="d"><div>D · grand bloc réduit par zoom</div></div>
+  <div class="t" id="e">E · couche forcée<small>translateZ(0)</small></div>
+  <div class="t" id="f">F · glisse<small>animation transform</small></div>
+  <div class="t" id="g">G · clignote<small>animation opacity</small></div>
+  <div id="h"><div>H · grand bloc non réduit (déborde)</div></div>
+  <div id="i"><div>I · grand bloc réduit par transform, sans overflow</div></div>
+  <div class="t" id="j">J · translate + scale<small>petit bloc</small></div>
+<script>
+document.getElementById('vp').appendChild(document.createTextNode('Page ' + window.innerWidth + ' × ' + window.innerHeight + ' px'));
+</script>
+</body>
+</html>

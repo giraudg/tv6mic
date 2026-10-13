@@ -1,0 +1,141 @@
+/* Écrans TV 6MIC : lecteur et gabarits, scène 1920 × 1080.
+   Chromium 56 : flexbox sans gap, pas de grid ni d'aspect-ratio, positions top/left (pas inset),
+   animations limitées au déplacement, à l'échelle et au fondu (30 i/s mesurés dans MagicINFO). */
+
+@font-face { font-family: "TV Anton"; font-weight: 400; src: url(/polices/anton-latin-400-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "TV Anton"; font-weight: 400; src: url(/polices/anton-latin-ext-400-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "TV Anton"; font-weight: 700; src: url(/polices/anton-latin-400-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "TV Archivo"; font-weight: 400; src: url(/polices/archivo-latin-400-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "TV Archivo"; font-weight: 400; src: url(/polices/archivo-latin-ext-400-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "TV Archivo"; font-weight: 600; src: url(/polices/archivo-latin-600-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "TV Archivo"; font-weight: 600; src: url(/polices/archivo-latin-ext-600-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "TV Archivo"; font-weight: 700; src: url(/polices/archivo-latin-700-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "TV Archivo"; font-weight: 700; src: url(/polices/archivo-latin-ext-700-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+:root {
+  --f-sans: "owners", "TV Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-cond: "zuume-cut", "TV Anton", Impact, "Arial Narrow", sans-serif;
+  --degrade: linear-gradient(100deg, #c23d97 0%, #a94fd6 55%, #8e63ff 100%);
+  --violet: #8e63ff; --rouge: #dc2626; --gris: #a9a6b3; --trait: #3d3946; --nuit: #0b0a0d;
+}
+
+html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+body { cursor: none; -webkit-font-smoothing: antialiased; }
+
+/* ---- scène : 1920 × 1080, réduite par zoom (transform: scale ne s'affiche pas sur ces écrans) ---- */
+#scene { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000;
+  color: #fff; font-family: var(--f-sans); line-height: 1.2; }
+.couche, .video { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; opacity: 0; }
+.couche { overflow: hidden; -webkit-transition: opacity .6s ease; transition: opacity .6s ease; }
+.couche.visible, .video.visible { opacity: 1; }
+.video { background: #000; object-fit: contain; }
+.video.visible { -webkit-transition: none; transition: none; }
+
+/* ---- gabarits ---- */
+.g { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+.g p { margin: 0; }
+.g .a { opacity: 0; }
+.g-logo { position: absolute; right: 96px; top: 84px; height: 96px; width: auto; }
+
+@-webkit-keyframes g-glisse { from { opacity: 0; -webkit-transform: translate3d(-90px, 0, 0); } to { opacity: 1; -webkit-transform: translate3d(0, 0, 0); } }
+@keyframes g-glisse { from { opacity: 0; transform: translate3d(-90px, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@-webkit-keyframes g-monte { from { opacity: 0; -webkit-transform: translate3d(0, 70px, 0); } to { opacity: 1; -webkit-transform: translate3d(0, 0, 0); } }
+@keyframes g-monte { from { opacity: 0; transform: translate3d(0, 70px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@-webkit-keyframes g-fondu { from { opacity: 0; } to { opacity: 1; } }
+@keyframes g-fondu { from { opacity: 0; } to { opacity: 1; } }
+@-webkit-keyframes g-zoom { from { -webkit-transform: scale(1); } to { -webkit-transform: scale(1.08); } }
+@keyframes g-zoom { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+.joue .a0 { -webkit-animation: g-fondu .8s .1s ease-out both; animation: g-fondu .8s .1s ease-out both; }
+.joue .a1 { -webkit-animation: g-glisse .9s .2s cubic-bezier(.2, .7, .2, 1) both; animation: g-glisse .9s .2s cubic-bezier(.2, .7, .2, 1) both; }
+.joue .a2 { -webkit-animation: g-monte .9s .4s cubic-bezier(.2, .7, .2, 1) both; animation: g-monte .9s .4s cubic-bezier(.2, .7, .2, 1) both; }
+.joue .a3 { -webkit-animation: g-monte .9s .6s cubic-bezier(.2, .7, .2, 1) both; animation: g-monte .9s .6s cubic-bezier(.2, .7, .2, 1) both; }
+.joue .a4 { -webkit-animation: g-fondu .9s .8s ease-out both; animation: g-fondu .9s .8s ease-out both; }
+
+/* 1. Soirée */
+.g-photo { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #111 center / cover no-repeat;
+  -webkit-transform-origin: 62% 40%; transform-origin: 62% 40%; }
+.joue .g-photo { -webkit-animation: g-zoom 12s linear both; animation: g-zoom 12s linear both; }
+.g-voile { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .9) 0%, rgba(0, 0, 0, .66) 40%, rgba(0, 0, 0, .1) 74%, rgba(0, 0, 0, 0) 100%),
+              linear-gradient(0deg, rgba(0, 0, 0, .55) 0%, rgba(0, 0, 0, 0) 45%); }
+.g-mention { position: absolute; left: 120px; top: 96px; padding: 14px 24px 12px; background: var(--violet);
+  font-size: 30px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
+.g-rouge { background: var(--rouge) !important; }
+.g-bloc { position: absolute; left: 120px; bottom: 112px; width: 1180px; }
+.g-avec-qr .g-bloc { width: 1140px; }
+.g-date { display: inline-block; padding: 16px 26px 12px; background: var(--degrade);
+  font-family: var(--f-cond); font-weight: 700; font-size: 60px; line-height: 1; text-transform: uppercase; letter-spacing: .01em; }
+.g-nom { margin-top: 30px; font-family: var(--f-cond); font-weight: 700; font-size: 190px; line-height: .9;
+  text-transform: uppercase; letter-spacing: .005em; }
+.g-infos { margin-top: 30px; font-size: 40px; line-height: 1.3; color: #ece9f3; white-space: pre-line; max-height: 156px; overflow: hidden; }
+.g-qr { position: absolute; right: 96px; bottom: 112px; width: 200px; padding: 18px 18px 14px; background: #fff; color: #000; text-align: center; }
+.g-qr svg { display: block; width: 200px; height: 200px; }
+.g-qr span { display: block; margin-top: 12px; font-size: 22px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
+
+/* 2. Agenda */
+.g-agenda { background: var(--nuit); }
+.g-fond { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: center / cover no-repeat; opacity: .22; }
+.g-entete { position: absolute; left: 0; top: 0; width: 1920px; height: 236px; background: var(--degrade); overflow: hidden; }
+.g-motif { position: absolute; top: 0; right: 0; width: 900px; height: 236px; background: #000; opacity: .28;
+  -webkit-mask: url(/logo/motif-6mic.svg) left top / cover no-repeat; -webkit-transform: scaleX(-1); transform: scaleX(-1); }
+.g-titre { position: absolute; left: 120px; bottom: 46px; width: 1300px; white-space: nowrap; overflow: hidden;
+  font-family: var(--f-cond); font-weight: 700; font-size: 128px; line-height: .92; text-transform: uppercase; }
+.g-entete .g-logo { top: auto; bottom: 58px; height: 84px; }
+.g-liste { position: absolute; left: 120px; top: 276px; width: 1680px; }
+.g-ligne { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; height: 88px;
+  border-bottom: 2px solid var(--trait); opacity: 0; }
+.joue .g-ligne { -webkit-animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; }
+.g-quand { -webkit-flex: none; flex: none; width: 330px; font-family: var(--f-cond); font-weight: 700; font-size: 56px; line-height: 1; text-transform: uppercase; white-space: nowrap; }
+.g-quand .g-j { display: inline-block; width: 126px; color: var(--gris); }
+.g-quand b { display: inline-block; width: 82px; font-weight: 700; }
+.g-quand .g-m { color: #fff; }
+.g-quoi { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; font-size: 44px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-etiq { -webkit-flex: none; flex: none; margin-left: 28px; padding: 10px 16px 8px; background: var(--violet);
+  font-size: 22px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; white-space: nowrap; }
+/* 5 dates ou moins : lignes plus hautes et texte plus grand */
+.g-court .g-liste { top: 300px; }
+.g-court .g-ligne { height: 128px; }
+.g-court .g-quand { width: 432px; font-size: 72px; }
+.g-court .g-quand .g-j { width: 160px; }
+.g-court .g-quand b { width: 104px; }
+.g-court .g-quoi { font-size: 56px; }
+.g-court .g-etiq { font-size: 26px; padding: 12px 18px 10px; }
+.g-page { position: absolute; right: 120px; bottom: 34px; font-size: 26px; font-weight: 600; color: var(--gris); letter-spacing: .06em; }
+
+/* 3. Image */
+.g-image { background: #000 center / cover no-repeat; }
+.g-image.g-contenir { background-size: contain; }
+
+/* Veille et messages */
+.g-veille { background: #000; }
+.g-veille-logo { position: absolute; left: 700px; top: 444px; width: 520px; height: auto; opacity: .85;
+  -webkit-transition: -webkit-transform 2s ease; transition: transform 2s ease; }
+.g-veille-texte { position: absolute; left: 0; width: 1920px; top: 760px; text-align: center; font-size: 30px; color: var(--gris); }
+.g-menu { position: absolute; left: 160px; top: 140px; width: 1600px; }
+.g-menu h1 { margin: 0 0 40px; font-family: var(--f-cond); font-weight: 700; font-size: 110px; line-height: .95; text-transform: uppercase; }
+.g-menu p { margin: 0 0 30px; font-size: 32px; color: var(--gris); }
+.g-menu a { display: block; padding: 18px 0; border-bottom: 2px solid var(--trait); color: #fff; text-decoration: none; font-size: 44px; font-weight: 600; }
+.g-menu a span { color: var(--gris); font-weight: 400; margin-left: 24px; }
+
+/* Identification de l'écran */
+.g-ident { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; z-index: 100000; background: rgba(0, 0, 0, .86);
+  display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-justify-content: center; justify-content: center; -webkit-align-items: center; align-items: center; text-align: center; }
+.g-ident-l { font-size: 40px; color: var(--gris); }
+.g-ident-nom { margin: 24px 0; padding: 18px 48px 10px; background: var(--degrade); font-family: var(--f-cond); font-weight: 700; font-size: 220px; line-height: .95; text-transform: uppercase; }
+.g-ident-code { font-size: 40px; font-weight: 600; }
+
+/* Suivi technique (?debug=1) */
+#suivi { position: fixed; right: 8px; bottom: 8px; z-index: 100001; max-width: 46%; padding: 8px 12px; background: rgba(0, 0, 0, .78);
+  color: #fde68a; font: 14px/1.35 monospace; white-space: pre-wrap; pointer-events: none; }
+#secours { position: fixed; left: 40px; right: 40px; top: 40px; z-index: 100002; color: #fff; font: 24px/1.4 Arial, sans-serif; }
+#secours small { display: block; margin-top: 12px; font-size: 16px; color: #ccc; }

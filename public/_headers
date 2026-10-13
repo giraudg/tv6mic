@@ -1,0 +1,12 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/sw.js
+  Cache-Control: no-cache
+
+/test-medias/*
+  Cache-Control: public, max-age=86400
+
+/polices/*
+  Cache-Control: public, max-age=2592000

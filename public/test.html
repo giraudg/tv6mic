@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Test d'affichage 6MIC</title>
+<!--
+  Page d'entrée fixée dans MagicINFO (widget Flux Web).
+  Affiche l'environnement, compte les démarrages (persistance du stockage),
+  puis lance le diagnostic complet. ?stay=1 reste sur cette page.
+-->
+<style>
+  html, body { margin: 0; padding: 0; background: #1e3a8a; color: #fff; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
+  .wrap { padding: 50px 80px; font-size: 40px; line-height: 58px; }
+  .ok { color: #86efac; } .ko { color: #fca5a5; } .warn { color: #fde68a; }
+  .small { font-size: 26px; line-height: 38px; color: #dbeafe; }
+  #count { margin-top: 18px; }
+  #go { margin-top: 26px; font-size: 32px; line-height: 44px; color: #fde68a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ok">1. Page chargée : le HTML s'affiche.</div>
+  <div id="js" class="ko">2. JavaScript : ne s'est pas exécuté.</div>
+  <div id="info" class="small"></div>
+  <div id="count" class="small"></div>
+  <div id="err" class="ko small"></div>
+  <div id="go"></div>
+</div>
+<script>
+window.onerror = function (msg, src, line) {
+  document.getElementById('err').appendChild(document.createTextNode('Erreur : ' + msg + ' (ligne ' + line + ') '));
+};
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function stamp(d) { return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function line(node, text, cls) {
+  var p = document.createElement('div');
+  if (cls) { p.className = cls; }
+  p.appendChild(document.createTextNode(text));
+  node.appendChild(p);
+}
+
+var js = document.getElementById('js');
+js.className = 'ok';
+js.innerHTML = '';
+js.appendChild(document.createTextNode('2. JavaScript : OK.'));
+
+var inFrame = false;
+try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
+var d = new Date();
+var info = document.getElementById('info');
+line(info, 'Adresse : ' + location.href);
+line(info, 'Taille de la page : ' + window.innerWidth + ' × ' + window.innerHeight + ' px, densité x' + (window.devicePixelRatio || 1) + (inFrame ? ' · affichée dans un cadre (iframe)' : ' · page principale'));
+line(info, 'Heure de l\'écran : ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + ' le ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear());
+line(info, 'Navigateur : ' + navigator.userAgent);
+
+/* Compteur de démarrages : s'il augmente après avoir éteint puis rallumé l'écran,
+   le stockage local survit aux redémarrages (utile pour mémoriser l'identité de l'écran). */
+var count = document.getElementById('count');
+try {
+  var n = parseInt(localStorage.getItem('diag6mic_boots') || '0', 10) + 1;
+  var first = localStorage.getItem('diag6mic_first') || stamp(d);
+  var last = localStorage.getItem('diag6mic_last') || '';
+  var lastMs = parseInt(localStorage.getItem('diag6mic_last_ms') || '0', 10);
+  localStorage.setItem('diag6mic_boots', String(n));
+  localStorage.setItem('diag6mic_first', first);
+  localStorage.setItem('diag6mic_last', stamp(d));
+  localStorage.setItem('diag6mic_last_ms', String(d.getTime()));
+  line(count, 'Ouvertures de cette page enregistrées : ' + n + ' (première le ' + first + (last ? ', précédente le ' + last : '') + ')', n > 1 ? 'ok small' : 'warn small');
+  if (lastMs) { line(count, 'Précédente ouverture il y a ' + Math.round((d.getTime() - lastMs) / 1000) + ' s.', 'small'); }
+  if (n === 1) { line(count, 'Éteignez puis rallumez l\'écran : ce compteur doit passer à 2.', 'small'); }
+  var st = null;
+  try { st = JSON.parse(localStorage.getItem('diag6mic_state') || 'null'); } catch (e3) {}
+  if (st && st.completedAt) {
+    line(count, 'Diagnostic terminé à ' + stamp(new Date(st.completedAt)) + (st.reloads ? ', après ' + st.reloads + ' rechargement(s) de la page' : '') + '.', 'ok small');
+  } else if (st) {
+    line(count, 'Diagnostic en cours : reprise à l\'étape ' + (st.nextStep + 1) + (st.reloads ? ' (' + st.reloads + ' rechargement(s) déjà)' : '') + '.', 'warn small');
+  }
+} catch (e2) {
+  line(count, 'Stockage local indisponible : ' + (e2 && e2.name), 'ko small');
+}
+
+/* Lancement automatique du diagnostic complet, sauf avec ?stay=1. */
+var go = document.getElementById('go');
+if (location.search.indexOf('stay=1') < 0) {
+  var left = 15;
+  try { if (localStorage.getItem('diag6mic_state')) { left = 4; } } catch (e4) {}
+  var tick = function () {
+    go.innerHTML = '';
+    go.appendChild(document.createTextNode('Lancement du diagnostic complet dans ' + left + ' s…'));
+    if (left <= 0) { location.href = 'diagnostic/index.html?ecran=magicinfo&v=8' + (inFrame ? '&cadre=1' : ''); return; }
+    left--;
+    setTimeout(tick, 1000);
+  };
+  tick();
+}
+</script>
+</body>
+</html>

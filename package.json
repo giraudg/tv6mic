@@ -1,0 +1,17 @@
+{
+  "name": "tv-6mic",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Affichage dynamique des écrans TV du 6MIC : lecteur des écrans, programmation des flux, back-office.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "acorn": "8.19.0",
+    "wrangler": "4.149.0"
+  }
+}

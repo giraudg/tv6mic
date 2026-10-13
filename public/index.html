@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Écran TV · 6MIC</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<!-- Polices du 6MIC (projet Adobe Fonts de Navettes), chargées sans bloquer : à défaut, Archivo et Anton intégrées -->
+<link rel="stylesheet" href="https://use.typekit.net/trm8rah.css" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="/lecteur/lecteur.css">
+</head>
+<body>
+<div id="scene">
+  <div class="couche" id="c0"></div>
+  <div class="couche" id="c1"></div>
+  <video class="video" id="v0" muted playsinline preload="auto"></video>
+  <video class="video" id="v1" muted playsinline preload="auto"></video>
+</div>
+<script>
+/* Si le lecteur n'a pas démarré au bout de 20 s, on affiche pourquoi (navigateur, erreurs). */
+(function () {
+  var errs = [];
+  window.addEventListener('error', function (e) { errs.push((e.message || 'Erreur') + (e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : '')); });
+  setTimeout(function () {
+    if (window.__tvStarted) { return; }
+    var m = document.createElement('div'), t = document.createElement('b'), d = document.createElement('small');
+    m.id = 'secours';
+    t.appendChild(document.createTextNode('Le lecteur des écrans 6MIC ne démarre pas sur cet appareil.'));
+    d.appendChild(document.createTextNode('Navigateur : ' + navigator.userAgent + (errs.length ? ' — Erreurs : ' + errs.join(' | ') : '')));
+    m.appendChild(t); m.appendChild(d); document.body.appendChild(m);
+  }, 20000);
+})();
+</script>
+<script src="/vendor/qrcode.js"></script>
+<script src="/lecteur/regles.js"></script>
+<script src="/lecteur/gabarits.js"></script>
+<script src="/lecteur/lecteur.js"></script>
+</body>
+</html>

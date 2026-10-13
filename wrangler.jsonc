@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Doit rester identique au nom du Worker dans le tableau de bord Cloudflare (Workers Builds).
+  "name": "tv-6mic",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "tv.6mic-aix.fr", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none",
+    // Le Worker passe en premier pour l'API ; le reste (lecteur, diagnostic, médias d'essai) est servi depuis public/.
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tv-6mic",
+      "database_id": "593f8d6f-e950-4b63-9480-30957462c372",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true },
+  // Garde les variables saisies dans le tableau de bord lors des déploiements depuis GitHub.
+  "keep_vars": true
+}
