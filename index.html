@@ -126,7 +126,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000;
    Outils généraux (ES5 uniquement)
    ====================================================================== */
 var STAGE_W = 1920, STAGE_H = 1080;
-var VERSION = 'v4';
+var VERSION = 'v5';
 var results = [];
 var errors = [];
 var startedAt = new Date();
@@ -644,7 +644,7 @@ function videoTest(opt, cb) {
     clearTimeout(timer);
     cleanupVideo(v); remove(band);
     if (!opt.noRecord) { add('Vidéo', opt.key, opt.label, value, status); }
-    cb(status);
+    cb(status, value);
   });
   v.className = 'fullvideo';
   v.muted = true; v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
@@ -664,12 +664,13 @@ function videoTest(opt, cb) {
         dropPct = 100 * (q1.dropped - q0.dropped) / (q1.decoded - q0.decoded);
         if (dropPct >= 0.5) { dropTxt = ' · ' + round(dropPct, 1) + ' % images perdues'; }
       }
-      if (!v.videoWidth || (q0 && q1 && q1.decoded <= q0.decoded)) {
-        fin('fail', 'image non décodée (seul le son avance)');
-        return;
-      }
+      /* Sur les téléviseurs, le décodage matériel ne tient pas toujours le compteur d'images :
+         on ne s'y fie que s'il a déjà compté au moins une image. */
+      var counterWorks = !!(q1 && q1.decoded > 0);
+      if (!v.videoWidth) { fin('fail', 'image non décodée (taille vidéo 0 × 0)'); return; }
+      if (counterWorks && q0 && q1.decoded <= q0.decoded) { fin('fail', 'image figée (compteur d\'images arrêté)'); return; }
       var status = (ratio >= 0.95 && stalls === 0 && dropPct <= 5) ? 'ok' : (ratio >= 0.8 ? 'warn' : 'fail');
-      fin(status, 'vitesse ' + Math.round(ratio * 100) + ' % · démarrage ' + Math.round(tPlay - t0) + ' ms' + (stalls ? ' · ' + stalls + ' coupure(s)' : '') + dropTxt);
+      fin(status, 'vitesse ' + Math.round(ratio * 100) + ' % · ' + v.videoWidth + '×' + v.videoHeight + ' · démarrage ' + Math.round(tPlay - t0) + ' ms' + (stalls ? ' · ' + stalls + ' coupure(s)' : '') + dropTxt + (counterWorks ? '' : ' · à confirmer à l\'œil'));
     }, opt.observe || 5000);
   });
   if (opt.overlay) {
@@ -705,15 +706,44 @@ function stepVideoHevc(done) {
     text: 'Vidéo 4 / 4 : 1080p, 30 images/s, HEVC (H.265). Ce format peut être refusé, c\'est attendu.', look: 'la vidéo s\'affiche-t-elle ?' }, function () { done(); });
 }
 
-/* Enchaînement de deux vidéos : mesure du temps de noir entre A et B. */
+/* Enchaînement avec un seul lecteur : A se termine, on charge B dans le même élément. */
+function stepChainSingle(done) {
+  var G = 'Vidéo', v = document.createElement('video'), tEnd = null, aStarted = false;
+  var fin = once(function (status, value) { clearTimeout(timer); cleanupVideo(v); add(G, 'chain1', 'Enchaînement (1 lecteur)', value, status); done(); });
+  v.className = 'fullvideo'; v.muted = true; v.setAttribute('muted', ''); v.preload = 'auto';
+  v.addEventListener('error', function () { fin('fail', (tEnd === null ? 'vidéo A' : 'vidéo B') + ' illisible : ' + mediaError(v)); });
+  v.addEventListener('playing', function () {
+    if (tEnd === null) { aStarted = true; return; }
+    var gap = Math.round(now() - tEnd);
+    setTimeout(function () { fin(gap <= 300 ? 'ok' : (gap <= 1000 ? 'warn' : 'fail'), gap + ' ms de noir entre A et B'); }, 1200);
+  });
+  v.addEventListener('ended', function () {
+    if (tEnd !== null) { return; }
+    tEnd = now();
+    v.src = bust('media/enchainement-b.mp4');
+    try { var p = v.play(); if (p && p['catch']) { p['catch'](function () {}); } } catch (e) {}
+  });
+  testArea.appendChild(v);
+  caption('Enchaînement : la vidéo bleue A, puis la rouge B, dans le même lecteur.', 'combien de temps reste-t-il noir entre les deux ?');
+  var timer = setTimeout(function () {
+    if (!aStarted) { fin('fail', 'la vidéo A n\'a pas démarré'); return; }
+    if (tEnd === null) { fin('fail', 'la vidéo A n\'a pas signalé sa fin (arrêtée à ' + round(v.currentTime, 1) + ' s sur ' + round(v.duration || 0, 1) + ' s)'); return; }
+    fin('fail', 'la vidéo B n\'a pas démarré');
+  }, 20000);
+  v.src = bust('media/enchainement-a.mp4');
+  try { var pa = v.play(); if (pa && pa['catch']) { pa['catch'](function () {}); } } catch (e2) {}
+}
+
+/* Deux lecteurs : B est préchargé pendant que A joue. Beaucoup de téléviseurs n'ont qu'un décodeur vidéo. */
 function stepChain(done) {
   var G = 'Vidéo';
-  var a = document.createElement('video'), b = document.createElement('video'), tEnd = null;
+  var a = document.createElement('video'), b = document.createElement('video'), tEnd = null, aStarted = false;
   var fin = once(function (status, value) {
     clearTimeout(timer); cleanupVideo(a); cleanupVideo(b);
-    add(G, 'chain', 'Enchaînement A → B', value, status);
+    add(G, 'chain', 'Préchargement (2 lecteurs)', value, status);
     done();
   });
+  a.addEventListener('playing', function () { aStarted = true; });
   var list = [a, b], i;
   for (i = 0; i < list.length; i++) {
     list[i].className = 'fullvideo'; list[i].muted = true; list[i].setAttribute('muted', ''); list[i].preload = 'auto';
@@ -735,8 +765,11 @@ function stepChain(done) {
     }, 1200);
   });
   testArea.appendChild(b); testArea.appendChild(a);
-  caption('Enchaînement : la vidéo bleue A enchaîne sur la vidéo rouge B, préchargée à l\'avance.', 'voit-on un écran noir entre les deux ?');
-  var timer = setTimeout(function () { fin('fail', tEnd === null ? 'la vidéo A n\'a pas fini (délai dépassé)' : 'la vidéo B n\'a pas démarré'); }, 20000);
+  caption('Préchargement : la vidéo B est chargée dans un second lecteur pendant que A joue.', 'la vidéo bleue A s\'affiche-t-elle, puis la rouge B ?');
+  var timer = setTimeout(function () {
+    if (tEnd !== null) { fin('warn', 'la vidéo B préchargée n\'a pas démarré'); return; }
+    fin('warn', aStarted ? 'A bloquée pendant le préchargement de B (un seul décodeur ?)' : 'A ne démarre pas quand B est préchargée (un seul décodeur ?)');
+  }, 20000);
   b.src = bust('media/enchainement-b.mp4'); try { b.load(); } catch (e2) {}
   a.src = bust('media/enchainement-a.mp4');
   try { var pa = a.play(); if (pa && pa['catch']) { pa['catch'](function () {}); } } catch (e3) {}
@@ -757,9 +790,9 @@ function stepBlob(done) {
     try { url = URL.createObjectURL(x.response); } catch (e2) { fin('fail', 'Blob refusé'); return; }
     clearNode(testArea);
     videoTest({ key: 'blobplay', label: 'Vidéo depuis Blob', src: url, observe: 3500, noRecord: true,
-      text: 'Lecture de la vidéo depuis la mémoire.', look: 'la vidéo s\'affiche-t-elle normalement ?' }, function (st) {
+      text: 'Lecture de la vidéo depuis la mémoire.', look: 'la vidéo s\'affiche-t-elle normalement ?' }, function (st, val) {
       try { URL.revokeObjectURL(url); } catch (e3) {}
-      fin(st, st === 'ok' ? 'oui, téléchargée en ' + round(secs, 1) + ' s' : (st === 'warn' ? 'oui, mais saccadée' : 'non'));
+      fin(st, st === 'fail' ? 'non : ' + val : 'oui, téléchargée en ' + round(secs, 1) + ' s · ' + val);
     });
   };
   x.send();
@@ -836,7 +869,7 @@ function stepNetwork(done) {
       ['tlsLe1', 'HTTPS LE X1', 'https://valid-isrgrootx1.letsencrypt.org/', 'Let\'s Encrypt, racine X1'],
       ['tlsLe2', 'HTTPS LE X2', 'https://valid-isrgrootx2.letsencrypt.org/', 'Let\'s Encrypt, racine X2'],
       ['tlsGoogle', 'HTTPS Google', 'https://www.google.com/generate_204', 'Google Trust Services'],
-      ['tls6mic', 'HTTPS site 6MIC', 'https://www.6mic-aix.fr/', 'www.6mic-aix.fr'],
+      ['tls6mic', 'HTTPS 6mic-aix.fr', 'https://www.6mic-aix.fr/', 'www.6mic-aix.fr'],
       ['tlsDecli', 'HTTPS Declinator', 'https://declinaisons.6mic-aix.fr/', 'declinaisons.6mic-aix.fr']
     ];
     if (!window.fetch) {
@@ -852,7 +885,7 @@ function stepNetwork(done) {
         if (left === 0) {
           for (var k = 0; k < targets.length; k++) {
             var g = verdict[targets[k][0]];
-            add(G, targets[k][0], targets[k][1], (g ? 'accepté' : 'refusé ou injoignable') + ' · ' + targets[k][3], g ? 'ok' : 'warn');
+            add(G, targets[k][0], targets[k][1], g ? 'accepté' : 'refusé ou injoignable', g ? 'ok' : 'warn');
           }
           done();
         }
@@ -976,7 +1009,8 @@ var STEPS = [
   ['Vidéo 4K', stepVideo4k, 34000],
   ['Vidéo 60 i/s', stepVideo60, 26000],
   ['Vidéo HEVC', stepVideoHevc, 26000],
-  ['Enchaînement', stepChain, 24000],
+  ['Enchaînement', stepChainSingle, 24000],
+  ['Deux lecteurs', stepChain, 24000],
   ['Vidéo en mémoire', stepBlob, 90000],
   ['Son', stepSound, 10000],
   ['Réseau', stepNetwork, 150000]
