@@ -67,20 +67,26 @@
   var POSITIONS = { droite: 'Droite', gauche: 'Gauche', haut: 'Haut', bas: 'Bas' };
   var COULEURS = { rose: 'Rose', violet: 'Violet', degrade: 'Dégradé', blanc: 'Blanc' };
   var MOTIF_DEFAUT = { type: 'faisceaux', position: 'droite', couleur: 'degrade' };
+  // Couleur personnalisée : « #rrggbb » à la place d'un nom de couleur.
+  var TEINTE = /^#[0-9a-fA-F]{6}$/;
+  var TEINTES = { rose: '#e744a8', violet: '#8e63ff', degrade: '#e744a8', blanc: '#ffffff' };
   // Réglage complet : celui du contenu, complété par le motif par défaut (les soirées sans réglage ont le motif par défaut).
+  function connu(liste, v) { return typeof v === 'string' && Object.prototype.hasOwnProperty.call(liste, v); }
   function motifDe(d) {
     var m = (d && d.motif) || {};
     return {
-      type: MOTIFS[m.type] ? m.type : MOTIF_DEFAUT.type,
-      position: POSITIONS[m.position] ? m.position : MOTIF_DEFAUT.position,
-      couleur: COULEURS[m.couleur] ? m.couleur : MOTIF_DEFAUT.couleur
+      type: connu(MOTIFS, m.type) ? m.type : MOTIF_DEFAUT.type,
+      position: connu(POSITIONS, m.position) ? m.position : MOTIF_DEFAUT.position,
+      couleur: connu(COULEURS, m.couleur) || (typeof m.couleur === 'string' && TEINTE.test(m.couleur)) ? m.couleur.toLowerCase() : MOTIF_DEFAUT.couleur
     };
   }
   function motif(d) {
     var m = motifDe(d), boite;
     if (m.type === 'aucun') { return null; }
-    boite = el('div', 'g-deco a a0 g-d-' + m.type + ' g-d-' + m.position + ' g-c-' + m.couleur);
-    boite.appendChild(el('div', 'g-deco-m'));
+    var perso = TEINTE.test(m.couleur), calque = el('div', 'g-deco-m');
+    boite = el('div', 'g-deco a a0 g-d-' + m.type + ' g-d-' + m.position + ' g-c-' + (perso ? 'perso' : m.couleur));
+    if (perso) { calque.style.backgroundColor = m.couleur; }
+    boite.appendChild(calque);
     return boite;
   }
 
@@ -162,6 +168,6 @@
   racine.Gabarits = {
     soiree: soiree, agenda: agenda, image: image, veille: veille, identification: identification,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
-    MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, motifDe: motifDe
+    MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe
   };
 }(this));

@@ -402,7 +402,12 @@ const MOTIF = { type: ['faisceaux', 'rayons', 'hachures', 'aucun'], position: ['
 function motifValide(m) {
   if (!m || typeof m !== 'object') return null;
   const r = {};
-  for (const k of Object.keys(MOTIF)) { if (MOTIF[k].indexOf(m[k]) < 0) return null; r[k] = m[k]; }
+  for (const k of Object.keys(MOTIF)) {
+    // couleur : un nom de la charte ou une teinte personnalisée « #rrggbb » (pipette)
+    if (k === 'couleur' && typeof m.couleur === 'string' && /^#[0-9a-f]{6}$/i.test(m.couleur)) { r.couleur = m.couleur.toLowerCase(); continue; }
+    if (MOTIF[k].indexOf(m[k]) < 0) return null;
+    r[k] = m[k];
+  }
   return r;
 }
 function validerDonnees(type, d) {

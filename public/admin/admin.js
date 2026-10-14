@@ -618,30 +618,103 @@ function titreAuto(ed) {
   return d.fichier || TYPES[ed.type];
 }
 // Motif du design system posé sur la photo d'une soirée : sans réglage, le motif par défaut s'affiche.
-function champMotif(d, changer) {
+// Couleur : une des couleurs de la charte, ou une teinte personnalisée (nuancier, code « #rrggbb » ou pipette).
+const ICONE_PIPETTE = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5l5 5"/><path d="M17 2.5a2.1 2.1 0 013 3l-2.5 2.5-3-3z"/><path d="M14.5 5.5l-9.3 9.3a2 2 0 00-.5.9L4 19.5l3.8-.7a2 2 0 00.9-.5l9.3-9.3"/></svg>';
+function champMotif(d, changer, apercuNoeud) {
   const reglage = G.motifDe(d);
   const lignes = {};
+  let saisieCode = false;   // pendant la frappe du code, on ne réécrit pas le champ sous les doigts
+  const estTeinte = c => G.TEINTE.test(c || '');
   const maj = () => {
-    for (const cle of ['type', 'position', 'couleur']) lignes[cle].querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === reglage[cle])));
-    const sans = reglage.type === 'aucun';
+    for (const cle of ['type', 'position', 'couleur']) lignes[cle].querySelectorAll('button[data-v]').forEach(b => {
+      const v = b.dataset.v;
+      b.setAttribute('aria-pressed', String(v === 'perso' ? estTeinte(reglage.couleur) : v === reglage[cle]));
+    });
+    const sans = reglage.type === 'aucun', perso = estTeinte(reglage.couleur);
     lignes.position.closest('.champ').hidden = sans; lignes.couleur.closest('.champ').hidden = sans;
+    rangPerso.hidden = sans || !perso;
+    if (perso) {
+      pastillePerso.style.background = reglage.couleur;
+      nuancier.value = reglage.couleur;
+      if (!saisieCode) code.value = reglage.couleur;
+    }
     defaut.hidden = !d.motif;
   };
   const choisir = (cle, v) => { reglage[cle] = v; d.motif = Object.assign({}, reglage); maj(); changer(); };
-  const ligne = (cle, choix, label) => {
+  const teinte = hex => { if (estTeinte(hex)) choisir('couleur', hex.toLowerCase()); };
+  const ligne = (cle, choix, label, ...plus) => {
     lignes[cle] = h('div', { class: 'seg', role: 'group', 'aria-label': label }, Object.entries(choix).map(([k, t]) =>
-      h('button', { type: 'button', 'data-v': k, onclick: () => choisir(cle, k) }, cle === 'couleur' ? h('i', { class: 'pastille p-' + k }) : null, t)));
+      h('button', { type: 'button', 'data-v': k, onclick: () => choisir(cle, k) }, cle === 'couleur' ? h('i', { class: 'pastille p-' + k }) : null, t)), plus);
     return h('div', { class: 'champ' }, h('span', { class: 'lbl', text: label }), lignes[cle]);
   };
+
+  /* couleur personnalisée */
+  const pastillePerso = h('i', { class: 'pastille p-perso' });
+  const boutonPerso = h('button', { type: 'button', 'data-v': 'perso', onclick: () => {
+    // on part de la couleur affichée (le dégradé commence par le rose)
+    if (!estTeinte(reglage.couleur)) teinte(G.TEINTES[reglage.couleur] || '#e744a8');
+  } }, pastillePerso, 'Personnalisée');
+  const nuancier = h('input', { type: 'color', 'aria-label': 'Nuancier', value: '#e744a8', oninput: e => teinte(e.target.value) });
+  const code = h('input', { type: 'text', class: 'code-teinte', maxLength: 7, spellcheck: false, autocomplete: 'off', 'aria-label': 'Code couleur', placeholder: '#e744a8',
+    oninput: e => { let v = e.target.value.trim(); if (v && v[0] !== '#') v = '#' + v; saisieCode = true; if (estTeinte(v)) teinte(v); saisieCode = false; },
+    onblur: () => { code.value = reglage.couleur; } });
+  const bulle = h('p', { class: 'aide pipette-aide', hidden: true });
+  const pipette = h('button', { type: 'button', class: 'btn pt', title: 'Prélever une couleur à l’écran', onclick: () => prelever() });
+  pipette.innerHTML = ICONE_PIPETTE + '<span>Pipette</span>';
+  const rangPerso = h('div', { class: 'perso' }, nuancier, code, pipette, bulle);
+
+  // Pipette : celle du navigateur quand il en a une (Chrome, Edge), sinon un clic dans la photo de l'aperçu.
+  let annulerPrelevement = null;
+  async function prelever() {
+    if (annulerPrelevement) { annulerPrelevement(); return; }
+    if ('EyeDropper' in window) {
+      try { const r = await new window.EyeDropper().open(); teinte(versHex(r.sRGBHex)); } catch { /* annulé */ }
+      return;
+    }
+    const src = d.photo && d.photo.src;
+    if (!src || !apercuNoeud) { annoncer('Ajoutez d’abord une photo, ou choisissez la teinte dans le nuancier.', true); return; }
+    apercuNoeud.classList.add('preleve');
+    bulle.hidden = false; bulle.textContent = 'Cliquez dans la photo de l’aperçu pour prélever sa couleur (Échap pour annuler).';
+    const fin = () => { apercuNoeud.classList.remove('preleve'); bulle.hidden = true; apercuNoeud.removeEventListener('click', clic, true); document.removeEventListener('keydown', echap); annulerPrelevement = null; };
+    const echap = e => { if (e.key === 'Escape') fin(); };
+    const clic = async e => {
+      e.preventDefault(); e.stopPropagation(); fin();
+      try { teinte(await couleurDansPhoto(src, apercuNoeud, e)); } catch { annoncer('Couleur illisible dans cette photo.', true); }
+    };
+    apercuNoeud.addEventListener('click', clic, true);
+    document.addEventListener('keydown', echap);
+    annulerPrelevement = fin;
+  }
+
   const defaut = h('button', { type: 'button', class: 'lien', onclick: () => {
     d.motif = null; Object.assign(reglage, G.motifDe(d)); maj(); changer();
   } }, 'Revenir au motif par défaut');
   const boite = h('fieldset', { class: 'motif' }, h('legend', { text: 'Motif 6MIC' }),
-    ligne('type', G.MOTIFS, 'Motif'), ligne('position', G.POSITIONS, 'Position'), ligne('couleur', G.COULEURS, 'Couleur'),
+    ligne('type', G.MOTIFS, 'Motif'), ligne('position', G.POSITIONS, 'Position'), ligne('couleur', G.COULEURS, 'Couleur', boutonPerso), rangPerso,
     h('small', null, 'Les motifs du design system 6MIC, posés sur la photo. Par défaut : ' + G.MOTIFS[G.MOTIF_DEFAUT.type].toLowerCase() + ', ' +
       G.POSITIONS[G.MOTIF_DEFAUT.position].toLowerCase() + ', ' + G.COULEURS[G.MOTIF_DEFAUT.couleur].toLowerCase() + '. ', defaut));
   maj();
   return boite;
+}
+// « rgb(r, g, b) » ou « #rrggbb » → « #rrggbb »
+function versHex(c) {
+  const m = String(c).match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  return m ? '#' + m.slice(1, 4).map(n => (+n).toString(16).padStart(2, '0')).join('') : String(c).toLowerCase();
+}
+// Couleur de la photo sous le clic : même cadrage que l'écran (photo « cover », centrée), moyenne sur 5 × 5 px.
+const imagesPrelevement = new Map();
+async function couleurDansPhoto(src, boite, e) {
+  let img = imagesPrelevement.get(src);
+  if (!img) { img = new Image(); img.src = src; await img.decode(); imagesPrelevement.set(src, img); }
+  const r = boite.getBoundingClientRect(), s = r.width / 1920;
+  const X = (e.clientX - r.left) / s, Y = (e.clientY - r.top) / s;
+  const k = Math.max(1920 / img.naturalWidth, 1080 / img.naturalHeight);
+  const ix = (X - (1920 - img.naturalWidth * k) / 2) / k, iy = (Y - (1080 - img.naturalHeight * k) / 2) / k;
+  const c = h('canvas', { width: 5, height: 5 }), x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(img, ix - 2.5, iy - 2.5, 5, 5, 0, 0, 5, 5);
+  const p = x.getImageData(0, 0, 5, 5).data, t = [0, 0, 0];
+  for (let i = 0; i < p.length; i += 4) { t[0] += p[i]; t[1] += p[i + 1]; t[2] += p[i + 2]; }
+  return '#' + t.map(v => Math.round(v / 25).toString(16).padStart(2, '0')).join('');
 }
 function vueEditeur(id, typeNouveau) {
   const base = id ? E.contenuParId.get(id) : (TYPES[typeNouveau] ? { id: null, type: typeNouveau, titre: '', donnees: donneesVides(typeNouveau), duree: null, statut: 'actif' } : null);
@@ -695,7 +768,7 @@ function vueEditeur(id, typeNouveau) {
       h('option', { value: '', text: 'Aucune' }), MENTIONS.map(m => h('option', { value: m, text: m, selected: d.mention === m })), h('option', { value: '*', text: 'Autre…', selected: autre }));
     champs.push(h('div', { class: 'grille2' }, h('div', { class: 'champ' }, h('label', { for: 'f-mention', text: 'Mention' }), sel, libre),
       texte('billetterie', 'Lien billetterie', { type: 'url', max: 300, placeholder: 'https://', aide: 'Affiche un QR code. Laisser vide pour ne pas en mettre.' })));
-    champs.push(champMotif(d, changer));
+    champs.push(champMotif(d, changer, ap.noeud));
   } else if (ed.type === 'agenda') {
     const lignes = h('div', { class: 'dates-ag' });
     const remplir = () => {
