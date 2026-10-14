@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Back-office · Écrans TV 6MIC</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="stylesheet" href="https://use.typekit.net/trm8rah.css">
+<link rel="stylesheet" href="/lecteur/gabarits.css">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+<header class="ah">
+  <div class="ah-in">
+    <div class="ah-top">
+      <a class="ah-brand" href="/admin/"><img src="/logo/6mic-logo-blanc-tv.png" alt="6MIC" width="76" height="30"><span class="ah-t">Écrans TV · Back-office</span></a>
+      <span class="ah-sp"></span>
+      <span class="ah-user" id="moi" hidden></span>
+      <button type="button" class="ah-a" id="deconnexion" hidden>Se déconnecter</button>
+    </div>
+    <nav class="ah-nav" id="nav" hidden>
+      <div class="ah-tabs" role="group" aria-label="Rubriques">
+        <button type="button" data-vue="tableau">Écrans</button>
+        <button type="button" data-vue="contenus">Contenus</button>
+        <button type="button" data-vue="calendrier">Calendrier</button>
+        <button type="button" data-vue="flux">Flux et boucles</button>
+        <button type="button" data-vue="journal">Journal</button>
+      </div>
+      <p class="etat-sync" id="sync" role="status"></p>
+    </nav>
+  </div>
+</header>
+<main class="vue" id="vue">
+  <p class="chargement" id="demarrage">Chargement…</p>
+  <form class="connexion" id="connexion" hidden novalidate>
+    <p class="surtitre">Back-office</p>
+    <h1>Écrans TV</h1>
+    <p class="aide">Réservé à l’équipe du 6MIC.</p>
+    <div class="champ"><label for="cx-prenom">Votre prénom</label><input type="text" id="cx-prenom" autocomplete="nickname" maxlength="40" required><small>Sert à savoir qui a modifié quoi (journal).</small></div>
+    <div class="champ"><label for="cx-mdp">Mot de passe</label><input type="password" id="cx-mdp" autocomplete="current-password" required></div>
+    <p class="erreur" id="cx-erreur" role="alert" hidden></p>
+    <div><button type="submit" class="btn btn-noir">Se connecter →</button></div>
+  </form>
+  <div id="app" hidden></div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="/vendor/qrcode.js"></script>
+<script src="/lecteur/regles.js"></script>
+<script src="/lecteur/gabarits.js"></script>
+<script type="module" src="/admin/admin.js"></script>
+</body>
+</html>

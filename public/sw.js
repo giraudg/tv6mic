@@ -1,8 +1,8 @@
 /* Service Worker du lecteur des écrans 6MIC : garde une copie des fichiers du lecteur
    pour qu'il redémarre même sans réseau (la programmation et les médias sont gardés par le lecteur).
    Il remplace aussi l'ancien Service Worker du diagnostic, enregistré à la même adresse. ES5. */
-var SHELL = 'tv6mic-lecteur-1';
-var FICHIERS = ['/', '/lecteur/lecteur.css', '/lecteur/regles.js', '/lecteur/gabarits.js', '/lecteur/lecteur.js',
+var SHELL = 'tv6mic-lecteur-2';
+var FICHIERS = ['/', '/lecteur/gabarits.css', '/lecteur/lecteur.css', '/lecteur/regles.js', '/lecteur/gabarits.js', '/lecteur/lecteur.js',
   '/vendor/qrcode.js', '/logo/6mic-logo-blanc-tv.png', '/logo/motif-6mic.svg',
   '/polices/anton-latin-400-normal.woff2', '/polices/archivo-latin-400-normal.woff2',
   '/polices/archivo-latin-600-normal.woff2', '/polices/archivo-latin-700-normal.woff2'];

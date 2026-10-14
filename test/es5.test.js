@@ -24,7 +24,7 @@ test('ES5 : scripts en ligne de index.html', () => {
 });
 
 test('CSS compatible Chromium 56', () => {
-  const css = fs.readFileSync(path.join(racine, 'lecteur/lecteur.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const css = ['lecteur/lecteur.css', 'lecteur/gabarits.css'].map(f => fs.readFileSync(path.join(racine, f), 'utf8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
   const interdits = [/display\s*:\s*grid/, /(^|[;{\s])gap\s*:/, /aspect-ratio/, /(^|[;{\s])inset\s*:/, /clamp\(/, /:is\(/, /:where\(/, /backdrop-filter/];
   for (const r of interdits) assert.ok(!r.test(css), 'propriété non prise en charge : ' + r);
 });

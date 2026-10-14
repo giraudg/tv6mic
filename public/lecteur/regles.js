@@ -166,6 +166,7 @@
   return {
     DUREES: DUREES, PAR_PAGE: PAR_PAGE,
     decalageParis: decalageParis, heureParis: heureParis, ajouterJours: ajouterJours, jourSemaine: jourSemaine,
-    jourDeService: jourDeService, estActive: estActive, etapes: etapes, suivante: suivante, contient: contient
+    jourDeService: jourDeService, estActive: estActive, couvreJour: couvreJour, utilisable: utilisable,
+    etapes: etapes, suivante: suivante, contient: contient
   };
 }));
