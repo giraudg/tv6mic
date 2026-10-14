@@ -42,6 +42,7 @@ h1, h2, h3, p { margin: 0; }
 .ah-tabs button { flex: none; border: 0; background: rgba(0, 0, 0, .25); color: #fff; padding: 11px 16px 10px; font-weight: 600; font-size: 15px; }
 .ah-tabs button:hover { background: rgba(0, 0, 0, .45); }
 .ah-tabs button[aria-pressed="true"] { background: #fff; color: #000; }
+.ah-tabs svg, .ah-tabs .court { display: none; }
 .etat-sync { font-size: 12px; padding-bottom: 12px; display: flex; align-items: center; gap: 8px; font-weight: 500; }
 .etat-sync i { width: 8px; height: 8px; border-radius: 50%; background: #fff; flex: none; }
 
@@ -70,9 +71,10 @@ h1, h2, h3, p { margin: 0; }
 .btn[disabled] { opacity: .45; cursor: not-allowed; }
 .btn.pt { padding: 5px 9px; font-size: 13px; }
 .btn.carre { width: 34px; height: 34px; padding: 0; }
-.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid #000; max-width: 100%; }
-.seg button { border: 0; background: #fff; padding: 7px 12px; font-weight: 500; }
-.seg button + button { border-left: 1px solid #000; }
+/* Séparateurs dessinés par l'écart de 1 px sur fond noir : quand la rangée passe à la ligne, les filets restent nets,
+   et les boutons de la dernière rangée s'élargissent pour la remplir. */
+.seg { display: inline-flex; flex-wrap: wrap; gap: 1px; background: #000; border: 1px solid #000; max-width: 100%; }
+.seg button { flex: 1 1 auto; border: 0; background: #fff; padding: 7px 12px; font-weight: 500; }
 .seg button[aria-pressed="true"] { background: #000; color: #fff; }
 .champ { display: grid; gap: 6px; min-width: 0; align-content: start; }
 .champ > label, .lbl { font-size: 12px; font-weight: 700; letter-spacing: .02em; }
@@ -139,7 +141,13 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .groupe-t { display: flex; align-items: baseline; gap: 12px; margin: 14px 0 0; padding-bottom: 6px; border-bottom: 1px solid #000; font-family: var(--cond); font-size: 30px; line-height: 1; text-transform: uppercase; }
 .groupe-t span { font-family: var(--sans); font-size: 13px; font-weight: 500; text-transform: none; color: var(--gris); }
 .plus { display: flex; justify-content: center; padding: 8px 0; }
-@media (max-width: 640px) { .filtre { flex: 1 1 100%; } .filtre select { min-width: 0; width: 100%; } .filtres input[type="search"] { width: 100%; } }
+@media (max-width: 640px) {
+  /* filtres serrés : recherche + archives sur une ligne, puis les listes deux par deux */
+  .filtres input[type="search"] { flex: 1 1 160px; width: auto; min-width: 0; }
+  .filtres-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+  .filtre select { min-width: 0; width: 100%; }
+  .compte { margin: 0; align-self: center; }
+}
 .vignette { border: 1px solid #000; background: #fff; color: #000; text-decoration: none; display: grid; align-content: start; text-align: left; padding: 0; min-width: 0; }
 .vignette:hover { box-shadow: 6px 6px 0 var(--violet-clair); }
 .vignette.archive { opacity: .6; }
@@ -275,8 +283,8 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .ecrans-choix { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .ecrans-choix .coche { border: 1px solid #000; padding: 8px 10px; }
 .ecrans-choix .tous { grid-column: 1 / -1; background: var(--brume); }
-.semaine { display: flex; flex-wrap: wrap; gap: 4px; }
-.semaine button { width: 44px; border: 1px solid #000; background: #fff; padding: 7px 0; font-weight: 600; }
+.semaine { display: grid; grid-template-columns: repeat(7, 44px); gap: 4px; }
+.semaine button { width: auto; border: 1px solid #000; background: #fff; padding: 7px 0; font-weight: 600; }
 .semaine button[aria-pressed="true"] { background: #000; color: #fff; }
 .plage { display: flex; gap: 8px; align-items: center; }
 .plage input { width: 120px; }
@@ -293,3 +301,56 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 /* ---------- toast ---------- */
 .toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #000; color: #fff; padding: 10px 14px; font-weight: 500; z-index: 50; max-width: calc(100% - 32px); }
 .toast.erreur { background: var(--rouge); color: #fff; }
+
+/* ---------- téléphone ---------- */
+@media (max-width: 640px) {
+  /* en-tête compact ; les rubriques passent dans une barre fixe en bas (comme la barre basse du site 6MIC) */
+  .ah-suite, .ah-user { display: none; }
+  .ah { z-index: 30; }   /* l'en-tête isole ses calques : il doit passer devant le contenu pour que la barre du bas reste dessus */
+  .ah-in, .ah-in:has(.ah-nav:not([hidden])) { gap: 10px; padding: 12px 16px; }
+  .ah-top { flex-wrap: nowrap; }
+  .etat-sync { padding-bottom: 0; }
+  .ah-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+    background: #000; padding-bottom: env(safe-area-inset-bottom, 0px); overflow: visible; max-width: none; }
+  .ah-tabs button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 9px 2px 8px;
+    background: #000; color: rgba(255, 255, 255, .72); font-size: 11px; font-weight: 600; line-height: 1.1; }
+  .ah-tabs button:hover { background: #000; }
+  .ah-tabs button[aria-pressed="true"] { background: #000; color: #fff; box-shadow: inset 0 3px 0 var(--magenta); }
+  .ah-tabs svg { display: block; width: 22px; height: 22px; }
+  .ah-tabs .long { display: none; }
+  .ah-tabs .court { display: inline; }
+  .vue { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+  .toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+
+  /* titres de page : les boutons d'action passent sous le titre, en grille */
+  .tete { flex-direction: column; align-items: stretch; }
+  .tete > .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tete > .actions > * { flex: 1 1 40%; }               /* deux boutons par rangée */
+  .tete > .actions > .carre { flex: 0 0 44px; }         /* ‹ › du calendrier restent carrés */
+  .tete > .actions .sep { display: none; }
+  .tete > .actions .btn { white-space: normal; text-align: center; }
+  .nouveau { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .nouveau .lbl { display: none; }
+  .nouveau .btn { padding: 9px 2px; font-size: 14px; }
+
+  /* contrôles segmentés sur toute la largeur, un peu plus serrés pour tenir sur une ligne */
+  .seg { display: flex; width: 100%; }
+  .seg button { padding: 8px 6px; font-size: 14px; }
+  .filtres { gap: 10px; }
+  .filtres .coche { margin-left: 2px; }
+
+  /* contenus en liste compacte (vignette à gauche) : 140 soirées par an se parcourent au pouce */
+  .vignettes { grid-template-columns: 1fr; gap: 8px; }
+  .vignette { grid-template-columns: 112px minmax(0, 1fr); }
+  .vignette-img { aspect-ratio: auto; min-height: 78px; border-bottom: 0; border-right: 1px solid #000; }
+  .vignette-soiree, .vignette-ag { display: none; }
+  .vignette-img .puce { left: 4px; top: 4px; font-size: 9px; padding: 2px 4px; }
+  .vignette-c { padding: 8px 10px; gap: 2px; align-content: center; }
+  .vignette-c b { font-size: 14px; }
+  .groupe-t { font-size: 24px; margin-top: 8px; }
+
+  /* fenêtres : jours de la semaine sur une ligne, raccourcis de dates en deux colonnes */
+  .semaine { grid-template-columns: repeat(7, 1fr); }
+  .dlg-c .actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .dlg-c .actions .btn { white-space: normal; }
+}
