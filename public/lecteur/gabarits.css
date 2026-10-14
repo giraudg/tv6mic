@@ -32,6 +32,8 @@
 .g { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; color: #fff;
   font-family: var(--g-sans); line-height: 1.2; text-align: left; }
 .g p { margin: 0; }
+/* Même modèle de boîte que sur les écrans, même dans l'aperçu du back-office (qui passe tout en border-box). */
+.g, .g * { -webkit-box-sizing: content-box; box-sizing: content-box; }
 .g .a { opacity: 0; }
 .g-logo { position: absolute; right: 96px; top: 84px; height: 96px; width: auto; }
 
@@ -67,8 +69,8 @@
 .g-nom { margin-top: 30px; font-family: var(--g-cond); font-weight: 700; font-size: 190px; line-height: .9;
   text-transform: uppercase; letter-spacing: .005em; }
 .g-infos { margin-top: 30px; font-size: 40px; line-height: 1.3; color: #ece9f3; white-space: pre-line; max-height: 156px; overflow: hidden; }
-.g-qr { position: absolute; right: 96px; bottom: 112px; width: 200px; padding: 18px 18px 14px; background: #fff; color: #000; text-align: center; }
-.g-qr svg { display: block; width: 200px; height: 200px; }
+.g-qr { position: absolute; right: 96px; bottom: 112px; width: 200px; padding: 20px 20px 16px; background: #fff; color: #000; text-align: center; }
+.g-qr svg { display: block; width: 200px; height: 200px; shape-rendering: crispEdges; }
 .g-qr span { display: block; margin-top: 12px; font-size: 22px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
 
 /* 2. Agenda */

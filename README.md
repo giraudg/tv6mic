@@ -55,6 +55,8 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
   archivage, suppression. Deux personnes qui modifient le même contenu : la seconde est prévenue (conflit 409) au lieu d'écraser.
 - **Calendrier** : vue mensuelle par écran ; glisser sur des jours (ou Ctrl/⌘ + clic) pour programmer un contenu.
 - **Programmation** : un ou plusieurs écrans, période ou jours choisis, jours de la semaine, plages horaires, priorité.
+  Pour retirer : un contenu d'un écran (Flux et boucles, bouton ×, les autres écrans ne changent pas), un seul jour
+  (clic sur le contenu dans le Calendrier, la période est coupée en deux), ou toute la programmation (éditeur du contenu).
 - **Flux et boucles** : nom des écrans, contenu par défaut, adresse MagicINFO, simulation de la boucle à une date et une heure,
   ordre de passage par glisser-déposer.
 - **Journal** : qui a modifié quoi et quand.

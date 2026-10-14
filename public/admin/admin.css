@@ -130,18 +130,19 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .filtres input[type="search"] { width: 260px; }
 .nouveau { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .vignettes { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
-.vignette { border: 1px solid #000; background: #fff; display: grid; align-content: start; text-align: left; padding: 0; min-width: 0; }
+.vignette { border: 1px solid #000; background: #fff; color: #000; text-decoration: none; display: grid; align-content: start; text-align: left; padding: 0; min-width: 0; }
 .vignette:hover { box-shadow: 6px 6px 0 var(--violet-clair); }
 .vignette.archive { opacity: .6; }
 .vignette-img { aspect-ratio: 16 / 9; background: #111 center / cover no-repeat; position: relative; border-bottom: 1px solid #000; overflow: hidden; color: #fff; }
 .vignette-img .puce { position: absolute; left: 8px; top: 8px; }
 .vignette-ag { position: absolute; inset: 0; display: grid; align-content: start; padding: 34px 12px 10px; background: #0b0a0d; }
 .vignette-ag b { font-family: var(--cond); text-transform: uppercase; font-size: 22px; line-height: .95; }
-.vignette-ag span { font-size: 11px; color: #bdbdbd; margin-top: 4px; }
+.vignette-ag > span { font-size: 11px; color: #bdbdbd; margin-top: 4px; }
 .vignette-soiree { position: absolute; left: 10px; right: 10px; bottom: 8px; font-family: var(--cond); text-transform: uppercase; font-size: 24px; line-height: .9; text-shadow: 0 0 12px rgba(0, 0, 0, .8); }
 .vignette-c { padding: 10px 12px 12px; display: grid; gap: 4px; }
 .vignette-c b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vignette-c span { font-size: 12px; color: var(--gris); }
+.vignette-c > span { font-size: 12px; color: var(--gris); }
+.prog-resume .aide { font-size: 12px; color: var(--gris); }
 .prog-resume { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 
 /* ---------- éditeur de contenu ---------- */
@@ -179,6 +180,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .diffs .resume { font-size: 14px; }
 .diffs .resume small { display: block; }
 .diffs .finie { color: var(--gris); }
+.diffs .fl { display: flex; gap: 6px; }
 
 /* ---------- calendrier ---------- */
 .cal-barre { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
@@ -230,6 +232,10 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 /* ---------- fenêtres ---------- */
 .dlg { border: 1px solid #000; padding: 0; width: calc(100% - 32px); max-width: 720px; max-height: calc(100dvh - 32px); background: #fff; color: #000; box-shadow: 10px 10px 0 var(--rose-clair); }
 .dlg.petit { max-width: 480px; }
+/* En-tête et boutons toujours visibles : seul le contenu défile quand la fenêtre est plus haute que l'écran. */
+.dlg[open] { display: flex; flex-direction: column; overflow: hidden; }
+.dlg-h, .dlg-p { flex: none; }
+.dlg-c { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .dlg::backdrop { background: rgba(29, 8, 21, .55); }
 .dlg-h { position: relative; isolation: isolate; overflow: hidden; color: #fff; padding: 18px 56px 18px 22px; background: linear-gradient(160deg, var(--magenta), var(--violet)); }
 .dlg-h::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 55%; z-index: -1; pointer-events: none; background: #000; opacity: .3;

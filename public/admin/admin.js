@@ -425,7 +425,8 @@ function champMedia({ genre, valeur, facultatif, change }) {
 /* ================= résumés de programmation ================= */
 function nomsFlux(codes) {
   if (codes.length === E.flux.length) return 'Tous les écrans';
-  return codes.map(c => (E.fluxParCode.get(c) || { nom: c }).nom).join(', ');
+  // Dans l'ordre des écrans (Billetterie, Club, Hall…), quel que soit l'ordre de saisie.
+  return E.flux.filter(f => codes.includes(f.code)).map(f => f.nom).concat(codes.filter(c => !E.fluxParCode.has(c))).join(', ');
 }
 function resumeJours(d) {
   let t;
@@ -573,7 +574,8 @@ function vignette(c) {
   const flux = [...new Set(actives.flatMap(x => x.flux))];
   const sous = c.type === 'soiree' ? (d.date ? dateLongue(d.date) + (d.date < t ? ' (passée)' : '') : 'Date à préciser')
     : c.type === 'agenda' ? plur((d.dates || []).filter(x => x.date >= t).length, 'date') + ' à venir'
-      : c.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s · ' + mo(d.taille || 0) : 'Sans fichier') : (d.largeur ? d.largeur + ' × ' + d.hauteur + ' px' : 'Sans fichier');
+      : c.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s' + (d.taille ? ' · ' + mo(d.taille) : '') : d.src ? 'Vidéo' : 'Sans fichier')
+        : (d.largeur ? d.largeur + ' × ' + d.hauteur + ' px' : d.src ? 'Image' : 'Sans fichier');
   return h('a', { class: 'vignette' + (c.statut === 'archive' ? ' archive' : ''), href: '#contenu/' + c.id }, img,
     h('div', { class: 'vignette-c' }, h('b', { text: c.titre }), h('span', { text: sous }),
       h('div', { class: 'prog-resume' }, c.statut === 'archive' ? h('span', { class: 'puce puce-gris', text: 'Archivé' })
@@ -768,10 +770,19 @@ function vueEditeur(id, typeNouveau) {
     (() => {
       const l = diffsDe(ed.id).sort((a, b) => a.debut < b.debut ? -1 : 1);
       if (!l.length) return h('p', { class: 'aide', text: 'Pas encore programmé : ce contenu ne s’affiche sur aucun écran.' });
-      return h('ul', { class: 'diffs' }, l.map(x => h('li', { class: x.fin < auj() ? 'finie' : null },
-        h('span', { class: 'resume' }, h('b', { text: nomsFlux(x.flux) }), x.prioritaire ? h('span', { class: 'puce prio', text: 'Prioritaire', style: { marginLeft: '8px' } }) : null,
-          h('small', { text: resumeJours(x) + ' · ' + resumeHoraires(x) + (x.fin < auj() ? ' · terminée' : '') })),
-        h('button', { type: 'button', class: 'btn pt', onclick: () => dialogueDiffusion({ diffusion: x }) }, 'Modifier'))));
+      return h('ul', { class: 'diffs' }, l.map(x => {
+        const li = h('li', { class: x.fin < auj() ? 'finie' : null },
+          h('span', { class: 'resume' }, h('b', { text: nomsFlux(x.flux) }), x.prioritaire ? h('span', { class: 'puce prio', text: 'Prioritaire', style: { marginLeft: '8px' } }) : null,
+            h('small', { text: resumeJours(x) + ' · ' + resumeHoraires(x) + (x.fin < auj() ? ' · terminée' : '') })),
+          h('span', { class: 'fl' },
+            h('button', { type: 'button', class: 'btn pt', onclick: () => dialogueDiffusion({ diffusion: x }) }, 'Modifier'),
+            h('button', { type: 'button', class: 'btn pt btn-danger', onclick: async () => {
+              if (!(await demander('Retirer cette programmation ?', '« ' + ed.titre + ' » ne s’affichera plus sur ' + nomsFlux(x.flux) + ' (' + resumeJours(x) + ').', 'Retirer', true))) return;
+              try { await ecrire(() => api('DELETE', '/api/admin/diffusions/' + x.id), 'Programmation retirée.'); } catch { return; }
+              li.remove(); naviguerSansPerte();
+            } }, 'Retirer')));
+        return li;
+      }));
     })()) : null;
 
   afficher(
@@ -791,7 +802,7 @@ function vueEditeur(id, typeNouveau) {
 let ouvrirProgrammation = null;
 
 /* ================= fenêtre : programmer un contenu ================= */
-function dialogueDiffusion({ diffusion, contenu, jours }) {
+function dialogueDiffusion({ diffusion, contenu, jours, jour }) {
   const x = diffusion ? structuredClone(diffusion) : {
     id: null, contenu: contenu || '', flux: E.flux.filter(f => f.code !== 'reserve').map(f => f.code),
     debut: jours ? jours[0] : auj(), fin: jours ? jours[jours.length - 1] : R.ajouterJours(auj(), 6),
@@ -805,6 +816,7 @@ function dialogueDiffusion({ diffusion, contenu, jours }) {
   if (!x.plages) x.plages = [['19:00', '23:30']];
   if (!x.jours) x.jours = [];
   const miniCal = { mois: null };
+  const unJour = !!(diffusion && jour && (diffusion.jours && diffusion.jours.length ? diffusion.jours.length > 1 : diffusion.debut !== diffusion.fin));
   const resume = h('p', { class: 'resume-diff' });
   const corps = h('div', { style: { display: 'grid', gap: '18px' } });
   const majResume = () => {
@@ -882,11 +894,18 @@ function dialogueDiffusion({ diffusion, contenu, jours }) {
     titre: x.contenu && E.contenuParId.get(x.contenu) ? E.contenuParId.get(x.contenu).titre : 'Programmer un contenu',
     corps,
     pied: [
+      // Depuis le calendrier : retirer seulement le jour cliqué (la période est coupée en deux, les autres jours restent).
+      x.id && unJour && h('button', { type: 'button', class: 'btn btn-danger', onclick: async () => {
+        const titre = (E.contenuParId.get(x.contenu) || {}).titre || 'Ce contenu';
+        if (!(await demander('Retirer le ' + dateLongue(jour) + ' ?', '« ' + titre + ' » ne s’affichera pas ce jour-là' + (x.flux.length > 1 ? ', sur aucun de ses écrans (' + nomsFlux(x.flux) + ')' : '') + '. Les autres jours de la programmation ne changent pas.', 'Retirer ce jour', true))) return;
+        try { await ecrire(() => api('POST', '/api/admin/diffusions/' + x.id + '/retirer-jour', { jour }), 'Jour retiré de la programmation.'); } catch { return; }
+        fen.close(); naviguerSansPerte();
+      } }, 'Retirer le ' + dateCourte(jour)),
       x.id && h('button', { type: 'button', class: 'btn btn-danger', onclick: async () => {
-        if (!(await demander('Retirer cette programmation ?', 'Le contenu ne s’affichera plus sur ces écrans pour ces dates.', 'Retirer', true))) return;
+        if (!(await demander(unJour ? 'Retirer toute la programmation ?' : 'Retirer cette programmation ?', 'Le contenu ne s’affichera plus sur ces écrans pour ' + (unJour ? 'toutes ces dates.' : 'ces dates.'), unJour ? 'Tout retirer' : 'Retirer', true))) return;
         try { await ecrire(() => api('DELETE', '/api/admin/diffusions/' + x.id), 'Programmation retirée.'); } catch { return; }
         fen.close(); naviguerSansPerte();
-      } }, 'Retirer'),
+      } }, unJour ? 'Tout retirer' : 'Retirer'),
       h('span', { class: 'sep' }),
       h('button', { type: 'button', class: 'btn', onclick: () => fen.close() }, 'Annuler'),
       h('button', { type: 'button', class: 'btn btn-noir', onclick: sauver }, 'Enregistrer')]
@@ -967,7 +986,7 @@ function vueCalendrier(arg) {
       h('span', { class: 'cal-n', text: p.n === 1 ? '1er ' + MC[p.m] : String(p.n) }),
       concerts.map(c => h('span', { class: 'cal-plus', text: '★ ' + (c.donnees.nom || c.titre) })),
       visibles.slice(0, 5).map(({ x, c }) => h('button', { type: 'button', class: 'cal-e t-' + c.type + (x.prioritaire ? ' prio' : ''), title: c.titre + ' — ' + resumeDiffusion(x),
-        text: (x.plages ? x.plages[0][0] + ' ' : '') + c.titre, onclick: e => { e.stopPropagation(); cal.sel = []; majSel(); dialogueDiffusion({ diffusion: x }); } })),
+        text: (x.plages ? x.plages[0][0] + ' ' : '') + c.titre, onclick: e => { e.stopPropagation(); cal.sel = []; majSel(); dialogueDiffusion({ diffusion: x, jour: d }); } })),
       visibles.length > 5 && h('span', { class: 'cal-plus', text: '+ ' + (visibles.length - 5) + ' autres' }));
     cellule.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
@@ -1043,7 +1062,8 @@ function carteFlux(f, ms) {
       h('a', { class: 'nom', href: '#contenu/' + l.c.id, text: l.c.titre + (l.pages > 1 ? ' (' + l.pages + ' pages)' : '') }),
       h('span', { class: 'fl' },
         h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Monter', disabled: i === 0, onclick: () => deplacer(i, i - 1) }, '↑'),
-        h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Descendre', disabled: i === ligne.length - 1, onclick: () => deplacer(i, i + 1) }, '↓')));
+        h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Descendre', disabled: i === ligne.length - 1, onclick: () => deplacer(i, i + 1) }, '↓'),
+        h('button', { type: 'button', class: 'btn carre pt btn-danger', 'aria-label': 'Retirer de cet écran', title: 'Retirer de cet écran', onclick: () => retirerDeLEcran(l.c, f) }, '×')));
     li.addEventListener('dragstart', e => { glisse = i; li.classList.add('glisse'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); });
     li.addEventListener('dragend', () => { li.classList.remove('glisse'); liste.querySelectorAll('.cible').forEach(n => n.classList.remove('cible')); });
     li.addEventListener('dragover', e => { e.preventDefault(); li.classList.add('cible'); });
@@ -1073,6 +1093,14 @@ function carteFlux(f, ms) {
     h('div', { class: 'carte-p' },
       h('button', { type: 'button', class: 'btn pt', onclick: () => identifier(f.code) }, 'Identifier'),
       h('a', { class: 'btn pt', href: '/?flux=' + f.code + '&debug=1', target: '_blank', rel: 'noopener' }, 'Voir le flux ↗')));
+}
+
+// Retire un contenu de la boucle d'un écran (ses programmations à venir sur cet écran) ; les autres écrans ne changent pas.
+async function retirerDeLEcran(c, f) {
+  const autres = [...new Set(E.diffusions.filter(d => d.contenu === c.id && d.fin >= auj() && d.flux.includes(f.code)).flatMap(d => d.flux))].filter(k => k !== f.code);
+  if (!(await demander('Retirer de l’écran ' + f.nom + ' ?', '« ' + c.titre + ' » ne passera plus sur ' + f.nom + '.' + (autres.length ? ' Il reste programmé sur ' + nomsFlux(autres) + '.' : ''), 'Retirer de ' + f.nom, true))) return;
+  try { await ecrire(() => api('POST', '/api/admin/retirer-ecran', { contenu: c.id, flux: f.code }), '« ' + c.titre + ' » retiré de ' + f.nom + '.'); } catch { return; }
+  if (surVue('flux')) vueFlux();
 }
 
 /* ================= vue : journal ================= */

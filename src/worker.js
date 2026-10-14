@@ -9,6 +9,8 @@
    - GET  /api/admin/etat           flux, contenus, diffusions, écrans
    - POST /api/admin/contenus, PUT|DELETE /api/admin/contenus/{id}, POST /api/admin/contenus/{id}/dupliquer
    - POST /api/admin/diffusions, PUT|DELETE /api/admin/diffusions/{id}
+   - POST /api/admin/diffusions/{id}/retirer-jour   retire un jour d'une programmation (période coupée en deux si besoin)
+   - POST /api/admin/retirer-ecran   retire un contenu de la boucle d'un écran (ses programmations à venir sur cet écran)
    - PUT  /api/admin/flux/{code}, POST /api/admin/flux/{code|tous}/identifier, POST /api/admin/ordre
    - POST /api/admin/medias         import d'un fichier (corps brut) vers R2
    - GET  /api/admin/journal?page=N
@@ -205,6 +207,7 @@ async function admin(req, env, url) {
   if (p === '/api/admin/contenus' && m === 'POST') return creerContenu(req, env, qui);
   if (p === '/api/admin/diffusions' && m === 'POST') return enregistrerDiffusion(req, env, qui, null);
   if (p === '/api/admin/ordre' && m === 'POST') return ordonner(req, env, qui);
+  if (p === '/api/admin/retirer-ecran' && m === 'POST') return retirerEcran(req, env, qui);
 
   let r = p.match(/^\/api\/admin\/contenus\/([a-z0-9-]+)(\/dupliquer)?$/);
   if (r) {
@@ -212,10 +215,11 @@ async function admin(req, env, url) {
     if (!r[2] && m === 'PUT') return modifierContenu(req, env, qui, r[1]);
     if (!r[2] && m === 'DELETE') return supprimerContenu(env, qui, r[1]);
   }
-  r = p.match(/^\/api\/admin\/diffusions\/([a-z0-9-]+)$/);
+  r = p.match(/^\/api\/admin\/diffusions\/([a-z0-9-]+)(\/retirer-jour)?$/);
   if (r) {
-    if (m === 'PUT') return enregistrerDiffusion(req, env, qui, r[1]);
-    if (m === 'DELETE') return supprimerDiffusion(env, qui, r[1]);
+    if (r[2] && m === 'POST') return retirerJour(req, env, qui, r[1]);
+    if (!r[2] && m === 'PUT') return enregistrerDiffusion(req, env, qui, r[1]);
+    if (!r[2] && m === 'DELETE') return supprimerDiffusion(env, qui, r[1]);
   }
   r = p.match(/^\/api\/admin\/flux\/([a-z0-9-]+)(\/identifier)?$/);
   if (r) {
@@ -552,6 +556,70 @@ async function supprimerDiffusion(env, qui, id) {
   ], 'Programmation retirée', d.titre + ' (' + (d.debut === d.fin ? d.debut : d.debut + ' au ' + d.fin) + ')');
   return json({ ok: true });
 }
+const jourPlus = (j, n) => new Date(Date.parse(j + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+// Jour de service en cours (une journée va de 6 h à 6 h, heure de Paris).
+const jourDeService = () => dateParis(Date.now() - 6 * 3600e3);
+
+// Retire un seul jour d'une programmation, pour tous ses écrans. Une période est coupée en deux
+// (avant / après ce jour) ; une liste de jours perd ce jour ; sans jour restant, la programmation disparaît.
+async function retirerJour(req, env, qui, id) {
+  const b = await lireCorps(req);
+  const jour = date(b.jour, 'jour', true);
+  const d = await env.DB.prepare('SELECT d.*, c.titre FROM diffusions d JOIN contenus c ON c.id = d.contenu_id WHERE d.id = ?').bind(id).first();
+  if (!d) throw new ErreurHttp(404, 'Programmation introuvable (supprimée entre-temps ?).');
+  const db = env.DB, maj = "modifie_le = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+  const supprimer = [db.prepare('DELETE FROM diffusion_flux WHERE diffusion_id = ?').bind(id), db.prepare('DELETE FROM diffusions WHERE id = ?').bind(id)];
+  let requetes;
+  const jours = lireJSON(d.jours, null);
+  if (jours && jours.length) {
+    if (jours.indexOf(jour) < 0) throw refus('Ce jour ne fait pas partie de la programmation.');
+    const reste = jours.filter(j => j !== jour);
+    requetes = reste.length
+      ? [db.prepare(`UPDATE diffusions SET jours = ?, debut = ?, fin = ?, ${maj} WHERE id = ?`).bind(JSON.stringify(reste), reste[0], reste[reste.length - 1], id)]
+      : supprimer;
+  } else {
+    if (jour < d.debut || jour > d.fin) throw refus('Ce jour est en dehors de la programmation.');
+    if (d.debut === d.fin) requetes = supprimer;
+    else if (jour === d.debut) requetes = [db.prepare(`UPDATE diffusions SET debut = ?, ${maj} WHERE id = ?`).bind(jourPlus(jour, 1), id)];
+    else if (jour === d.fin) requetes = [db.prepare(`UPDATE diffusions SET fin = ?, ${maj} WHERE id = ?`).bind(jourPlus(jour, -1), id)];
+    else {
+      // Coupure : la programmation s'arrête la veille, une copie reprend le lendemain sur les mêmes écrans.
+      const nid = nouvelId('d');
+      requetes = [
+        db.prepare(`UPDATE diffusions SET fin = ?, ${maj} WHERE id = ?`).bind(jourPlus(jour, -1), id),
+        db.prepare('INSERT INTO diffusions (id, contenu_id, debut, fin, jours, semaine, plages, prioritaire, ordre) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)')
+          .bind(nid, d.contenu_id, jourPlus(jour, 1), d.fin, d.semaine, d.plages, d.prioritaire, d.ordre),
+        db.prepare('INSERT INTO diffusion_flux (diffusion_id, flux_code) SELECT ?, flux_code FROM diffusion_flux WHERE diffusion_id = ?').bind(nid, id)
+      ];
+    }
+  }
+  await ecrire(env, qui, requetes, 'Jour retiré d’une programmation', d.titre + ' (' + jour + ')');
+  return json({ ok: true });
+}
+
+// Retire un contenu de la boucle d'un écran : cet écran est enlevé de toutes les programmations
+// de ce contenu qui ne sont pas terminées ; une programmation sans autre écran disparaît. Les autres écrans ne changent pas.
+async function retirerEcran(req, env, qui) {
+  const b = await lireCorps(req);
+  const contenu = await lireContenu(env, String(b.contenu || ''));
+  const code = String(b.flux || '');
+  const f = CODE_VALIDE.test(code) && await env.DB.prepare('SELECT nom FROM flux WHERE code = ?').bind(code).first();
+  if (!f) throw new ErreurHttp(404, 'Écran inconnu.');
+  const { results } = await env.DB.prepare(
+    `SELECT d.id, (SELECT COUNT(*) FROM diffusion_flux x WHERE x.diffusion_id = d.id) AS n
+       FROM diffusions d JOIN diffusion_flux df ON df.diffusion_id = d.id
+      WHERE d.contenu_id = ? AND df.flux_code = ? AND d.fin >= ?`
+  ).bind(contenu.id, code, jourDeService()).all();
+  if (!results.length) throw refus('Ce contenu n’est pas programmé sur cet écran.');
+  const requetes = [];
+  for (const d of results) {
+    requetes.push(env.DB.prepare('DELETE FROM diffusion_flux WHERE diffusion_id = ? AND flux_code = ?').bind(d.id, code));
+    if (d.n <= 1) requetes.push(env.DB.prepare('DELETE FROM diffusions WHERE id = ?').bind(d.id));
+  }
+  await ecrire(env, qui, requetes, 'Contenu retiré d’un écran', contenu.titre + ' → ' + f.nom);
+  return json({ ok: true, programmations: results.length });
+}
+
 // Ordre de la boucle : la liste des diffusions dans l'ordre voulu (1, 2, 3…).
 async function ordonner(req, env, qui) {
   const b = await lireCorps(req);
