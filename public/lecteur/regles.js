@@ -8,7 +8,8 @@
 }(this, function () {
   'use strict';
 
-  var DUREES = { soiree: 10, agenda: 15, image: 8, video: 0, veille: 60 };
+  var DUREES = { soiree: 10, agenda: 15, serie: 12, image: 8, video: 0, veille: 60 };
+  var SERIE_MAX = 4;         // dates d'une série
   var PAR_PAGE = 8;          // dates par page d'agenda
   var BASCULE = 6 * 60;      // avant 6 h du matin, on est encore dans la soirée de la veille
 
@@ -81,11 +82,11 @@
     r.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
     return r;
   }
-  // Contenu affichable : soirée pas encore passée, agenda avec des dates à venir, média présent.
+  // Contenu affichable : soirée pas encore passée, agenda ou série avec des dates à venir, média présent.
   function utilisable(c, service) {
     var d = c.donnees || {};
     if (c.type === 'soiree') { return !(d.date && service > d.date); }
-    if (c.type === 'agenda') { return datesAVenir(c, service).length > 0; }
+    if (c.type === 'agenda' || c.type === 'serie') { return datesAVenir(c, service).length > 0; }
     return !!d.src;
   }
   function duree(c) {
@@ -114,6 +115,10 @@
           dates: dates.slice(p * parPage, (p + 1) * parPage), defaut: !!extra });
       }
       return r;
+    }
+    if (c.type === 'serie') {
+      // les dates passées disparaissent ; « ce soir » et « demain » se calculent sur le jour de service
+      return [{ cle: c.id, type: 'serie', contenu: c, duree: duree(c), dates: datesAVenir(c, service).slice(0, SERIE_MAX), service: service, defaut: !!extra }];
     }
     return [{ cle: c.id, type: c.type, contenu: c, duree: duree(c), defaut: !!extra }];
   }
@@ -164,7 +169,7 @@
   }
 
   return {
-    DUREES: DUREES, PAR_PAGE: PAR_PAGE,
+    DUREES: DUREES, PAR_PAGE: PAR_PAGE, SERIE_MAX: SERIE_MAX,
     decalageParis: decalageParis, heureParis: heureParis, ajouterJours: ajouterJours, jourSemaine: jourSemaine,
     jourDeService: jourDeService, estActive: estActive, couvreJour: couvreJour, utilisable: utilisable,
     etapes: etapes, suivante: suivante, contient: contient

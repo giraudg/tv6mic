@@ -141,3 +141,18 @@ test('suivante : boucle, reprise après rechargement, étape disparue', () => {
   assert.strictEqual(R.suivante(l, 'inconnue').cle, 'a');
   assert.strictEqual(R.suivante(l, null).cle, 'a');
 });
+
+test('série : dates passées retirées, 4 au plus, jour de service transmis, masquée sans date à venir', () => {
+  const dates = [
+    { date: '2026-11-02', nom: 'passée' }, { date: '2026-11-10', nom: 'ce soir' }, { date: '2026-11-11', nom: 'demain' },
+    { date: '2026-11-20', nom: 'c' }, { date: '2026-11-25', nom: 'd' }, { date: '2026-11-30', nom: 'e' }];
+  const prog = { contenus: { s: contenu('s', 'serie', { titre: 'Série', dates }) }, diffusions: [diff('d1', 's')] };
+  // 1 h du matin le 11 : la journée de service est encore le 10 (une journée va de 6 h à 6 h)
+  const e = R.etapes(prog, paris('2026-11-11', '01:00')).etapes[0];
+  assert.strictEqual(e.type, 'serie');
+  assert.strictEqual(e.service, '2026-11-10');
+  assert.deepStrictEqual(e.dates.map(x => x.nom), ['ce soir', 'demain', 'c', 'd']);
+  assert.strictEqual(e.duree, R.DUREES.serie);
+  const passee = { contenus: { s: contenu('s', 'serie', { dates: [{ date: '2026-10-02' }] }) }, diffusions: [diff('d1', 's')] };
+  assert.deepStrictEqual(cles(passee, '2026-11-10', '12:00'), ['veille']);
+});

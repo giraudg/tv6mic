@@ -4,7 +4,7 @@
   --noir: #000; --blanc: #fff; --brume: #f1f1f1; --brume2: #e4e4e4; --gris: #404040; --filet: #bababa;
   --violet: #8e63ff; --violet-f: #6a42e6; --magenta: #e744a8; --bleu: #2563eb; --vert: #047857; --rouge: #b91c1c; --orange: #b45309;
   --rose-clair: #fde4f2; --bleu-clair: #dde9fe; --violet-clair: #ece5ff;
-  --t-soiree: #c23d97; --t-agenda: #2563eb; --t-image: #047857; --t-video: #6a42e6;
+  --t-soiree: #c23d97; --t-agenda: #2563eb; --t-serie: #b45309; --t-image: #047857; --t-video: #6a42e6;
   --sans: "owners", "TV Archivo", "Helvetica Neue", Arial, sans-serif;
   --cond: "zuume-cut", "TV Anton", Impact, "Arial Narrow", sans-serif;
   color-scheme: light;
@@ -102,6 +102,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .puce-filet { box-shadow: inset 0 0 0 1px #000; }
 .t-soiree { background: var(--t-soiree); color: #fff; }
 .t-agenda { background: var(--t-agenda); color: #fff; }
+.t-serie { background: var(--t-serie); color: #fff; }
 .t-image { background: var(--t-image); color: #fff; }
 .t-video { background: var(--t-video); color: #fff; }
 .prio { background: var(--rouge); color: #fff; }
@@ -199,6 +200,21 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .diffs .resume small { display: block; }
 .diffs .finie { color: var(--gris); }
 .diffs .fl { display: flex; gap: 6px; }
+/* éditeur de série : une carte par date (photo à gauche) */
+.dates-serie { display: grid; gap: 10px; }
+.date-serie { display: grid; grid-template-columns: 22px 168px minmax(0, 1fr) 36px; gap: 12px; align-items: start; padding: 12px; border: 1px solid #000; }
+.date-serie.passee { opacity: .55; }
+.date-serie .num { font-family: var(--cond); font-size: 28px; line-height: 1; }
+.date-serie-photo .media { display: grid; gap: 6px; }
+.date-serie-champs { display: grid; gap: 8px; min-width: 0; }
+.p-noir { background: #0b0a0d; }
+/* vignette d'une série : affiches côte à côte sur la couleur de fond */
+.vignette-serie { background: #8e63ff; }
+.vignette-serie.f-rose { background: #e744a8; } .vignette-serie.f-noir { background: #0b0a0d; }
+.vignette-serie.f-degrade { background: linear-gradient(180deg, #e744a8, #a94fd6 55%, #8e63ff); }
+.vignette-ser { position: absolute; left: 10px; right: 10px; bottom: 10px; height: 52%; display: flex; gap: 6px; }
+.vignette-ser i { flex: 1; background: #0b0a0d center / cover no-repeat; }
+.vignette-ser-t { position: absolute; left: 10px; right: 10px; top: 30px; font-family: var(--cond); text-transform: uppercase; font-size: 22px; line-height: .95; color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .motif { border: 1px solid #000; margin: 0; padding: 12px 16px 14px; display: grid; gap: 12px; min-width: 0; }
 .motif legend { padding: 0 6px; font-weight: 700; }
 .motif .champ { gap: 4px; }
@@ -329,13 +345,18 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
   .tete > .actions > .carre { flex: 0 0 44px; }         /* ‹ › du calendrier restent carrés */
   .tete > .actions .sep { display: none; }
   .tete > .actions .btn { white-space: normal; text-align: center; }
-  .nouveau { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .nouveau { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nouveau .btn { flex: 1 1 28%; }
+  .date-serie { grid-template-columns: 22px minmax(0, 1fr) 36px; }
+  .date-serie-photo { grid-column: 2; }
+  .date-serie-champs { grid-column: 2; }
+  .date-serie > .btn { grid-row: 1; grid-column: 3; }
   .nouveau .lbl { display: none; }
   .nouveau .btn { padding: 9px 2px; font-size: 14px; }
 
   /* contrôles segmentés sur toute la largeur, un peu plus serrés pour tenir sur une ligne */
   .seg { display: flex; width: 100%; }
-  .seg button { padding: 8px 6px; font-size: 14px; }
+  .seg button { padding: 8px 5px; font-size: 13.5px; }
   .filtres { gap: 10px; }
   .filtres .coche { margin-left: 2px; }
 
@@ -343,7 +364,8 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
   .vignettes { grid-template-columns: 1fr; gap: 8px; }
   .vignette { grid-template-columns: 112px minmax(0, 1fr); }
   .vignette-img { aspect-ratio: auto; min-height: 78px; border-bottom: 0; border-right: 1px solid #000; }
-  .vignette-soiree, .vignette-ag { display: none; }
+  .vignette-soiree, .vignette-ag, .vignette-ser-t { display: none; }
+  .vignette-ser { left: 6px; right: 6px; bottom: 6px; top: 22px; height: auto; gap: 3px; }
   .vignette-img .puce { left: 4px; top: 4px; font-size: 9px; padding: 2px 4px; }
   .vignette-c { padding: 8px 10px; gap: 2px; align-content: center; }
   .vignette-c b { font-size: 14px; }

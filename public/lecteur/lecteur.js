@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -62,6 +62,9 @@
     if (d.src) { r.push(d.src); }
     if (d.poster) { r.push(d.poster); }
     if (d.photo && d.photo.src) { r.push(d.photo.src); }
+    if (d.dates && d.dates.length) {           // photos d'une série
+      for (var i = 0; i < d.dates.length; i++) { if (d.dates[i] && d.dates[i].photo && d.dates[i].photo.src) { r.push(d.dates[i].photo.src); } }
+    }
     return r;
   }
 
@@ -204,6 +207,7 @@
       try {
         if (e.type === 'soiree') { g = Gabarits.soiree(e, url); }
         else if (e.type === 'agenda') { g = Gabarits.agenda(e, url); }
+        else if (e.type === 'serie') { g = Gabarits.serie(e, url); }
         else if (e.type === 'image') { g = Gabarits.image(e, url); }
         else { g = Gabarits.veille(!prog ? (horsLigne ? 'Connexion au serveur…' : 'Chargement…') : ''); }
       } catch (err) {
@@ -212,7 +216,14 @@
       }
       vider(couches[i]);
       couches[i].appendChild(g.noeud);
-      if (g.ajuster) { try { g.ajuster(); } catch (x) { noter('ajustement : ' + x.message); } }
+      if (g.ajuster) {
+        try { g.ajuster(); } catch (x) { noter('ajustement : ' + x.message); }
+        // Juste après un rechargement, les polices ne sont pas encore prêtes : la taille des noms a été calculée
+        // avec la police de secours (plus large). On recalcule dès qu'elles arrivent, si l'étape est toujours affichée.
+        if (D.fonts && D.fonts.status !== 'loaded' && D.fonts.ready) {
+          D.fonts.ready.then(function () { if (n === jeton) { try { g.ajuster(); } catch (x) { /* déjà noté */ } } });
+        }
+      }
       void couches[i].offsetWidth;
       g.noeud.className += ' joue';
       montrer({ type: 'couche', index: i });

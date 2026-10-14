@@ -30,7 +30,7 @@ const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 's
 const JC = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const MC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-const TYPES = { soiree: 'Soirée', agenda: 'Agenda', image: 'Image', video: 'Vidéo' };
+const TYPES = { soiree: 'Soirée', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo' };
 const SEMAINE = [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'J'], [5, 'V'], [6, 'S'], [7, 'D']];
 const MENTIONS = ['Complet', 'Dernières places', 'Nouvelle date', 'Annulé', 'Gratuit', 'Gratuit sur réservation'];
 
@@ -151,6 +151,7 @@ function apercu() {
       let g;
       if (etape.type === 'soiree') g = G.soiree(etape, s => s);
       else if (etape.type === 'agenda') g = G.agenda(etape, s => s);
+      else if (etape.type === 'serie') g = G.serie(etape, s => s);
       else if (etape.type === 'image') g = G.image(etape, s => s);
       else g = G.veille('');
       scene.append(g.noeud);
@@ -163,6 +164,12 @@ function apercu() {
 // Étapes d'aperçu d'un contenu (les pages d'un agenda), même si sa date est passée.
 function etapesApercu(c) {
   const contenu = { id: c.id || 'apercu', type: c.type, titre: c.titre, donnees: c.donnees, duree: c.duree };
+  if (c.type === 'serie') {
+    // dates à venir ; si toutes sont passées (ou pas encore saisies), on montre quand même ce qui est rempli
+    const prochaines = (c.donnees.dates || []).filter(x => x.date && x.date >= auj());
+    const dates = (prochaines.length ? prochaines : (c.donnees.dates || []).filter(x => x.date)).slice().sort((a, b) => a.date < b.date ? -1 : 1).slice(0, R.SERIE_MAX);
+    return [{ cle: 'apercu', type: 'serie', contenu, duree: c.duree || R.DUREES.serie, dates, service: auj() }];
+  }
   if (c.type !== 'agenda') return [{ cle: 'apercu', type: c.type, contenu, duree: c.duree || R.DUREES[c.type] }];
   const prog = { contenus: { [contenu.id]: contenu }, diffusions: [{ id: 'x', contenu: contenu.id, debut: '2000-01-01', fin: '2999-12-31' }] };
   let e = R.etapes(prog, maintenant()).etapes.filter(x => x.type === 'agenda');
@@ -567,12 +574,18 @@ function vignette(c) {
   const src = c.type === 'video' ? d.poster : c.type === 'image' ? d.src : d.photo && d.photo.src;
   if (src) img.style.backgroundImage = 'url("' + src + '")';
   if (c.type === 'agenda') img.append(h('div', { class: 'vignette-ag' }, h('b', { text: d.titre || c.titre }), h('span', { text: plur((d.dates || []).length, 'date') })));
+  if (c.type === 'serie') {
+    // planche des affiches de la série, sur la couleur de fond choisie
+    img.classList.add('vignette-serie', 'f-' + (d.fond || 'violet'));
+    img.append(h('div', { class: 'vignette-ser' }, (d.dates || []).slice(0, 4).map(x => h('i', { style: x.photo && x.photo.src ? { backgroundImage: 'url("' + x.photo.src + '")' } : null }))),
+      h('b', { class: 'vignette-ser-t', text: d.titre || c.titre }));
+  }
   if (c.type === 'soiree') img.append(h('div', { class: 'vignette-soiree', text: d.nom || '' }));
   img.append(h('span', { class: 'puce t-' + c.type, text: TYPES[c.type] }));
   const t = auj(), actives = diffsDe(c.id).filter(x => x.fin >= t);
   const flux = [...new Set(actives.flatMap(x => x.flux))];
   const sous = c.type === 'soiree' ? (d.date ? dateLongue(d.date) + (d.date < t ? ' (passée)' : '') : 'Date à préciser')
-    : c.type === 'agenda' ? plur((d.dates || []).filter(x => x.date >= t).length, 'date') + ' à venir'
+    : c.type === 'agenda' || c.type === 'serie' ? plur((d.dates || []).filter(x => x.date >= t).length, 'date') + ' à venir'
       : c.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s' + (d.taille ? ' · ' + mo(d.taille) : '') : d.src ? 'Vidéo' : 'Sans fichier')
         : (d.largeur ? d.largeur + ' × ' + d.hauteur + ' px' : d.src ? 'Image' : 'Sans fichier');
   return h('a', { class: 'vignette' + (c.statut === 'archive' ? ' archive' : ''), href: '#contenu/' + c.id }, img,
@@ -589,12 +602,12 @@ const filtre = Object.assign({}, FILTRE_VIDE, (() => { try { return JSON.parse(l
 const garderFiltre = () => { try { localStorage.setItem('tv6mic-filtre-contenus', JSON.stringify(filtre)); } catch { /* navigation privée */ } };
 const moisLong = m => { const [a, n] = m.split('-').map(Number); return MOIS[n - 1] + ' ' + a; };
 // Dates « de soirée » d'un contenu : la date du concert, ou toutes les dates d'un agenda.
-const datesDe = c => c.type === 'soiree' ? (c.donnees.date ? [c.donnees.date] : []) : c.type === 'agenda' ? (c.donnees.dates || []).map(x => x.date).filter(Boolean) : [];
+const datesDe = c => c.type === 'soiree' ? (c.donnees.date ? [c.donnees.date] : []) : c.type === 'agenda' || c.type === 'serie' ? (c.donnees.dates || []).map(x => x.date).filter(Boolean) : [];
 // Pour le tri : la date de la soirée ; pour un agenda, sa prochaine date (sinon la dernière).
 function dateRef(c, t) {
   const l = datesDe(c).slice().sort();
   if (!l.length) return null;
-  return c.type === 'agenda' ? (l.find(x => x >= t) || l[l.length - 1]) : l[0];
+  return c.type === 'agenda' || c.type === 'serie' ? (l.find(x => x >= t) || l[l.length - 1]) : l[0];
 }
 // Mois couverts par les programmations d'un contenu (jours réellement diffusés : période, jours choisis, jours de semaine).
 function moisProgrammes(c) {
@@ -700,7 +713,7 @@ function vueContenus() {
         Object.assign(filtre, FILTRE_VIDE, { type: 'soiree', soiree: 'avenir', prog: 'non', tri: 'date' }); synchro(); changer();
       } }, n > 1 ? 'Les afficher' : 'L’afficher'));
   };
-  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['agenda', 'Agendas'], ['image', 'Images'], ['video', 'Vidéos']].map(([k, tx]) =>
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['agenda', 'Agendas'], ['serie', 'Séries'], ['image', 'Images'], ['video', 'Vidéos']].map(([k, tx]) =>
     h('button', { type: 'button', 'data-v': k, onclick: () => { filtre.type = k; synchro(); changer(); } }, tx)));
   const recherche = h('input', { type: 'search', placeholder: 'Rechercher un nom…', value: filtre.texte, 'aria-label': 'Rechercher', oninput: e => { filtre.texte = e.target.value; changer(); } });
   const archives = h('input', { type: 'checkbox', checked: filtre.archives, onchange: e => { filtre.archives = e.target.checked; changer(); } });
@@ -728,6 +741,7 @@ function vueContenus() {
 function donneesVides(type) {
   if (type === 'soiree') return { nom: '', date: '', heure: '20:00', photo: null, infos: '', mention: '', billetterie: '' };
   if (type === 'agenda') return { titre: 'Prochainement au 6MIC', dates: [], photo: null };
+  if (type === 'serie') return { accroche: '', titre: '', fond: 'violet', dates: [] };
   if (type === 'image') return { src: null, ajustement: 'remplir' };
   return { src: null, poster: null, son: false };
 }
@@ -735,6 +749,7 @@ function titreAuto(ed) {
   const d = ed.donnees;
   if (ed.type === 'soiree') return (d.nom || 'Soirée') + (d.date ? ' · ' + dateCourte(d.date) : '');
   if (ed.type === 'agenda') return d.titre || 'Agenda';
+  if (ed.type === 'serie') return d.titre || 'Série';
   return d.fichier || TYPES[ed.type];
 }
 // Motif du design system posé sur la photo d'une soirée : sans réglage, le motif par défaut s'affiche.
@@ -836,6 +851,70 @@ async function couleurDansPhoto(src, boite, e) {
   for (let i = 0; i < p.length; i += 4) { t[0] += p[i]; t[1] += p[i + 1]; t[2] += p[i + 2]; }
   return '#' + t.map(v => Math.round(v / 25).toString(16).padStart(2, '0')).join('');
 }
+// Série : accroche, titre, couleur de fond, 1 à 4 dates (photo, jour, heure, nom, mention).
+// Les dates peuvent venir des soirées déjà enregistrées (avec leur photo).
+function champsSerie(d, changer) {
+  d.dates = d.dates || [];
+  const max = R.SERIE_MAX;
+  const lignes = h('div', { class: 'dates-serie' });
+  const choixSoiree = h('select', { 'aria-label': 'Ajouter une soirée enregistrée', onchange: e => {
+    const c = E.contenuParId.get(e.target.value); e.target.value = '';
+    if (!c || d.dates.length >= max) return;
+    const x = c.donnees;
+    d.dates.push({ date: x.date, heure: x.heure || '', nom: x.nom || c.titre, mention: x.mention || '', photo: x.photo && x.photo.src ? Object.assign({}, x.photo) : null });
+    d.dates.sort((a, b) => (a.date || '9') < (b.date || '9') ? -1 : 1);
+    remplir(); changer();
+  } });
+  const ajouter = h('button', { type: 'button', class: 'btn', onclick: () => {
+    if (d.dates.length >= max) return;
+    d.dates.push({ date: R.ajouterJours(auj(), 7), heure: '20:30', nom: '', mention: '', photo: null }); remplir(); changer();
+    lignes.lastChild.querySelector('input[type="text"]').focus();
+  } }, '+ Ajouter une date');
+  const compte = h('small');
+  function majChoix() {
+    const t = auj(), deja = new Set(d.dates.map(x => x.date + '|' + x.nom));
+    const soirees = E.contenus.filter(c => c.type === 'soiree' && c.statut === 'actif' && c.donnees.date && c.donnees.date >= t && !deja.has(c.donnees.date + '|' + (c.donnees.nom || c.titre)))
+      .sort((a, b) => a.donnees.date < b.donnees.date ? -1 : 1);
+    remplacer(choixSoiree, h('option', { value: '', text: soirees.length ? 'Ajouter une soirée enregistrée…' : 'Aucune autre soirée à venir' }),
+      soirees.map(c => h('option', { value: c.id, text: dateCourte(c.donnees.date) + ' · ' + (c.donnees.nom || c.titre) })));
+    const plein = d.dates.length >= max;
+    choixSoiree.disabled = plein || !soirees.length; ajouter.disabled = plein;
+    compte.textContent = plur(d.dates.length, 'date') + ' sur ' + max + ' au plus. Les dates passées disparaissent seules ; « Ce soir » et « Demain » s’affichent d’eux-mêmes.';
+  }
+  function remplir() {
+    remplacer(lignes, ...d.dates.map((x, i) => {
+      const pm = MENTIONS.includes(x.mention) || !x.mention;
+      return h('div', { class: 'date-serie' + (x.date && x.date < auj() ? ' passee' : '') },
+        h('span', { class: 'num', text: String(i + 1) }),
+        h('div', { class: 'date-serie-photo' }, champMedia({ genre: 'image', valeur: x.photo, facultatif: true, change: v => { x.photo = v; changer(); } })),
+        h('div', { class: 'date-serie-champs' },
+          h('div', { class: 'grille2' },
+            h('input', { type: 'date', value: x.date || '', 'aria-label': 'Date', oninput: e => { x.date = e.target.value; changer(); } }),
+            h('input', { type: 'time', value: x.heure || '', 'aria-label': 'Heure', oninput: e => { x.heure = e.target.value; changer(); } })),
+          h('input', { type: 'text', value: x.nom || '', maxLength: 120, placeholder: 'Nom de l’artiste ou de la soirée', 'aria-label': 'Nom', oninput: e => { x.nom = e.target.value; changer(); } }),
+          h('select', { 'aria-label': 'Mention', onchange: e => { x.mention = e.target.value; changer(); } },
+            h('option', { value: '', text: 'Sans mention' }), MENTIONS.map(m => h('option', { value: m, text: m, selected: x.mention === m })),
+            !pm && h('option', { value: x.mention, text: x.mention, selected: true }))),
+        h('button', { type: 'button', class: 'btn carre btn-danger', 'aria-label': 'Retirer cette date', onclick: () => { d.dates.splice(i, 1); remplir(); changer(); } }, '×'));
+    }));
+    majChoix();
+  }
+  remplir();
+  const fondSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Couleur de fond' }, Object.entries(G.FONDS_SERIE).map(([k, t]) =>
+    h('button', { type: 'button', 'data-v': k, 'aria-pressed': String((d.fond || 'violet') === k), onclick: e => {
+      d.fond = k; fondSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
+    } }, h('i', { class: 'pastille p-' + (k === 'noir' ? 'noir' : k) }), t)));
+  const champ = (label, entree, aide) => h('div', { class: 'champ' }, h('label', { text: label, for: entree.id }), entree, aide && h('small', { text: aide }));
+  const ligneTexte = (cle, label, placeholder, aide) => champ(label, h('input', { id: 'f-' + cle, type: 'text', value: d[cle] || '', maxLength: 80, placeholder,
+    oninput: e => { d[cle] = e.target.value; changer(); } }), aide);
+  return [
+    ligneTexte('accroche', 'Accroche (facultative)', 'Vous aimez Kery James ? / Esthétique rap / Ce soir au 6MIC…', 'Petite ligne au-dessus du titre.'),
+    ligneTexte('titre', 'Titre', 'Rap au 6MIC', 'Affiché en très grand ; la taille du texte s’adapte toute seule.'),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Couleur de fond' }), fondSeg),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Dates mises en avant (3 ou 4 conseillées)' }), lignes,
+      h('div', { class: 'actions' }, ajouter, choixSoiree), compte)
+  ];
+}
 function vueEditeur(id, typeNouveau) {
   const base = id ? E.contenuParId.get(id) : (TYPES[typeNouveau] ? { id: null, type: typeNouveau, titre: '', donnees: donneesVides(typeNouveau), duree: null, statut: 'actif' } : null);
   if (!base) { annoncer('Contenu introuvable.', true); location.hash = '#contenus'; return; }
@@ -921,6 +1000,8 @@ function vueEditeur(id, typeNouveau) {
         h('small', { text: 'Les dates passées disparaissent seules. 8 dates au plus par page ; au-delà, les pages s’enchaînent.' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo de fond (facultative)' }),
         champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); } })));
+  } else if (ed.type === 'serie') {
+    champs.push(...champsSerie(d, changer));
   } else if (ed.type === 'image') {
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Image' }),
       champMedia({ genre: 'image', valeur: d.src ? d : null, change: v => { Object.assign(d, v || { src: null }); changer(); } }),
@@ -945,6 +1026,8 @@ function vueEditeur(id, typeNouveau) {
     if ((ed.type === 'image' || ed.type === 'video') && !d.src) { annoncer('Importez d’abord le fichier.', true); return; }
     if (ed.type === 'soiree' && !d.nom.trim()) { annoncer('Indiquez le nom du concert.', true); $('#f-nom').focus(); return; }
     if (ed.type === 'agenda' && d.dates.some(x => !x.date)) { annoncer('Chaque ligne de l’agenda doit avoir une date.', true); return; }
+    if (ed.type === 'serie' && !d.dates.length) { annoncer('Ajoutez au moins une date à la série.', true); return; }
+    if (ed.type === 'serie' && d.dates.some(x => !x.date)) { annoncer('Chaque date de la série doit avoir un jour.', true); return; }
     enregistrer.disabled = true;
     const corps = { type: ed.type, titre: ed.titre || titreAuto(ed), donnees: d, duree: ed.duree, statut: apres === 'archiver' ? 'archive' : apres === 'restaurer' ? 'actif' : ed.statut };
     // Version lue à l'ouverture : le serveur refuse (409) si quelqu'un a enregistré entre-temps.
@@ -1200,7 +1283,7 @@ function vueCalendrier(arg) {
     if (p.j === 1) nbSemaines++;
     const items = diffs.filter(x => R.couvreJour(x, d)).map(x => ({ x, c: E.contenuParId.get(x.contenu) }))
       .sort((u, v) => (v.x.prioritaire - u.x.prioritaire) || ((u.x.plages ? u.x.plages[0][0] : '') < (v.x.plages ? v.x.plages[0][0] : '') ? -1 : 1));
-    const visibles = items.filter(({ x, c }) => !(c.type === 'soiree' && c.donnees.date && c.donnees.date < d) && !(c.type === 'agenda' && !(c.donnees.dates || []).some(z => z.date >= d)));
+    const visibles = items.filter(({ x, c }) => !(c.type === 'soiree' && c.donnees.date && c.donnees.date < d) && !((c.type === 'agenda' || c.type === 'serie') && !(c.donnees.dates || []).some(z => z.date >= d)));
     const concerts = soirees.filter(c => c.donnees.date === d);
     const cellule = h('div', { class: 'cal-c' + (p.m + 1 !== m ? ' hors' : '') + (d === t ? ' auj' : '') + (d < t ? ' passe' : ''), 'data-date': d, role: 'gridcell' },
       h('span', { class: 'cal-n', text: p.n === 1 ? '1er ' + MC[p.m] : String(p.n) }),

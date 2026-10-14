@@ -37,6 +37,7 @@ Gabarits (`public/lecteur/gabarits.js` et `gabarits.css`, partagés avec l'aper�
 | --- | --- | --- |
 | `soiree` | `nom`, `date` (AAAA-MM-JJ), `heure` (HH:MM), `photo.src`, `infos` (lignes séparées par `\n`), `mention`, `billetterie` (URL → QR code), `motif` (`type` faisceaux, rayons, hachures ou aucun ; `position` droite, gauche, haut, bas ; `couleur` rose, violet, degrade, blanc ou une teinte `#rrggbb` (pipette) — absent : faisceaux, droite, dégradé) | 10 s |
 | `agenda` | `titre`, `dates` : liste de `{ date, nom, mention }`, `photo.src` facultative ; 8 dates au plus par page | 15 s par page |
+| `serie` | `accroche`, `titre`, `fond` (`violet`, `rose`, `degrade`, `noir`), `dates` : 1 à 4 `{ date, heure, nom, mention, photo.src }` ; dates passées masquées, « Ce soir » / « Demain » automatiques | 12 s |
 | `image` | `src`, `ajustement` (`remplir` ou `ajuster`) | 8 s |
 | `video` | `src`, `poster`, `duree` (s), `taille` (octets), `son` (booléen) | durée de la vidéo |
 
@@ -98,7 +99,9 @@ Ensuite, chaque `git push` sur `main` redéploie automatiquement. Les fichiers �
 Les migrations de `migrations/` sont déjà appliquées sur la base de production. Pour une nouvelle migration :
 ajouter `migrations/0004_….sql`, puis `npm run db:migrate:remote` (ou l'exécuter depuis le tableau de bord D1).
 La programmation d'essai (`0002_essai.sql`) se retire depuis le back-office (Contenus → chaque contenu « essai » → Supprimer).
-`0003_admin.sql` ajoute le compteur d'échecs de connexion.
+`0003_admin.sql` ajoute le compteur d'échecs de connexion. `0004_serie.sql` ajoute le type « serie » : SQLite ne modifiant pas
+une contrainte CHECK, la table `contenus` est reconstruite ; les programmations sont mises de côté puis remises à l'identique
+(sinon la suppression de l'ancienne table les effacerait en cascade).
 
 ## Développement local
 

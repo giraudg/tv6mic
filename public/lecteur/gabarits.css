@@ -143,6 +143,47 @@
 .g-court .g-etiq { font-size: 26px; padding: 12px 18px 10px; }
 .g-page { position: absolute; right: 120px; bottom: 34px; font-size: 26px; font-weight: 600; color: var(--g-gris); letter-spacing: .06em; }
 
+/* 4. Série : aplat de couleur + texture rayonnante (design system), affiches côte à côte */
+.g-serie { background: #8e63ff; }
+.g-f-rose { background: #e744a8; }
+.g-f-degrade { background: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%); }
+.g-f-noir { background: #0b0a0d; }
+.g-s-rayons { position: absolute; left: 0; top: 0; width: 1920px; height: 1154px; background: #fff; opacity: .3;
+  -webkit-mask: url(/motifs/rayons.webp) left top / 100% 100% no-repeat; mask: url(/motifs/rayons.webp) left top / 100% 100% no-repeat; }
+.g-f-noir .g-s-rayons { background: #8e63ff; opacity: .75; }
+.g-s-tete { position: absolute; left: 120px; top: 78px; width: 1300px; }
+.g-s-accroche { margin-bottom: 10px; font-size: 34px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-s-titre { padding-top: .16em; font-family: var(--g-cond); font-weight: 700; font-size: 136px; line-height: .92; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; }
+/* marqueur ■■■ qui suit les grands titres de section du site */
+.g-s-marque { margin-top: 18px; width: 84px; height: 20px;
+  background: linear-gradient(90deg, #fff 0, #fff 20px, transparent 20px, transparent 32px, #fff 32px, #fff 52px, transparent 52px, transparent 64px, #fff 64px, #fff 84px); }
+.g-s-cartes { position: absolute; left: 120px; bottom: 64px; width: 1680px; display: -webkit-flex; display: flex; -webkit-align-items: flex-end; align-items: flex-end; }
+.g-s-carte { -webkit-flex: none; flex: none; margin-left: 48px; background: #000; opacity: 0; }
+.g-s-carte:first-child { margin-left: 0; }
+.joue .g-s-carte { -webkit-animation: g-monte .9s cubic-bezier(.2, .7, .2, 1) both; animation: g-monte .9s cubic-bezier(.2, .7, .2, 1) both; }
+.g-s-photo { position: relative; overflow: hidden; background: #111 center / cover no-repeat; }
+.g-s-vide { background: #0b0a0d; }
+.g-s-vide-m { position: absolute; right: 0; top: 0; width: 75%; height: 100%; opacity: .9;
+  background-image: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%);
+  -webkit-mask: url(/logo/motif-6mic.svg) left top / cover no-repeat; mask: url(/logo/motif-6mic.svg) left top / cover no-repeat;
+  -webkit-transform: scaleX(-1); transform: scaleX(-1); }
+.g-s-mention { position: absolute; left: 0; top: 24px; padding: 10px 16px 8px; background: var(--g-violet);
+  font-size: 22px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
+.g-f-violet .g-s-mention:not(.g-rouge) { background: #000; }
+.g-s-corps { height: 150px; padding: 22px 24px 20px; overflow: hidden; }
+.g-s-quand { font-size: 24px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-s-3 .g-s-quand { font-size: 30px; }
+.g-s-proche { color: #e744a8; }
+/* padding-top : place des accents des capitales (É, È) que couperait overflow: hidden avec line-height < 1 */
+.g-s-nom { margin-top: 4px; padding-top: .14em; font-family: var(--g-cond); font-weight: 700; font-size: 66px; line-height: .92; text-transform: uppercase; overflow: hidden; }
+/* hauteur du texte sous la photo = date + 14 px + deux lignes de nom (taille max × 0,92 × 2), selon le nombre d'affiches */
+.g-s-4 .g-s-corps { height: 160px; }
+.g-s-3 .g-s-corps { height: 170px; }
+.g-s-1 .g-s-corps, .g-s-2 .g-s-corps { height: 190px; }
+.g-s-1 .g-s-quand, .g-s-2 .g-s-quand { font-size: 36px; }
+
 /* 3. Image */
 .g-image { background: #000 center / cover no-repeat; }
 .g-image.g-contenir { background-size: contain; }

@@ -141,6 +141,59 @@
     return { noeud: g, ajuster: function () { ajusterTexte(titre, 128, 64, 1); } };
   }
 
+  /* 4. Série : 2 à 4 dates mises en avant (promo thématique, même esthétique, artistes proches de la soirée).
+     Aplat de couleur du design system avec la texture rayonnante, titre façon section du site (marqueur ■■■),
+     affiches côte à côte, le texte sous la photo (jamais dessus), « Ce soir » et « Demain » mis en évidence. */
+  var FONDS_SERIE = { violet: 'Violet', rose: 'Rose', degrade: 'Dégradé', noir: 'Noir' };
+  function lendemain(date) {
+    var p = String(date).split('-'), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + 1));
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+  }
+  function quandSerie(x, service) {
+    var p = parties(x.date), h = x.heure ? ' · ' + heureTexte(x.heure) : '';
+    if (service && x.date === service) { return { texte: 'Ce soir' + h, proche: true }; }
+    if (service && x.date === lendemain(service)) { return { texte: 'Demain' + h, proche: true }; }
+    return { texte: JOURS_COURTS[p.j] + ' ' + (p.n === 1 ? '1er' : p.n) + ' ' + MOIS_COURTS[p.m] + h, proche: false };
+  }
+  function serie(etape, url) {
+    var c = etape.contenu, d = c.donnees || {}, dates = etape.dates || [], n = Math.max(1, dates.length);
+    var g = el('div', 'g g-serie g-f-' + (FONDS_SERIE[d.fond] ? d.fond : 'violet') + ' g-s-' + n);
+    var tete = el('div', 'g-s-tete'), rang = el('div', 'g-s-cartes'), titre, noms = [], i, x, carte, photo, corps, q, nom;
+    // largeur des affiches : 1680 px partagés (écart 48 px), 816 px au plus ; photo 3:4, 470 px de haut au plus
+    var largeur = Math.min(816, Math.floor((1680 - (n - 1) * 48) / n)), hauteur = Math.min(n <= 2 ? 440 : 470, Math.round(largeur * 4 / 3));
+    var tailleNom = n <= 2 ? 72 : (n === 3 ? 66 : 64);
+    g.appendChild(el('div', 'g-s-rayons'));
+    g.appendChild(logo('g-logo a a0'));
+    if (d.accroche) { tete.appendChild(el('div', 'g-s-accroche a a0', d.accroche)); }
+    titre = el('div', 'g-s-titre a a1', d.titre || c.titre);
+    tete.appendChild(titre);
+    tete.appendChild(el('div', 'g-s-marque a a1'));
+    g.appendChild(tete);
+    for (i = 0; i < dates.length; i++) {
+      x = dates[i]; q = quandSerie(x, etape.service);
+      carte = el('div', 'g-s-carte');
+      carte.style.width = largeur + 'px';
+      carte.style.webkitAnimationDelay = carte.style.animationDelay = (0.45 + i * 0.16).toFixed(2) + 's';
+      photo = el('div', 'g-s-photo' + (x.photo && x.photo.src ? '' : ' g-s-vide'));
+      photo.style.height = hauteur + 'px';
+      if (x.photo && x.photo.src) { fond(photo, x.photo.src, url); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
+      if (x.mention) { photo.appendChild(el('div', 'g-s-mention' + (/complet|annul/i.test(x.mention) ? ' g-rouge' : ''), x.mention)); }
+      carte.appendChild(photo);
+      corps = el('div', 'g-s-corps');
+      corps.appendChild(el('div', 'g-s-quand' + (q.proche ? ' g-s-proche' : ''), q.texte));
+      nom = el('div', 'g-s-nom', x.nom || '');
+      noms.push(nom);
+      corps.appendChild(nom);
+      carte.appendChild(corps);
+      rang.appendChild(carte);
+    }
+    g.appendChild(rang);
+    return { noeud: g, ajuster: function () {
+      ajusterTexte(titre, 136, 72, 1);
+      for (var k = 0; k < noms.length; k++) { ajusterTexte(noms[k], tailleNom, 34, 2); }
+    } };
+  }
+
   /* 3. Image importée */
   function image(etape, url) {
     var d = etape.contenu.donnees || {}, g = el('div', 'g g-image' + (d.ajustement === 'ajuster' ? ' g-contenir' : ''));
@@ -168,7 +221,7 @@
   }
 
   racine.Gabarits = {
-    soiree: soiree, agenda: agenda, image: image, veille: veille, identification: identification,
+    soiree: soiree, agenda: agenda, serie: serie, image: image, veille: veille, identification: identification, FONDS_SERIE: FONDS_SERIE,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe
   };

@@ -23,7 +23,8 @@ const CODE_VALIDE = /^[a-z0-9-]{1,40}$/;
 const ID_VALIDE = /^[a-z0-9-]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
-const TYPES = ['soiree', 'agenda', 'image', 'video'];
+const TYPES = ['soiree', 'agenda', 'serie', 'image', 'video'];
+const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
 const MEDIAS_MAX = 100 * 1024 * 1024;
 
@@ -429,6 +430,18 @@ function validerDonnees(type, d) {
     const photo = source(d.photo, 'photo de fond', false);
     return { titre: chaine(d.titre, 80, 'titre de l’agenda'), dates, photo: photo ? { src: photo } : null };
   }
+  if (type === 'serie') {
+    // 2 à 4 dates mises en avant, chacune avec sa photo facultative ; triées par date.
+    if (d.dates !== undefined && !Array.isArray(d.dates)) throw refus('Dates invalides.');
+    if ((d.dates || []).length > 4) throw refus('Une série compte 4 dates au plus.');
+    const dates = (d.dates || []).map((x, i) => {
+      if (!x || typeof x !== 'object') throw refus('Date ' + (i + 1) + ' invalide.');
+      const photo = source(x.photo, 'photo de la date ' + (i + 1), false);
+      return { date: date(x.date, 'date ' + (i + 1), true), heure: heure(x.heure, 'heure, date ' + (i + 1)), nom: chaine(x.nom, 120, 'nom, date ' + (i + 1)),
+        mention: chaine(x.mention, 40, 'mention, date ' + (i + 1)), photo: photo ? { src: photo, largeur: nombre(x.photo.largeur, 0, 20000), hauteur: nombre(x.photo.hauteur, 0, 20000) } : null };
+    }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    return { accroche: chaine(d.accroche, 80, 'accroche'), titre: chaine(d.titre, 80, 'titre de la série'), fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'violet', dates };
+  }
   if (type === 'image') {
     return {
       src: source(d.src, 'image', false), ajustement: d.ajustement === 'ajuster' ? 'ajuster' : 'remplir', fichier: chaine(d.fichier, 120, 'nom du fichier'),
@@ -511,6 +524,7 @@ function sources(d) {
   if (d.src) r.push(d.src);
   if (d.poster) r.push(d.poster);
   if (d.photo && d.photo.src) r.push(d.photo.src);
+  if (Array.isArray(d.dates)) for (const x of d.dates) if (x && x.photo && x.photo.src) r.push(x.photo.src);   // photos d'une série
   return r;
 }
 // Supprime de R2 les fichiers qu'aucun contenu n'utilise plus.
