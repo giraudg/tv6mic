@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -208,6 +208,7 @@
         if (e.type === 'soiree') { g = Gabarits.soiree(e, url); }
         else if (e.type === 'agenda') { g = Gabarits.agenda(e, url); }
         else if (e.type === 'serie') { g = Gabarits.serie(e, url); }
+        else if (e.type === 'lineup') { g = Gabarits.lineup(e, url); }
         else if (e.type === 'image') { g = Gabarits.image(e, url); }
         else { g = Gabarits.veille(!prog ? (horsLigne ? 'Connexion au serveur…' : 'Chargement…') : ''); }
       } catch (err) {

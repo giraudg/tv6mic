@@ -156,3 +156,13 @@ test('série : dates passées retirées, 4 au plus, jour de service transmis, ma
   const passee = { contenus: { s: contenu('s', 'serie', { dates: [{ date: '2026-10-02' }] }) }, diffusions: [diff('d1', 's')] };
   assert.deepStrictEqual(cles(passee, '2026-11-10', '12:00'), ['veille']);
 });
+
+test('line-up : visible jusqu\'au soir de la date, heure de Paris transmise pour le passage en cours', () => {
+  const prog = { contenus: { l: contenu('l', 'lineup', { date: '2026-11-21', passages: [{ heure: '19:30', role: 'ouverture' }, { heure: '21:30', role: 'tete', nom: 'X' }] }) }, diffusions: [diff('d1', 'l')] };
+  const e = R.etapes(prog, paris('2026-11-22', '00:45')).etapes[0];   // après minuit : toujours la soirée du 21
+  assert.strictEqual(e.type, 'lineup');
+  assert.strictEqual(e.service, '2026-11-21');
+  assert.strictEqual(e.minutes, 45);
+  assert.strictEqual(e.duree, R.DUREES.lineup);
+  assert.deepStrictEqual(cles(prog, '2026-11-22', '12:00'), ['veille']);   // le lendemain midi : passée
+});

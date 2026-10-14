@@ -194,6 +194,71 @@
     } };
   }
 
+  /* 5. Line-up : programme de la soirée en frise horaire (ouverture, première partie, tête d'affiche, fermeture…).
+     Le jour de la soirée, le passage en cours est mis en avant (« En ce moment »), le suivant annoncé (« À suivre »),
+     les passages terminés s'estompent. Photo de la tête d'affiche à droite (sinon aplat avec les faisceaux du logo). */
+  var ROLES_LINEUP = { ouverture: 'Ouverture des portes', premiere: 'Première partie', tete: 'Tête d’affiche', dj: 'DJ set', fermeture: 'Fermeture', autre: '' };
+  // minutes depuis minuit, la soirée continuant après minuit (00:30 vient après 23:00 ; bascule à 6 h comme les programmations)
+  function minutesSoiree(hhmm) {
+    var p = String(hhmm || '').split(':'), m = (+p[0]) * 60 + (+p[1] || 0);
+    return m < 360 ? m + 1440 : m;
+  }
+  function lineup(etape, url) {
+    var c = etape.contenu, d = c.donnees || {}, g = el('div', 'g g-lineup'), i, p, ligne, texte, role, nom, etat, noms = [], tetes = [];
+    var passages = [], brut = d.passages || [];
+    for (i = 0; i < brut.length; i++) { if (brut[i] && brut[i].heure) { passages.push(brut[i]); } }
+    passages.sort(function (a, b) { return minutesSoiree(a.heure) - minutesSoiree(b.heure); });
+    var n = passages.length, jourJ = !!(etape.service && d.date === etape.service);
+    var maintenant = jourJ && typeof etape.minutes === 'number' ? (etape.minutes < 360 ? etape.minutes + 1440 : etape.minutes) : null;
+    var courant = -1, tete = null;
+    for (i = 0; i < n; i++) {
+      if (maintenant !== null && minutesSoiree(passages[i].heure) <= maintenant) { courant = i; }
+      if (!tete && passages[i].role === 'tete' && passages[i].nom) { tete = passages[i].nom; }
+    }
+    // panneau de droite : photo, sinon aplat dégradé avec les faisceaux
+    var panneau = el('div', 'g-l-panneau a a0' + (d.photo && d.photo.src ? '' : ' g-l-sansphoto'));
+    if (d.photo && d.photo.src) { fond(panneau, d.photo.src, url); } else { panneau.appendChild(el('div', 'g-l-motif')); }
+    g.appendChild(panneau);
+    g.appendChild(el('div', 'g-l-fondu'));
+    g.appendChild(logo('g-logo a a0'));
+    var entete = el('div', 'g-l-tete');
+    entete.appendChild(el('div', 'g-l-quand a a0', (jourJ ? 'Ce soir' : (d.date ? dateLongue(d.date) : 'Programme de la soirée')) + (d.lieu ? ' · ' + d.lieu : '')));
+    var titre = el('div', 'g-l-titre a a1', d.titre || tete || c.titre);
+    entete.appendChild(titre);
+    g.appendChild(entete);
+    // frise : hauteur des lignes selon leur nombre (670 px disponibles)
+    var liste = el('div', 'g-l-liste g-l-' + Math.max(1, Math.min(n, 8))), hauteurLigne = Math.min(176, Math.floor(670 / Math.max(n, 1)));
+    liste.appendChild(el('div', 'g-l-trait'));
+    for (i = 0; i < n; i++) {
+      p = passages[i];
+      etat = maintenant === null ? '' : (i < courant ? ' g-l-passe' : (i === courant ? ' g-l-encours' : (i === courant + 1 ? ' g-l-suivant' : '')));
+      ligne = el('div', 'g-l-ligne g-l-r-' + (ROLES_LINEUP[p.role] !== undefined ? p.role : 'autre') + etat + (p.nom ? '' : ' g-l-seul'));
+      ligne.style.height = hauteurLigne + 'px';
+      ligne.style.webkitAnimationDelay = ligne.style.animationDelay = (0.35 + i * 0.12).toFixed(2) + 's';
+      ligne.appendChild(el('div', 'g-l-heure', p.heure));
+      ligne.appendChild(el('div', 'g-l-point'));
+      texte = el('div', 'g-l-texte');
+      role = el('div', 'g-l-role', p.libelle || ROLES_LINEUP[p.role] || '');
+      if (i === courant) { role.appendChild(el('span', 'g-l-badge', 'En ce moment')); }
+      else if (maintenant !== null && i === courant + 1) { role.appendChild(el('span', 'g-l-badge g-l-badge-suivant', 'À suivre')); }
+      texte.appendChild(role);
+      if (p.nom) {
+        nom = el('div', 'g-l-nom', p.nom);
+        (p.role === 'tete' ? tetes : noms).push(nom);
+        texte.appendChild(nom);
+      }
+      ligne.appendChild(texte);
+      liste.appendChild(ligne);
+    }
+    g.appendChild(liste);
+    return { noeud: g, ajuster: function () {
+      var grand = hauteurLigne >= 150, k;
+      ajusterTexte(titre, 120, 64, 1);
+      for (k = 0; k < tetes.length; k++) { ajusterTexte(tetes[k], grand ? 96 : 72, 36, 1); }
+      for (k = 0; k < noms.length; k++) { ajusterTexte(noms[k], grand ? 68 : 56, 32, 1); }
+    } };
+  }
+
   /* 3. Image importée */
   function image(etape, url) {
     var d = etape.contenu.donnees || {}, g = el('div', 'g g-image' + (d.ajustement === 'ajuster' ? ' g-contenir' : ''));
@@ -221,7 +286,8 @@
   }
 
   racine.Gabarits = {
-    soiree: soiree, agenda: agenda, serie: serie, image: image, veille: veille, identification: identification, FONDS_SERIE: FONDS_SERIE,
+    soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, veille: veille, identification: identification,
+    FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, minutesSoiree: minutesSoiree,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe
   };

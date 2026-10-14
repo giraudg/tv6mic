@@ -8,7 +8,7 @@
 }(this, function () {
   'use strict';
 
-  var DUREES = { soiree: 10, agenda: 15, serie: 12, image: 8, video: 0, veille: 60 };
+  var DUREES = { soiree: 10, lineup: 12, agenda: 15, serie: 12, image: 8, video: 0, veille: 60 };
   var SERIE_MAX = 4;         // dates d'une série
   var PAR_PAGE = 8;          // dates par page d'agenda
   var BASCULE = 6 * 60;      // avant 6 h du matin, on est encore dans la soirée de la veille
@@ -85,7 +85,7 @@
   // Contenu affichable : soirée pas encore passée, agenda ou série avec des dates à venir, média présent.
   function utilisable(c, service) {
     var d = c.donnees || {};
-    if (c.type === 'soiree') { return !(d.date && service > d.date); }
+    if (c.type === 'soiree' || c.type === 'lineup') { return !(d.date && service > d.date); }
     if (c.type === 'agenda' || c.type === 'serie') { return datesAVenir(c, service).length > 0; }
     return !!d.src;
   }
@@ -104,7 +104,7 @@
     sa = a.d.cree_le || ''; sb = b.d.cree_le || '';
     return sa < sb ? -1 : (sa > sb ? 1 : 0);
   }
-  function etapesDe(c, service, extra) {
+  function etapesDe(c, service, extra, minutes) {
     var r = [], dates, pages, parPage, p;
     if (c.type === 'agenda') {
       dates = datesAVenir(c, service);
@@ -115,6 +115,10 @@
           dates: dates.slice(p * parPage, (p + 1) * parPage), defaut: !!extra });
       }
       return r;
+    }
+    if (c.type === 'lineup') {
+      // l'heure de Paris permet de marquer le passage en cours et le suivant, le jour de la soirée
+      return [{ cle: c.id, type: 'lineup', contenu: c, duree: duree(c), service: service, minutes: minutes, defaut: !!extra }];
     }
     if (c.type === 'serie') {
       // les dates passées disparaissent ; « ce soir » et « demain » se calculent sur le jour de service
@@ -143,11 +147,11 @@
       c = retenues[i].c;
       if (vus[c.id]) { continue; }
       vus[c.id] = true;
-      r = r.concat(etapesDe(c, service, false));
+      r = r.concat(etapesDe(c, service, false, h.minutes));
     }
     if (!r.length) {
       def = prog && prog.defaut && contenus[prog.defaut];
-      if (def && utilisable(def, service)) { r = etapesDe(def, service, true); }
+      if (def && utilisable(def, service)) { r = etapesDe(def, service, true, h.minutes); }
       if (!r.length) { r = [{ cle: 'veille', type: 'veille', contenu: null, duree: DUREES.veille, defaut: true }]; }
     }
     return { etapes: r, prioritaire: !!pri, service: service };

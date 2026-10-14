@@ -23,7 +23,8 @@ const CODE_VALIDE = /^[a-z0-9-]{1,40}$/;
 const ID_VALIDE = /^[a-z0-9-]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
-const TYPES = ['soiree', 'agenda', 'serie', 'image', 'video'];
+const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video'];
+const ROLES_LINEUP = ['ouverture', 'premiere', 'tete', 'dj', 'fermeture', 'autre'];
 const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
 const MEDIAS_MAX = 100 * 1024 * 1024;
@@ -429,6 +430,20 @@ function validerDonnees(type, d) {
     })).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     const photo = source(d.photo, 'photo de fond', false);
     return { titre: chaine(d.titre, 80, 'titre de l’agenda'), dates, photo: photo ? { src: photo } : null };
+  }
+  if (type === 'lineup') {
+    // Programme d'une soirée : passages (heure, rôle, nom), 8 au plus ; l'ordre d'affichage suit l'heure.
+    if (d.passages !== undefined && !Array.isArray(d.passages)) throw refus('Passages invalides.');
+    if ((d.passages || []).length > 8) throw refus('Un line-up compte 8 passages au plus.');
+    const passages = (d.passages || []).map((x, i) => {
+      if (!x || typeof x !== 'object') throw refus('Passage ' + (i + 1) + ' invalide.');
+      const h = heure(x.heure, 'heure du passage ' + (i + 1));
+      if (!h) throw refus('Indiquez l’heure du passage ' + (i + 1) + '.');
+      return { heure: h, role: ROLES_LINEUP.indexOf(x.role) >= 0 ? x.role : 'autre', libelle: chaine(x.libelle, 40, 'intitulé du passage ' + (i + 1)), nom: chaine(x.nom, 120, 'nom du passage ' + (i + 1)) };
+    });
+    const photo = source(d.photo, 'photo', false);
+    return { titre: chaine(d.titre, 80, 'titre'), date: date(d.date, 'date de la soirée', false), lieu: chaine(d.lieu, 40, 'lieu'), passages,
+      photo: photo ? { src: photo, largeur: nombre(d.photo.largeur, 0, 20000), hauteur: nombre(d.photo.hauteur, 0, 20000) } : null };
   }
   if (type === 'serie') {
     // 2 à 4 dates mises en avant, chacune avec sa photo facultative ; triées par date.

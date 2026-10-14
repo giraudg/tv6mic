@@ -184,6 +184,54 @@
 .g-s-1 .g-s-corps, .g-s-2 .g-s-corps { height: 190px; }
 .g-s-1 .g-s-quand, .g-s-2 .g-s-quand { font-size: 36px; }
 
+/* 5. Line-up : frise horaire à gauche, photo de la tête d'affiche à droite */
+.g-lineup { background: #0b0a0d; }
+.g-l-panneau { position: absolute; right: 0; top: 0; width: 820px; height: 1080px; background: #111 center / cover no-repeat; }
+.g-l-sansphoto { background: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%); }
+.g-l-motif { position: absolute; right: 0; top: 0; width: 810px; height: 1080px; background: #000; opacity: .3;
+  -webkit-mask: url(/logo/motif-6mic.svg) left top / 100% 100% no-repeat; mask: url(/logo/motif-6mic.svg) left top / 100% 100% no-repeat;
+  -webkit-transform: scaleX(-1); transform: scaleX(-1); }
+/* voile en haut de la photo : le logo reste lisible sur une photo claire */
+.g-l-panneau:after { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 260px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .55) 0%, rgba(0, 0, 0, 0) 100%); }
+.g-l-sansphoto:after { display: none; }
+/* fondu de la photo vers le noir, sous la frise */
+.g-l-fondu { position: absolute; left: 1100px; top: 0; width: 380px; height: 1080px;
+  background: linear-gradient(90deg, #0b0a0d 0%, rgba(11, 10, 13, .85) 35%, rgba(11, 10, 13, 0) 100%); }
+.g-l-tete { position: absolute; left: 120px; top: 84px; width: 1040px; }
+.g-l-quand { display: inline-block; padding: 12px 20px 10px; background: var(--g-degrade); font-size: 30px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
+.g-l-titre { margin-top: 10px; padding-top: .16em; font-family: var(--g-cond); font-weight: 700; font-size: 120px; line-height: .92;
+  text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+.g-l-liste { position: absolute; left: 120px; top: 340px; width: 1040px; }
+.g-l-trait { position: absolute; left: 251px; top: 30px; bottom: 30px; width: 4px; background: #3d3946; }
+.g-l-ligne { position: relative; display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; opacity: 0; }
+.joue .g-l-ligne { -webkit-animation: g-glisse .8s cubic-bezier(.2, .7, .2, 1) both; animation: g-glisse .8s cubic-bezier(.2, .7, .2, 1) both; }
+.g-l-heure { -webkit-flex: none; flex: none; width: 214px; text-align: right; font-family: var(--g-cond); font-weight: 700; font-size: 76px; line-height: 1; }
+.g-l-point { -webkit-flex: none; flex: none; position: relative; width: 26px; height: 26px; margin: 0 40px 0 26px; border-radius: 50%;
+  background: #0b0a0d; box-shadow: inset 0 0 0 5px #a9a6b3; }
+.g-l-texte { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; }
+.g-l-role { font-size: 26px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1.1; color: #a9a6b3; white-space: nowrap; }
+.g-l-nom { margin-top: 2px; padding-top: .12em; font-family: var(--g-cond); font-weight: 700; font-size: 68px; line-height: .92; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; }
+/* ouverture, fermeture… sans nom : l'intitulé devient le texte principal */
+.g-l-seul .g-l-role { font-size: 40px; color: #fff; letter-spacing: .04em; }
+/* tête d'affiche */
+.g-l-r-tete .g-l-point { width: 34px; height: 34px; margin: 0 36px 0 22px; background: var(--g-degrade); box-shadow: none; }
+.g-l-r-tete .g-l-nom { font-size: 96px; }
+.g-l-r-tete .g-l-role { color: #e744a8; }
+/* le jour J : en cours, à suivre, terminé */
+.g-l-passe { opacity: .32 !important; }
+.joue .g-l-passe { -webkit-animation-name: g-glisse-passe; animation-name: g-glisse-passe; }
+@-webkit-keyframes g-glisse-passe { from { opacity: 0; -webkit-transform: translate3d(-90px, 0, 0); } to { opacity: .32; -webkit-transform: translate3d(0, 0, 0); } }
+@keyframes g-glisse-passe { from { opacity: 0; transform: translate3d(-90px, 0, 0); } to { opacity: .32; transform: translate3d(0, 0, 0); } }
+.g-l-encours .g-l-point { background: #e744a8; box-shadow: 0 0 0 10px rgba(231, 68, 168, .3); }
+.g-l-encours .g-l-heure { color: #e744a8; }
+.g-l-badge { display: inline-block; margin-left: 18px; padding: 6px 12px 5px; background: #e744a8; color: #fff; font-size: 20px; letter-spacing: .08em; vertical-align: 4px; }
+.g-l-badge-suivant { background: transparent; box-shadow: inset 0 0 0 3px #8e63ff; color: #fff; }
+.g-l-6 .g-l-heure, .g-l-7 .g-l-heure, .g-l-8 .g-l-heure { font-size: 60px; }
+.g-l-7 .g-l-role, .g-l-8 .g-l-role { font-size: 22px; }
+
 /* 3. Image */
 .g-image { background: #000 center / cover no-repeat; }
 .g-image.g-contenir { background-size: contain; }
