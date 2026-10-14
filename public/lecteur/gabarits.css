@@ -117,14 +117,16 @@
 .g-entete { position: absolute; left: 0; top: 0; width: 1920px; height: 236px; background: var(--g-degrade); overflow: hidden; }
 .g-motif { position: absolute; top: 0; right: 0; width: 900px; height: 236px; background: #000; opacity: .28;
   -webkit-mask: url(/logo/motif-6mic.svg) left top / cover no-repeat; -webkit-transform: scaleX(-1); transform: scaleX(-1); }
-.g-titre { position: absolute; left: 120px; bottom: 46px; width: 1300px; white-space: nowrap; overflow: hidden;
+/* padding-top : place pour les accents des capitales (É, À…), sinon coupés par overflow: hidden avec line-height < 1 */
+.g-titre { position: absolute; left: 120px; bottom: 46px; width: 1300px; padding-top: .16em; white-space: nowrap; overflow: hidden;
   font-family: var(--g-cond); font-weight: 700; font-size: 128px; line-height: .92; text-transform: uppercase; }
 .g-entete .g-logo { top: auto; bottom: 58px; height: 84px; }
 .g-liste { position: absolute; left: 120px; top: 276px; width: 1680px; }
 .g-ligne { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; height: 88px;
   border-bottom: 2px solid var(--g-trait); opacity: 0; }
 .joue .g-ligne { -webkit-animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; }
-.g-quand { -webkit-flex: none; flex: none; width: 330px; font-family: var(--g-cond); font-weight: 700; font-size: 56px; line-height: 1; text-transform: uppercase; white-space: nowrap; }
+/* largeur : jour (126) + numéro (82) + mois le plus large (« mars », « janv. » : 122) + 30 px d'air avant le nom */
+.g-quand { -webkit-flex: none; flex: none; width: 360px; font-family: var(--g-cond); font-weight: 700; font-size: 56px; line-height: 1; text-transform: uppercase; white-space: nowrap; }
 .g-quand .g-j { display: inline-block; width: 126px; color: var(--g-gris); }
 .g-quand b { display: inline-block; width: 82px; font-weight: 700; }
 .g-quand .g-m { color: #fff; }
@@ -134,7 +136,7 @@
 /* 5 dates ou moins : lignes plus hautes et texte plus grand */
 .g-court .g-liste { top: 300px; }
 .g-court .g-ligne { height: 128px; }
-.g-court .g-quand { width: 432px; font-size: 72px; }
+.g-court .g-quand { width: 456px; font-size: 72px; }
 .g-court .g-quand .g-j { width: 160px; }
 .g-court .g-quand b { width: 104px; }
 .g-court .g-quoi { font-size: 56px; }

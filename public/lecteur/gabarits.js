@@ -41,10 +41,12 @@
   }
   // Réduit la taille du texte jusqu'à tenir dans sa boîte (largeur du bloc, nombre de lignes).
   function ajusterTexte(noeud, max, min, lignes) {
-    var taille = max, essais = 0;
+    var taille = max, essais = 0, cs = window.getComputedStyle(noeud);
+    // hauteur du texte seul : sans la marge intérieure (place des accents du titre de l'agenda)
+    function hauteur() { return noeud.offsetHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0); }
     noeud.style.fontSize = taille + 'px';
     while (essais < 40 && taille > min &&
-           (noeud.scrollWidth > noeud.clientWidth + 2 || noeud.offsetHeight > taille * 0.92 * lignes + 4)) {
+           (noeud.scrollWidth > noeud.clientWidth + 2 || hauteur() > taille * 0.92 * lignes + 4)) {
       taille -= 6; essais++;
       noeud.style.fontSize = taille + 'px';
     }
