@@ -210,22 +210,38 @@
      Le jour de la soirée, le passage en cours est mis en avant (« En ce moment »), le suivant annoncé (« À suivre »),
      les passages terminés s'estompent. Photo de la tête d'affiche à droite (sinon aplat avec les faisceaux du logo). */
   var ROLES_LINEUP = { ouverture: 'Ouverture des portes', premiere: 'Première partie', tete: 'Tête d’affiche', dj: 'DJ set', fermeture: 'Fermeture', autre: '' };
+  // Mise en valeur d'un passage, choisie librement ; sans choix, elle suit le rôle (la tête d'affiche en vedette).
+  var NIVEAUX_LINEUP = { vedette: 'Vedette', forte: 'Forte', normale: 'Normale', discrete: 'Discrète' };
+  var TAILLES_NIVEAU = { vedette: [96, 72], forte: [82, 64], normale: [68, 56], discrete: [48, 40] };
+  function niveauParDefaut(role) { return role === 'tete' ? 'vedette' : 'normale'; }
+  function niveauPassage(p) { return p && NIVEAUX_LINEUP[p.niveau] ? p.niveau : niveauParDefaut(p && p.role); }
+  // Nom mis en avant (titre par défaut) : le premier passage en vedette, sinon la première tête d'affiche.
+  function vedetteDe(passages) {
+    var i, t = null, p;
+    for (i = 0; i < (passages || []).length; i++) {
+      p = passages[i];
+      if (p && p.nom) {
+        if (niveauPassage(p) === 'vedette') { return p.nom; }
+        if (!t && p.role === 'tete') { t = p.nom; }
+      }
+    }
+    return t;
+  }
   // minutes depuis minuit, la soirée continuant après minuit (00:30 vient après 23:00 ; bascule à 6 h comme les programmations)
   function minutesSoiree(hhmm) {
     var p = String(hhmm || '').split(':'), m = (+p[0]) * 60 + (+p[1] || 0);
     return m < 360 ? m + 1440 : m;
   }
   function lineup(etape, url) {
-    var c = etape.contenu, d = c.donnees || {}, g = el('div', 'g g-lineup'), i, p, ligne, texte, role, nom, etat, noms = [], tetes = [];
+    var c = etape.contenu, d = c.donnees || {}, g = el('div', 'g g-lineup'), i, p, ligne, texte, role, nom, etat, niveau, noms = [];
     var passages = [], brut = d.passages || [];
     for (i = 0; i < brut.length; i++) { if (brut[i] && brut[i].heure) { passages.push(brut[i]); } }
     passages.sort(function (a, b) { return minutesSoiree(a.heure) - minutesSoiree(b.heure); });
     var n = passages.length, jourJ = !!(etape.service && d.date === etape.service);
     var maintenant = jourJ && typeof etape.minutes === 'number' ? (etape.minutes < 360 ? etape.minutes + 1440 : etape.minutes) : null;
-    var courant = -1, tete = null;
+    var courant = -1, tete = vedetteDe(passages);
     for (i = 0; i < n; i++) {
       if (maintenant !== null && minutesSoiree(passages[i].heure) <= maintenant) { courant = i; }
-      if (!tete && passages[i].role === 'tete' && passages[i].nom) { tete = passages[i].nom; }
     }
     // panneau de droite : photo, sinon aplat dégradé avec les faisceaux
     var panneau = el('div', 'g-l-panneau a a0' + (d.photo && d.photo.src ? '' : ' g-l-sansphoto'));
@@ -244,7 +260,8 @@
     for (i = 0; i < n; i++) {
       p = passages[i];
       etat = maintenant === null ? '' : (i < courant ? ' g-l-passe' : (i === courant ? ' g-l-encours' : (i === courant + 1 ? ' g-l-suivant' : '')));
-      ligne = el('div', 'g-l-ligne g-l-r-' + (ROLES_LINEUP[p.role] !== undefined ? p.role : 'autre') + etat + (p.nom ? '' : ' g-l-seul'));
+      niveau = niveauPassage(p);
+      ligne = el('div', 'g-l-ligne g-l-r-' + (ROLES_LINEUP[p.role] !== undefined ? p.role : 'autre') + ' g-l-v-' + niveau + etat + (p.nom ? '' : ' g-l-seul'));
       ligne.style.height = hauteurLigne + 'px';
       ligne.style.webkitAnimationDelay = ligne.style.animationDelay = (0.35 + i * 0.12).toFixed(2) + 's';
       ligne.appendChild(el('div', 'g-l-heure', p.heure));
@@ -256,7 +273,7 @@
       texte.appendChild(role);
       if (p.nom) {
         nom = el('div', 'g-l-nom', p.nom);
-        (p.role === 'tete' ? tetes : noms).push(nom);
+        noms.push([nom, TAILLES_NIVEAU[niveau]]);
         texte.appendChild(nom);
       }
       ligne.appendChild(texte);
@@ -266,8 +283,7 @@
     return { noeud: g, ajuster: function () {
       var grand = hauteurLigne >= 150, k;
       ajusterTexte(titre, 120, 64, 1);
-      for (k = 0; k < tetes.length; k++) { ajusterTexte(tetes[k], grand ? 96 : 72, 36, 1); }
-      for (k = 0; k < noms.length; k++) { ajusterTexte(noms[k], grand ? 68 : 56, 32, 1); }
+      for (k = 0; k < noms.length; k++) { ajusterTexte(noms[k][0], noms[k][1][grand ? 0 : 1], 28, 1); }
     } };
   }
 
@@ -299,7 +315,7 @@
 
   racine.Gabarits = {
     soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, veille: veille, identification: identification,
-    FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
+    FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, NIVEAUX_LINEUP: NIVEAUX_LINEUP, niveauPassage: niveauPassage, niveauParDefaut: niveauParDefaut, vedetteDe: vedetteDe, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe
   };

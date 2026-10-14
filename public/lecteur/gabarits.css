@@ -216,10 +216,20 @@
   white-space: nowrap; overflow: hidden; }
 /* ouverture, fermeture… sans nom : l'intitulé devient le texte principal */
 .g-l-seul .g-l-role { font-size: 40px; color: #fff; letter-spacing: .04em; }
-/* tête d'affiche */
-.g-l-r-tete .g-l-point { width: 34px; height: 34px; margin: 0 36px 0 22px; background: var(--g-degrade); box-shadow: none; }
-.g-l-r-tete .g-l-nom { font-size: 96px; }
-.g-l-r-tete .g-l-role { color: #e744a8; }
+/* mise en valeur (choisie, ou selon le rôle : la tête d'affiche en vedette). Le point reste centré sur le trait. */
+.g-l-v-vedette .g-l-point { width: 34px; height: 34px; margin: 0 36px 0 22px; background: var(--g-degrade); box-shadow: none; }
+.g-l-v-vedette .g-l-nom { font-size: 96px; }
+.g-l-v-vedette .g-l-role { color: #e744a8; }
+.g-l-v-vedette.g-l-seul .g-l-role { font-size: 52px; color: #fff; }
+.g-l-v-forte .g-l-point { width: 30px; height: 30px; margin: 0 38px 0 24px; background: #8e63ff; box-shadow: none; }
+.g-l-v-forte .g-l-nom { font-size: 82px; }
+.g-l-v-forte .g-l-role { color: #8e63ff; }
+.g-l-v-forte.g-l-seul .g-l-role { font-size: 46px; color: #fff; }
+.g-l-v-discrete .g-l-heure { font-size: 56px; color: #a9a6b3; }
+.g-l-v-discrete .g-l-point { width: 18px; height: 18px; margin: 0 44px 0 30px; box-shadow: inset 0 0 0 4px #3d3946; }
+.g-l-v-discrete .g-l-role { font-size: 22px; }
+.g-l-v-discrete .g-l-nom { font-size: 48px; color: #a9a6b3; }
+.g-l-v-discrete.g-l-seul .g-l-role { font-size: 30px; color: #a9a6b3; letter-spacing: .08em; }
 /* le jour J : en cours, à suivre, terminé */
 .g-l-passe { opacity: .32 !important; }
 .joue .g-l-passe { -webkit-animation-name: g-glisse-passe; animation-name: g-glisse-passe; }
@@ -231,6 +241,8 @@
 .g-l-badge-suivant { background: transparent; box-shadow: inset 0 0 0 3px #8e63ff; color: #fff; }
 .g-l-6 .g-l-heure, .g-l-7 .g-l-heure, .g-l-8 .g-l-heure { font-size: 60px; }
 .g-l-7 .g-l-role, .g-l-8 .g-l-role { font-size: 22px; }
+.g-l-6 .g-l-v-discrete .g-l-heure, .g-l-7 .g-l-v-discrete .g-l-heure, .g-l-8 .g-l-v-discrete .g-l-heure { font-size: 46px; }
+.g-l-7 .g-l-v-discrete .g-l-role, .g-l-8 .g-l-v-discrete .g-l-role { font-size: 19px; }
 
 /* 3. Image */
 .g-image { background: #000 center / cover no-repeat; }

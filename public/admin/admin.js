@@ -694,8 +694,7 @@ function vignette(c) {
   }
   if (c.type === 'soiree') img.append(h('div', { class: 'vignette-soiree', text: d.nom || '' }));
   if (c.type === 'lineup') {
-    const tete = (d.passages || []).find(x => x.role === 'tete' && x.nom);
-    img.append(h('div', { class: 'vignette-soiree', text: d.titre || (tete && tete.nom) || 'Line-up' }));
+    img.append(h('div', { class: 'vignette-soiree', text: d.titre || G.vedetteDe(d.passages) || 'Line-up' }));
   }
   img.append(h('span', { class: 'puce t-' + c.type, text: TYPES[c.type] }));
   const t = auj(), actives = diffsDe(c.id).filter(x => x.fin >= t);
@@ -870,8 +869,7 @@ function titreAuto(ed) {
   if (ed.type === 'agenda') return d.titre || 'Agenda';
   if (ed.type === 'serie') return d.titre || 'Série';
   if (ed.type === 'lineup') {
-    const tete = (d.passages || []).find(x => x.role === 'tete' && x.nom);
-    return 'Line-up · ' + (d.titre || (tete && tete.nom) || 'soirée') + (d.date ? ' · ' + dateCourte(d.date) : '');
+    return 'Line-up · ' + (d.titre || G.vedetteDe(d.passages) || 'soirée') + (d.date ? ' · ' + dateCourte(d.date) : '');
   }
   return d.fichier || TYPES[ed.type];
 }
@@ -1057,6 +1055,7 @@ function champsSerie(d, changer) {
 // Line-up : programme d'une soirée (passages : heure, rôle, nom), date, lieu, titre, photo de la tête d'affiche.
 // « Préremplir depuis une soirée » reprend la date, la photo et les noms (« TÊTE + PREMIÈRE PARTIE »).
 const LIEUX = ['Grande salle', 'Club'];
+const NIVEAU_PICTO = { vedette: '★★★', forte: '★★', normale: '★', discrete: '·' };
 function champsLineup(d, changer) {
   d.passages = d.passages || [];
   const max = 8;
@@ -1077,13 +1076,16 @@ function champsLineup(d, changer) {
   function rendre() {
     const t = auj();
     const soirees = E.contenus.filter(c => c.type === 'soiree' && c.statut === 'actif' && c.donnees.date && c.donnees.date >= t).sort((a, b) => a.donnees.date < b.donnees.date ? -1 : 1);
-    const lignes = d.passages.map((p, i) => h('div', { class: 'passage' + (p.role === 'tete' ? ' tete' : '') },
+    const lignes = d.passages.map((p, i) => h('div', { class: 'passage' + (G.niveauPassage(p) === 'vedette' ? ' tete' : '') },
       h('input', { type: 'time', value: p.heure || '', 'aria-label': 'Heure', oninput: e => { p.heure = e.target.value; changer(); } }),
       h('select', { 'aria-label': 'Rôle', onchange: e => { p.role = e.target.value; rendre(); changer(); } },
         Object.entries(G.ROLES_LINEUP).map(([k, l]) => h('option', { value: k, text: l || 'Autre…', selected: p.role === k }))),
       p.role === 'autre' && h('input', { type: 'text', value: p.libelle || '', maxLength: 40, placeholder: 'Intitulé (Entracte, Dédicaces…)', 'aria-label': 'Intitulé', oninput: e => { p.libelle = e.target.value; changer(); } }),
       h('input', { type: 'text', class: 'passage-nom', value: p.nom || '', maxLength: 120, 'aria-label': 'Nom',
         placeholder: p.role === 'ouverture' || p.role === 'fermeture' ? 'Nom (facultatif)' : 'Nom de l’artiste', oninput: e => { p.nom = e.target.value; changer(); } }),
+      h('select', { class: 'passage-niveau', 'aria-label': 'Mise en valeur', title: 'Mise en valeur à l’écran', onchange: e => { p.niveau = e.target.value; rendre(); changer(); } },
+        h('option', { value: '', text: 'Auto · ' + G.NIVEAUX_LINEUP[G.niveauParDefaut(p.role)], selected: !p.niveau }),
+        Object.entries(G.NIVEAUX_LINEUP).map(([k, l]) => h('option', { value: k, text: (NIVEAU_PICTO[k] || '') + ' ' + l, selected: p.niveau === k }))),
       h('button', { type: 'button', class: 'btn carre btn-danger', 'aria-label': 'Retirer ce passage', onclick: () => { d.passages.splice(i, 1); rendre(); changer(); } }, '×')));
     const ajout = h('button', { type: 'button', class: 'btn', disabled: d.passages.length >= max, onclick: () => {
       const der = d.passages[d.passages.length - 1];
@@ -1105,7 +1107,7 @@ function champsLineup(d, changer) {
         h('input', { id: 'f-titre', type: 'text', value: d.titre || '', maxLength: 80, placeholder: 'Vide : nom de la tête d’affiche', oninput: e => { d.titre = e.target.value; changer(); } })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Passages' }), h('div', { class: 'passages' }, lignes),
         h('div', { class: 'actions' }, ajout),
-        h('small', { text: 'Rangés par heure à l’écran ; un passage après minuit (00:30) compte pour la même soirée. 8 passages au plus.' })),
+        h('small', { text: 'Rangés par heure à l’écran ; un passage après minuit (00:30) compte pour la même soirée. 8 passages au plus. Mise en valeur : « Auto » suit le rôle (la tête d’affiche en vedette) ; Vedette, Forte, Normale ou Discrète la fixent, par exemple pour une co-tête d’affiche ou une info pratique.' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo de la tête d’affiche (facultative)' }),
         champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
           cadre: Object.assign({ conseil: 'côté droit de l’écran, bord gauche fondu au noir : sujet au centre ou à droite' }, G.CADRES.lineup) }),

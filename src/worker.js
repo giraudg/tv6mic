@@ -25,6 +25,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video'];
 const ROLES_LINEUP = ['ouverture', 'premiere', 'tete', 'dj', 'fermeture', 'autre'];
+const NIVEAUX_LINEUP = ['vedette', 'forte', 'normale', 'discrete'];   // vide = selon le rôle
 const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
 const MEDIAS_MAX = 100 * 1024 * 1024;
@@ -439,7 +440,8 @@ function validerDonnees(type, d) {
       if (!x || typeof x !== 'object') throw refus('Passage ' + (i + 1) + ' invalide.');
       const h = heure(x.heure, 'heure du passage ' + (i + 1));
       if (!h) throw refus('Indiquez l’heure du passage ' + (i + 1) + '.');
-      return { heure: h, role: ROLES_LINEUP.indexOf(x.role) >= 0 ? x.role : 'autre', libelle: chaine(x.libelle, 40, 'intitulé du passage ' + (i + 1)), nom: chaine(x.nom, 120, 'nom du passage ' + (i + 1)) };
+      return { heure: h, role: ROLES_LINEUP.indexOf(x.role) >= 0 ? x.role : 'autre', libelle: chaine(x.libelle, 40, 'intitulé du passage ' + (i + 1)), nom: chaine(x.nom, 120, 'nom du passage ' + (i + 1)),
+        niveau: NIVEAUX_LINEUP.indexOf(x.niveau) >= 0 ? x.niveau : '' };
     });
     const photo = source(d.photo, 'photo', false);
     return { titre: chaine(d.titre, 80, 'titre'), date: date(d.date, 'date de la soirée', false), lieu: chaine(d.lieu, 40, 'lieu'), passages,
