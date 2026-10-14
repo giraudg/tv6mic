@@ -60,14 +60,40 @@
     return boite;
   }
 
+  /* Motifs du design system 6MIC, posés sur la photo des soirées.
+     faisceaux : traits du logo (motif « focus », vectoriel) ; rayons : texture rayonnante des aplats du site ;
+     hachures : traits à 41,3° des affiches de l'agenda. Chaque motif se colore (masque CSS) et se place sur un bord. */
+  var MOTIFS = { faisceaux: 'Faisceaux', rayons: 'Rayons', hachures: 'Hachures', aucun: 'Aucun' };
+  var POSITIONS = { droite: 'Droite', gauche: 'Gauche', haut: 'Haut', bas: 'Bas' };
+  var COULEURS = { rose: 'Rose', violet: 'Violet', degrade: 'Dégradé', blanc: 'Blanc' };
+  var MOTIF_DEFAUT = { type: 'faisceaux', position: 'droite', couleur: 'degrade' };
+  // Réglage complet : celui du contenu, complété par le motif par défaut (les soirées sans réglage ont le motif par défaut).
+  function motifDe(d) {
+    var m = (d && d.motif) || {};
+    return {
+      type: MOTIFS[m.type] ? m.type : MOTIF_DEFAUT.type,
+      position: POSITIONS[m.position] ? m.position : MOTIF_DEFAUT.position,
+      couleur: COULEURS[m.couleur] ? m.couleur : MOTIF_DEFAUT.couleur
+    };
+  }
+  function motif(d) {
+    var m = motifDe(d), boite;
+    if (m.type === 'aucun') { return null; }
+    boite = el('div', 'g-deco a a0 g-d-' + m.type + ' g-d-' + m.position + ' g-c-' + m.couleur);
+    boite.appendChild(el('div', 'g-deco-m'));
+    return boite;
+  }
+
   /* 1. Soirée : photo plein cadre, date, nom, infos, mention, QR code de la billetterie */
   function soiree(etape, url) {
     var c = etape.contenu, d = c.donnees || {}, g = el('div', 'g g-soiree');
-    var photo = el('div', 'g-photo'), bloc = el('div', 'g-bloc'), nom, q;
+    var photo = el('div', 'g-photo'), bloc = el('div', 'g-bloc'), nom, q, deco;
     fond(photo, d.photo && d.photo.src, url);
     photo.style.webkitAnimationDuration = photo.style.animationDuration = Math.max(8, (etape.duree || 10) + 2) + 's';
     g.appendChild(photo);
     g.appendChild(el('div', 'g-voile'));
+    deco = motif(d);
+    if (deco) { g.appendChild(deco); }
     g.appendChild(logo('g-logo a a0'));
     if (d.mention) { g.appendChild(el('div', 'g-mention a a0' + (/complet|annul/i.test(d.mention) ? ' g-rouge' : ''), d.mention)); }
     if (d.date) { bloc.appendChild(el('div', 'g-date a a1', dateLongue(d.date) + (d.heure ? ' · ' + heureTexte(d.heure) : ''))); }
@@ -135,6 +161,7 @@
 
   racine.Gabarits = {
     soiree: soiree, agenda: agenda, image: image, veille: veille, identification: identification,
-    dateLongue: dateLongue, heureTexte: heureTexte, el: el
+    dateLongue: dateLongue, heureTexte: heureTexte, el: el,
+    MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, motifDe: motifDe
   };
 }(this));

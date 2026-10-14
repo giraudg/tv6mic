@@ -397,6 +397,14 @@ function lien(v) {
   if (!/^https?:\/\/[^\s]+$/i.test(s)) throw refus('Le lien de la billetterie doit commencer par https://.');
   return s;
 }
+// Motif des soirées (design system) : les trois réglages ensemble, sinon rien (le lecteur prend alors le motif par défaut).
+const MOTIF = { type: ['faisceaux', 'rayons', 'hachures', 'aucun'], position: ['droite', 'gauche', 'haut', 'bas'], couleur: ['rose', 'violet', 'degrade', 'blanc'] };
+function motifValide(m) {
+  if (!m || typeof m !== 'object') return null;
+  const r = {};
+  for (const k of Object.keys(MOTIF)) { if (MOTIF[k].indexOf(m[k]) < 0) return null; r[k] = m[k]; }
+  return r;
+}
 function validerDonnees(type, d) {
   if (!d || typeof d !== 'object') throw refus('Données manquantes.');
   if (type === 'soiree') {
@@ -404,7 +412,8 @@ function validerDonnees(type, d) {
     return {
       nom: chaine(d.nom, 120, 'nom du concert'), date: date(d.date, 'date du concert', false), heure: heure(d.heure, 'heure'),
       photo: photo ? { src: photo, largeur: nombre(d.photo.largeur, 0, 20000), hauteur: nombre(d.photo.hauteur, 0, 20000) } : null,
-      infos: chaine(d.infos, 300, 'infos'), mention: chaine(d.mention, 40, 'mention'), billetterie: lien(d.billetterie)
+      infos: chaine(d.infos, 300, 'infos'), mention: chaine(d.mention, 40, 'mention'), billetterie: lien(d.billetterie),
+      motif: motifValide(d.motif)
     };
   }
   if (type === 'agenda') {

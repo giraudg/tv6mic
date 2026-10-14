@@ -73,6 +73,44 @@
 .g-qr svg { display: block; width: 200px; height: 200px; shape-rendering: crispEdges; }
 .g-qr span { display: block; margin-top: 12px; font-size: 22px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
 
+/* Motif des soirées (design system 6MIC) : un calque de couleur découpé par un masque, posé sur un bord.
+   Origine 0 0 pour toutes les transformations : chaque position tourne ou retourne le motif pour que
+   son bord « chargé » (traits, rayons) touche le bord choisi de l'écran. */
+.g-deco { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; pointer-events: none; }
+.g-deco-m { position: absolute; left: 0; top: 0; -webkit-transform-origin: 0 0; transform-origin: 0 0; }
+.g-c-rose .g-deco-m { background-color: #e744a8; }
+.g-c-violet .g-deco-m { background-color: #8e63ff; }
+.g-c-blanc .g-deco-m { background-color: #fff; }
+.g-c-degrade .g-deco-m { background-image: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%); }
+
+/* Faisceaux : motif « focus » du site (traits du logo), 1080 × 1440 ; ses traits partent du bord gauche. */
+.g-d-faisceaux .g-deco-m { width: 810px; height: 1080px; opacity: .92;
+  -webkit-mask: url(/logo/motif-6mic.svg) left top / 100% 100% no-repeat; mask: url(/logo/motif-6mic.svg) left top / 100% 100% no-repeat; }
+.g-d-faisceaux.g-d-gauche .g-deco-m { opacity: .6; }
+.g-d-faisceaux.g-d-droite .g-deco-m { -webkit-transform: translate(1920px, 0) scaleX(-1); transform: translate(1920px, 0) scaleX(-1); }
+/* En haut et en bas, motif plus petit (bande de 864 px) pour ne pas couvrir les visages. */
+.g-d-faisceaux.g-d-haut .g-deco-m, .g-d-faisceaux.g-d-bas .g-deco-m { width: 648px; height: 864px; }
+.g-d-faisceaux.g-d-haut .g-deco-m { -webkit-transform: translate(1920px, 0) rotate(90deg); transform: translate(1920px, 0) rotate(90deg); }
+.g-d-faisceaux.g-d-bas .g-deco-m { -webkit-transform: translate(1056px, 1080px) rotate(-90deg); transform: translate(1056px, 1080px) rotate(-90deg); }
+
+/* Rayons : texture rayonnante des aplats du site, convertie en masque (rayons et lueur en haut). */
+.g-d-rayons .g-deco-m { width: 1920px; height: 1154px; opacity: .95;
+  -webkit-mask: url(/motifs/rayons.webp) left top / 100% 100% no-repeat; mask: url(/motifs/rayons.webp) left top / 100% 100% no-repeat; }
+.g-d-rayons.g-d-bas .g-deco-m { -webkit-transform: translate(0, 1080px) scaleY(-1); transform: translate(0, 1080px) scaleY(-1); }
+.g-d-rayons.g-d-gauche .g-deco-m, .g-d-rayons.g-d-droite .g-deco-m { width: 1080px; height: 649px; }
+.g-d-rayons.g-d-gauche .g-deco-m { opacity: .75; -webkit-transform: translate(0, 1080px) rotate(-90deg); transform: translate(0, 1080px) rotate(-90deg); }
+.g-d-rayons.g-d-droite .g-deco-m { -webkit-transform: translate(1920px, 0) rotate(90deg); transform: translate(1920px, 0) rotate(90deg); }
+
+/* Hachures : traits à 41,3° des affiches de l'agenda du site, en bande fondue le long du bord choisi. */
+.g-d-hachures .g-deco-m { width: 1920px; height: 1080px; opacity: .7;
+  -webkit-mask-image: repeating-linear-gradient(131.3deg, #000 0, #000 3px, transparent 3px, transparent 15px);
+  mask-image: repeating-linear-gradient(131.3deg, #000 0, #000 3px, transparent 3px, transparent 15px); }
+.g-d-hachures.g-d-gauche .g-deco-m { opacity: .45; }
+.g-d-hachures.g-d-droite { -webkit-mask-image: linear-gradient(270deg, #000 0, rgba(0, 0, 0, .7) 18%, transparent 42%); mask-image: linear-gradient(270deg, #000 0, rgba(0, 0, 0, .7) 18%, transparent 42%); }
+.g-d-hachures.g-d-gauche { -webkit-mask-image: linear-gradient(90deg, #000 0, rgba(0, 0, 0, .7) 18%, transparent 42%); mask-image: linear-gradient(90deg, #000 0, rgba(0, 0, 0, .7) 18%, transparent 42%); }
+.g-d-hachures.g-d-haut { -webkit-mask-image: linear-gradient(180deg, #000 0, rgba(0, 0, 0, .7) 20%, transparent 46%); mask-image: linear-gradient(180deg, #000 0, rgba(0, 0, 0, .7) 20%, transparent 46%); }
+.g-d-hachures.g-d-bas { -webkit-mask-image: linear-gradient(0deg, #000 0, rgba(0, 0, 0, .7) 20%, transparent 46%); mask-image: linear-gradient(0deg, #000 0, rgba(0, 0, 0, .7) 20%, transparent 46%); }
+
 /* 2. Agenda */
 .g-agenda { background: var(--g-nuit); }
 .g-fond { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: center / cover no-repeat; opacity: .22; }

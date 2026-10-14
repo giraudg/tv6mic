@@ -10,3 +10,6 @@
 
 /polices/*
   Cache-Control: public, max-age=2592000
+
+/motifs/*
+  Cache-Control: public, max-age=86400

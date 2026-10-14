@@ -617,6 +617,32 @@ function titreAuto(ed) {
   if (ed.type === 'agenda') return d.titre || 'Agenda';
   return d.fichier || TYPES[ed.type];
 }
+// Motif du design system posé sur la photo d'une soirée : sans réglage, le motif par défaut s'affiche.
+function champMotif(d, changer) {
+  const reglage = G.motifDe(d);
+  const lignes = {};
+  const maj = () => {
+    for (const cle of ['type', 'position', 'couleur']) lignes[cle].querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === reglage[cle])));
+    const sans = reglage.type === 'aucun';
+    lignes.position.closest('.champ').hidden = sans; lignes.couleur.closest('.champ').hidden = sans;
+    defaut.hidden = !d.motif;
+  };
+  const choisir = (cle, v) => { reglage[cle] = v; d.motif = Object.assign({}, reglage); maj(); changer(); };
+  const ligne = (cle, choix, label) => {
+    lignes[cle] = h('div', { class: 'seg', role: 'group', 'aria-label': label }, Object.entries(choix).map(([k, t]) =>
+      h('button', { type: 'button', 'data-v': k, onclick: () => choisir(cle, k) }, cle === 'couleur' ? h('i', { class: 'pastille p-' + k }) : null, t)));
+    return h('div', { class: 'champ' }, h('span', { class: 'lbl', text: label }), lignes[cle]);
+  };
+  const defaut = h('button', { type: 'button', class: 'lien', onclick: () => {
+    d.motif = null; Object.assign(reglage, G.motifDe(d)); maj(); changer();
+  } }, 'Revenir au motif par défaut');
+  const boite = h('fieldset', { class: 'motif' }, h('legend', { text: 'Motif 6MIC' }),
+    ligne('type', G.MOTIFS, 'Motif'), ligne('position', G.POSITIONS, 'Position'), ligne('couleur', G.COULEURS, 'Couleur'),
+    h('small', null, 'Les motifs du design system 6MIC, posés sur la photo. Par défaut : ' + G.MOTIFS[G.MOTIF_DEFAUT.type].toLowerCase() + ', ' +
+      G.POSITIONS[G.MOTIF_DEFAUT.position].toLowerCase() + ', ' + G.COULEURS[G.MOTIF_DEFAUT.couleur].toLowerCase() + '. ', defaut));
+  maj();
+  return boite;
+}
 function vueEditeur(id, typeNouveau) {
   const base = id ? E.contenuParId.get(id) : (TYPES[typeNouveau] ? { id: null, type: typeNouveau, titre: '', donnees: donneesVides(typeNouveau), duree: null, statut: 'actif' } : null);
   if (!base) { annoncer('Contenu introuvable.', true); location.hash = '#contenus'; return; }
@@ -669,6 +695,7 @@ function vueEditeur(id, typeNouveau) {
       h('option', { value: '', text: 'Aucune' }), MENTIONS.map(m => h('option', { value: m, text: m, selected: d.mention === m })), h('option', { value: '*', text: 'Autre…', selected: autre }));
     champs.push(h('div', { class: 'grille2' }, h('div', { class: 'champ' }, h('label', { for: 'f-mention', text: 'Mention' }), sel, libre),
       texte('billetterie', 'Lien billetterie', { type: 'url', max: 300, placeholder: 'https://', aide: 'Affiche un QR code. Laisser vide pour ne pas en mettre.' })));
+    champs.push(champMotif(d, changer));
   } else if (ed.type === 'agenda') {
     const lignes = h('div', { class: 'dates-ag' });
     const remplir = () => {

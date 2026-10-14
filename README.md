@@ -35,7 +35,7 @@ Gabarits (`public/lecteur/gabarits.js` et `gabarits.css`, partagés avec l'aper�
 
 | Type | Données (`contenus.donnees`, JSON) | Durée par défaut |
 | --- | --- | --- |
-| `soiree` | `nom`, `date` (AAAA-MM-JJ), `heure` (HH:MM), `photo.src`, `infos` (lignes séparées par `\n`), `mention`, `billetterie` (URL → QR code) | 10 s |
+| `soiree` | `nom`, `date` (AAAA-MM-JJ), `heure` (HH:MM), `photo.src`, `infos` (lignes séparées par `\n`), `mention`, `billetterie` (URL → QR code), `motif` (`type` faisceaux, rayons, hachures ou aucun ; `position` droite, gauche, haut, bas ; `couleur` rose, violet, degrade, blanc — absent : faisceaux, droite, dégradé) | 10 s |
 | `agenda` | `titre`, `dates` : liste de `{ date, nom, mention }`, `photo.src` facultative ; 8 dates au plus par page | 15 s par page |
 | `image` | `src`, `ajustement` (`remplir` ou `ajuster`) | 8 s |
 | `video` | `src`, `poster`, `duree` (s), `taille` (octets), `son` (booléen) | durée de la vidéo |
