@@ -51,7 +51,10 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
   Cookie de session signé (HMAC), valable 30 jours ; 10 essais ratés en 15 min bloquent l'adresse IP pendant 15 min.
   Toute écriture exige la même origine et un corps JSON (ou l'en-tête `X-TV6MIC: 1` pour les envois de fichiers).
 - **Écrans** : état de chaque écran (en ligne, contenu affiché, boucle en cours, incidents), bouton « Identifier ».
-- **Contenus** : création et modification des 4 types avec aperçu fidèle (mêmes gabarits que les écrans), duplication,
+- **Contenus** : filtres par type, mois de la soirée, mois de programmation, contenus non programmés (raccourci vers les
+  soirées à venir sans programmation), tri par date de soirée (groupé par mois), modification ou nom ; 60 vignettes puis
+  « Afficher plus » ; réglages gardés dans le navigateur.
+  Création et modification des 4 types avec aperçu fidèle (mêmes gabarits que les écrans), duplication,
   archivage, suppression. Deux personnes qui modifient le même contenu : la seconde est prévenue (conflit 409) au lieu d'écraser.
 - **Calendrier** : vue mensuelle par écran ; glisser sur des jours (ou Ctrl/⌘ + clic) pour programmer un contenu.
 - **Programmation** : un ou plusieurs écrans, période ou jours choisis, jours de la semaine, plages horaires, priorité.

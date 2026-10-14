@@ -562,7 +562,6 @@ async function identifier(code) {
 }
 
 /* ================= vue : contenus ================= */
-const filtre = { type: 'tous', archives: false, texte: '' };
 function vignette(c) {
   const d = c.donnees, img = h('div', { class: 'vignette-img' });
   const src = c.type === 'video' ? d.poster : c.type === 'image' ? d.src : d.photo && d.photo.src;
@@ -583,24 +582,145 @@ function vignette(c) {
           h('span', { class: 'aide', text: 'jusqu’au ' + dateCourte(actives.map(x => x.fin).sort().pop()) })]
           : h('span', { class: 'puce puce-filet', text: 'Non programmé' }))));
 }
+/* Filtres des contenus. Avec ~140 soirées par an, on filtre par mois de la soirée, par mois de programmation,
+   et on repère les contenus non programmés. Réglages gardés dans ce navigateur (localStorage). */
+const FILTRE_VIDE = { type: 'tous', archives: false, texte: '', soiree: '', prog: '', tri: 'date' };
+const filtre = Object.assign({}, FILTRE_VIDE, (() => { try { return JSON.parse(localStorage.getItem('tv6mic-filtre-contenus')) || {}; } catch { return {}; } })());
+const garderFiltre = () => { try { localStorage.setItem('tv6mic-filtre-contenus', JSON.stringify(filtre)); } catch { /* navigation privée */ } };
+const moisLong = m => { const [a, n] = m.split('-').map(Number); return MOIS[n - 1] + ' ' + a; };
+// Dates « de soirée » d'un contenu : la date du concert, ou toutes les dates d'un agenda.
+const datesDe = c => c.type === 'soiree' ? (c.donnees.date ? [c.donnees.date] : []) : c.type === 'agenda' ? (c.donnees.dates || []).map(x => x.date).filter(Boolean) : [];
+// Pour le tri : la date de la soirée ; pour un agenda, sa prochaine date (sinon la dernière).
+function dateRef(c, t) {
+  const l = datesDe(c).slice().sort();
+  if (!l.length) return null;
+  return c.type === 'agenda' ? (l.find(x => x >= t) || l[l.length - 1]) : l[0];
+}
+// Mois couverts par les programmations d'un contenu (jours réellement diffusés : période, jours choisis, jours de semaine).
+function moisProgrammes(c) {
+  const mois = new Set();
+  for (const d of diffsDe(c.id)) {
+    let j = d.debut, n = 0;
+    while (j <= d.fin && n++ < 800) { if (R.couvreJour(d, j)) mois.add(j.slice(0, 7)); j = R.ajouterJours(j, 1); }
+  }
+  return mois;
+}
+// Index calculé une fois par affichage : évite de reparcourir les programmations pour chaque filtre.
+function indexContenus() {
+  const t = auj();
+  return E.contenus.map(c => {
+    const diffs = diffsDe(c.id);
+    return { c, dates: datesDe(c), ref: dateRef(c, t), mois: moisProgrammes(c),
+      aVenir: diffs.some(d => d.fin >= t), aujourdhui: diffs.some(d => R.couvreJour(d, t)) };
+  });
+}
+function correspond(x, f, t, sauf) {
+  const c = x.c;
+  if (f.type !== 'tous' && c.type !== f.type) return false;
+  if (f.archives ? c.statut !== 'archive' : c.statut === 'archive') return false;
+  const q = f.texte.trim().toLowerCase();
+  if (q && !(c.titre + ' ' + (c.donnees.nom || '') + ' ' + (c.donnees.titre || '') + ' ' + (c.donnees.dates || []).map(z => z.nom).join(' ')).toLowerCase().includes(q)) return false;
+  if (sauf !== 'soiree' && f.soiree) {
+    if (f.soiree === 'avenir' ? !x.dates.some(d => d >= t)
+      : f.soiree === 'passees' ? !(x.dates.length && x.dates.every(d => d < t))
+        : f.soiree === 'sans' ? x.dates.length > 0
+          : !x.dates.some(d => d.startsWith(f.soiree))) return false;
+  }
+  if (sauf !== 'prog' && f.prog) {
+    if (f.prog === 'non' ? x.aVenir : f.prog === 'oui' ? !x.aVenir : f.prog === 'auj' ? !x.aujourdhui : !x.mois.has(f.prog)) return false;
+  }
+  return true;
+}
 function vueContenus() {
-  const grille = h('div', { class: 'vignettes' });
-  const remplir = () => {
-    const q = filtre.texte.trim().toLowerCase();
-    const l = E.contenus.filter(c => (filtre.type === 'tous' || c.type === filtre.type) && (filtre.archives ? c.statut === 'archive' : c.statut !== 'archive')
-      && (!q || (c.titre + ' ' + (c.donnees.nom || '') + ' ' + (c.donnees.titre || '')).toLowerCase().includes(q)));
-    remplacer(grille, ...(l.length ? l.map(vignette) : [h('p', { class: 'aide', text: filtre.archives ? 'Aucun contenu archivé.' : 'Aucun contenu pour ce filtre.' })]));
+  const t = auj(), index = indexContenus();
+  let limite = 60;
+  const zone = h('div', { class: 'resultats' }), compte = h('span', { class: 'aide' });
+  const selSoiree = h('select', { 'aria-label': 'Date de la soirée', onchange: e => { filtre.soiree = e.target.value; changer(); } });
+  const selProg = h('select', { 'aria-label': 'Programmation', onchange: e => { filtre.prog = e.target.value; changer(); } });
+  const selTri = h('select', { 'aria-label': 'Trier par', onchange: e => { filtre.tri = e.target.value; changer(); } },
+    [['date', 'Date de la soirée'], ['modif', 'Dernière modification'], ['nom', 'Nom']].map(([v, l]) => h('option', { value: v, text: l, selected: filtre.tri === v })));
+  const changer = () => { limite = 60; garderFiltre(); remplir(); };
+  // Options des deux listes de mois, avec le nombre de contenus que chacune afficherait (compte tenu des autres filtres).
+  const options = (sel, cle, fixes, mois, titreMois) => {
+    const base = index.filter(x => correspond(x, filtre, t, cle));
+    const n = v => base.filter(x => correspond(x, Object.assign({}, filtre, { [cle]: v }), t)).length;
+    const valeur = filtre[cle];
+    const groupe = mois.length ? h('optgroup', { label: titreMois }, mois.map(m => h('option', { value: m, text: moisLong(m) + ' (' + n(m) + ')', selected: valeur === m }))) : null;
+    remplacer(sel, fixes.map(([v, l]) => h('option', { value: v, text: l + (v ? ' (' + n(v) + ')' : ''), selected: valeur === v })), groupe);
+    if (valeur && !sel.value) { filtre[cle] = ''; sel.value = ''; }
   };
-  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['agenda', 'Agendas'], ['image', 'Images'], ['video', 'Vidéos']].map(([k, t]) =>
-    h('button', { type: 'button', 'aria-pressed': String(filtre.type === k), onclick: e => { filtre.type = k; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); remplir(); } }, t)));
+  const remplir = () => {
+    const visibles = index.filter(x => x.c.statut !== 'archive' || filtre.archives);
+    const moisSoirees = [...new Set(visibles.flatMap(x => x.dates.map(d => d.slice(0, 7))))].sort();
+    const moisProg = [...new Set(visibles.flatMap(x => [...x.mois]))].sort();
+    options(selSoiree, 'soiree', [['', 'Toutes les dates'], ['avenir', 'À venir'], ['passees', 'Passées'], ['sans', 'Sans date (images, vidéos)']], moisSoirees, 'Mois de la soirée');
+    options(selProg, 'prog', [['', 'Toutes'], ['non', 'Non programmés'], ['oui', 'Programmés'], ['auj', 'À l’écran aujourd’hui']], moisProg, 'Programmés en');
+    const l = index.filter(x => correspond(x, filtre, t));
+    const total = index.filter(x => filtre.archives ? x.c.statut === 'archive' : x.c.statut !== 'archive').length;
+    compte.textContent = l.length === total ? plur(l.length, 'contenu') : plur(l.length, 'contenu affiché', 'contenus affichés') + ' sur ' + total;
+    reinit.hidden = ['type', 'archives', 'texte', 'soiree', 'prog'].every(k => filtre[k] === FILTRE_VIDE[k]);
+    // tri et regroupement
+    let groupes;
+    if (filtre.tri === 'nom') groupes = [[null, l.slice().sort((a, b) => a.c.titre.localeCompare(b.c.titre, 'fr'))]];
+    else if (filtre.tri === 'modif') groupes = [[null, l.slice().sort((a, b) => a.c.modifie_le < b.c.modifie_le ? 1 : -1)]];
+    else {
+      // à venir (mois croissants), puis passées (mois décroissants), puis sans date
+      const avenir = l.filter(x => x.ref && x.ref >= t).sort((a, b) => a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0);
+      const passees = l.filter(x => x.ref && x.ref < t).sort((a, b) => a.ref < b.ref ? 1 : a.ref > b.ref ? -1 : 0);
+      const sans = l.filter(x => !x.ref).sort((a, b) => a.c.modifie_le < b.c.modifie_le ? 1 : -1);
+      const parMois = (liste, passe) => {
+        const g = new Map();
+        for (const x of liste) { const m = x.ref.slice(0, 7); if (!g.has(m)) g.set(m, []); g.get(m).push(x); }
+        return [...g].map(([m, xs]) => [moisLong(m) + (passe ? ' · passé' : ''), xs]);
+      };
+      groupes = [...parMois(avenir, false), ...parMois(passees, true), ...(sans.length ? [['Sans date : images, vidéos…', sans]] : [])];
+    }
+    // affichage progressif : 60 vignettes, puis « Afficher plus »
+    let reste = limite;
+    const blocs = [];
+    for (const [titre, xs] of groupes) {
+      if (reste <= 0) break;
+      const part = xs.slice(0, reste); reste -= part.length;
+      blocs.push(titre ? h('h2', { class: 'groupe-t' }, titre, h('span', { text: plur(xs.length, 'contenu') })) : null,
+        h('div', { class: 'vignettes' }, part.map(x => vignette(x.c))));
+    }
+    const restants = l.length - Math.min(l.length, limite);
+    remplacer(zone, ...(l.length ? blocs : [h('p', { class: 'aide vide', text: filtre.archives ? 'Aucun contenu archivé pour ces filtres.' : 'Aucun contenu pour ces filtres.' })]),
+      restants > 0 && h('div', { class: 'plus' }, h('button', { type: 'button', class: 'btn', onclick: () => { limite += 60; remplir(); } }, 'Afficher plus (' + restants + ' restants)')));
+    majAlerte();
+  };
+  // Raccourci : soirées à venir qui ne passent sur aucun écran.
+  const alerte = h('div', { class: 'alerte-prog', hidden: true });
+  const majAlerte = () => {
+    const n = index.filter(x => x.c.type === 'soiree' && x.c.statut !== 'archive' && x.dates.some(d => d >= t) && !x.aVenir).length;
+    const deja = filtre.type === 'soiree' && filtre.soiree === 'avenir' && filtre.prog === 'non' && !filtre.archives;
+    alerte.hidden = !n || deja;
+    remplacer(alerte, h('span', { text: n > 1 ? n + ' soirées à venir ne sont programmées sur aucun écran.' : '1 soirée à venir n’est programmée sur aucun écran.' }),
+      h('button', { type: 'button', class: 'btn pt', onclick: () => {
+        Object.assign(filtre, FILTRE_VIDE, { type: 'soiree', soiree: 'avenir', prog: 'non', tri: 'date' }); synchro(); changer();
+      } }, n > 1 ? 'Les afficher' : 'L’afficher'));
+  };
+  const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['agenda', 'Agendas'], ['image', 'Images'], ['video', 'Vidéos']].map(([k, tx]) =>
+    h('button', { type: 'button', 'data-v': k, onclick: () => { filtre.type = k; synchro(); changer(); } }, tx)));
+  const recherche = h('input', { type: 'search', placeholder: 'Rechercher un nom…', value: filtre.texte, 'aria-label': 'Rechercher', oninput: e => { filtre.texte = e.target.value; changer(); } });
+  const archives = h('input', { type: 'checkbox', checked: filtre.archives, onchange: e => { filtre.archives = e.target.checked; changer(); } });
+  const reinit = h('button', { type: 'button', class: 'lien', onclick: () => { Object.assign(filtre, FILTRE_VIDE); synchro(); changer(); } }, 'Réinitialiser les filtres');
+  const synchro = () => {
+    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === filtre.type)));
+    recherche.value = filtre.texte; archives.checked = filtre.archives; selTri.value = filtre.tri;
+  };
   afficher(
     h('div', { class: 'tete' }, h('div', null, h('p', { class: 'surtitre', text: plur(E.contenus.filter(c => c.statut !== 'archive').length, 'contenu') }), h('h1', { class: 'titre', text: 'Contenus' })),
       h('div', { class: 'nouveau' }, h('span', { class: 'lbl', text: 'Nouveau :' }),
-        Object.entries(TYPES).map(([k, t]) => h('a', { class: 'btn' + (k === 'soiree' ? ' btn-noir' : ''), href: '#nouveau/' + k }, '+ ' + t)))),
-    h('div', { class: 'filtres' }, seg,
-      h('input', { type: 'search', placeholder: 'Rechercher…', value: filtre.texte, 'aria-label': 'Rechercher', oninput: e => { filtre.texte = e.target.value; remplir(); } }),
-      h('label', { class: 'coche' }, h('input', { type: 'checkbox', checked: filtre.archives, onchange: e => { filtre.archives = e.target.checked; remplir(); } }), 'Archives')),
-    grille);
+        Object.entries(TYPES).map(([k, tx]) => h('a', { class: 'btn' + (k === 'soiree' ? ' btn-noir' : ''), href: '#nouveau/' + k }, '+ ' + tx)))),
+    h('div', { class: 'filtres' }, seg, recherche, h('label', { class: 'coche' }, archives, 'Archives')),
+    h('div', { class: 'filtres filtres-2' },
+      h('label', { class: 'filtre' }, h('span', { class: 'lbl', text: 'Date de la soirée' }), selSoiree),
+      h('label', { class: 'filtre' }, h('span', { class: 'lbl', text: 'Programmation' }), selProg),
+      h('label', { class: 'filtre' }, h('span', { class: 'lbl', text: 'Trier par' }), selTri),
+      h('p', { class: 'compte' }, compte, reinit)),
+    alerte, zone);
+  synchro();
   remplir();
 }
 
