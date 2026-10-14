@@ -179,7 +179,23 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .apercu-msg { position: absolute; inset: 0; display: grid; place-items: center; color: #bdbdbd; font-size: 14px; padding: 20px; text-align: center; }
 .media { display: grid; gap: 8px; }
 .media-ligne { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.media-vignette { width: 160px; aspect-ratio: 16 / 9; background: #111 center / cover no-repeat; border: 1px solid #000; flex: none; }
+.media-vignette { width: 160px; aspect-ratio: 16 / 9; background: #111 center / cover no-repeat; border: 1px solid #000; flex: none;
+  position: relative; display: grid; place-items: center; cursor: pointer; }
+/* vide : le format attendu, à la taille du cadre */
+.media-vide { display: grid; gap: 2px; padding: 6px; text-align: center; color: #fff; pointer-events: none; line-height: 1.15; }
+.media-vide b { font-family: var(--cond); font-size: 20px; font-weight: 400; letter-spacing: .02em; }
+.media-vide small { font-size: 11px; color: rgba(255, 255, 255, .72); }
+@media (hover: none) { .media-vide small { display: none; } }
+.occupe .media-vignette { cursor: default; }
+/* glisser-déposer : la zone survolée */
+.depot.survol .media-vignette { outline: 3px dashed var(--violet-f); outline-offset: 3px; }
+.depot.survol .media-vignette::after { content: "Déposer ici"; position: absolute; inset: 0; display: grid; place-items: center;
+  background: rgba(106, 66, 230, .82); color: #fff; font-weight: 700; font-size: 13px; text-align: center; }
+.date-serie.survol { background: var(--violet-clair); }
+.depot.survol .media-vide { visibility: hidden; }
+.format { display: grid; gap: 4px; font-size: 13px; }
+.format p { color: var(--gris); }
+.format b { color: #000; font-weight: 600; }
 .barre { height: 6px; background: var(--brume2); position: relative; overflow: hidden; }
 .barre i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--violet-f); width: 0; transition: width .2s; }
 .controle { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }

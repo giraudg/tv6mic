@@ -49,7 +49,7 @@ function heureIso(iso) {
   const x = R.heureParis(ms), p = parts(x.date);
   return p.n + ' ' + MC[p.m] + ' ' + String(Math.floor(x.minutes / 60)).padStart(2, '0') + ':' + String(x.minutes % 60).padStart(2, '0');
 }
-const mo = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0).replace('.', ',') + ' Mo';
+const mo = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' Ko' : (n / 1048576).toFixed(n < 10485760 ? 1 : 0).replace('.', ',') + ' Mo';
 const plur = (n, s, p) => n + ' ' + (n > 1 ? (p || s + 's') : s);
 const enListe = l => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1];
 function annoncer(message, erreur) {
@@ -218,10 +218,71 @@ async function preparerImage(fichier) {
   x.fillStyle = '#000'; x.fillRect(0, 0, cw, ch);
   x.drawImage(img, 0, 0, cw, ch);
   const blob = await sansProfilIcc(await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.86)));
-  const avertissement = (w < 1920 && ht < 1080) || w < 1280 || ht < 720
-    ? 'Image de petite taille (' + w + ' × ' + ht + ' px) : elle sera floue en plein écran. Idéal : 1920 × 1080 px ou plus.' : '';
-  return { blob, largeur: cw, hauteur: ch, avertissement };
+  return { blob, largeur: cw, hauteur: ch };
 }
+// Format d'une image en mots : « paysage 16:9 », « portrait ≈ 4:5 », « presque carré »…
+const RAPPORTS = [[16 / 9, '16:9'], [3 / 2, '3:2'], [4 / 3, '4:3'], [5 / 4, '5:4'], [4 / 5, '4:5'], [3 / 4, '3:4'], [2 / 3, '2:3'], [9 / 16, '9:16']];
+function nomFormat(w, ht) {
+  const r = w / ht, ecart = x => Math.abs(Math.log(r / x));
+  if (ecart(1) < 0.02) return 'carré';
+  if (r > 0.87 && r < 1.15) return 'presque carré';
+  const [v, nom] = RAPPORTS.reduce((a, b) => ecart(b[0]) < ecart(a[0]) ? b : a);
+  const sens = r > 1 ? 'paysage' : 'portrait';
+  if (ecart(v) < 0.012) return sens + ' ' + nom;
+  if (ecart(v) < 0.06) return sens + ' ≈ ' + nom;
+  return sens + ' ' + (r > 1 ? r.toFixed(2).replace('.', ',') + ':1' : '1:' + (1 / r).toFixed(2).replace('.', ','));
+}
+// Une image face au cadre où l'écran l'affiche : recadrage (ou bandes noires) et netteté.
+function verdictCadre(img, c) {
+  const l = [];
+  if (!img || !img.largeur || !img.hauteur) return l;
+  const ri = img.largeur / img.hauteur, rf = c.largeur / c.hauteur;
+  const desc = 'Votre image ' + img.largeur + ' × ' + img.hauteur + ' px (' + nomFormat(img.largeur, img.hauteur) + ')';
+  let echelle;
+  if (c.contenir) {
+    echelle = Math.min(c.largeur / img.largeur, c.hauteur / img.hauteur);
+    if (ri > rf * 1.02) l.push(['a', desc + ' : bandes noires en haut et en bas']);
+    else if (ri < rf / 1.02) l.push(['a', desc + ' : bandes noires sur les côtés']);
+    else l.push(['v', desc + ' : occupe tout l’écran']);
+  } else {
+    echelle = Math.max(c.largeur / img.largeur, c.hauteur / img.hauteur);
+    if (ri > rf * 1.03) { const p = Math.round(rf / ri * 100); l.push([p < 70 ? 'a' : 'v', desc + ' : côtés coupés, ' + p + ' % de la largeur visible']); }
+    else if (ri < rf / 1.03) { const p = Math.round(ri / rf * 100); l.push([p < 70 ? 'a' : 'v', desc + ' : haut et bas coupés, ' + p + ' % de la hauteur visible']); }
+    else l.push(['v', desc + ' : au bon format']);
+  }
+  const mini = Math.ceil(img.largeur * echelle) + ' × ' + Math.ceil(img.hauteur * echelle) + ' px';
+  if (echelle > 1.5) l.push(['a', 'Trop petite : agrandie ' + echelle.toFixed(1).replace('.', ',') + ' fois, elle sera floue (il faudrait ' + mini + ').']);
+  else if (echelle > 1.1) l.push(['a', 'Un peu petite : légèrement floue (idéal ' + mini + ' ou plus).']);
+  return l;
+}
+
+/* Glisser-déposer. Un seul gestionnaire pour la page : une zone porte la classe « depot » et une fonction
+   _recevoir(fichiers) ; la plus proche du pointeur l'emporte. Ailleurs, le dépôt est neutralisé : sinon le
+   navigateur ouvrirait l'image à la place du back-office et la saisie en cours serait perdue. */
+let zoneSurvolee = null;
+const avecFichiers = e => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+function survoler(z) {
+  if (z === zoneSurvolee) return;
+  if (zoneSurvolee) zoneSurvolee.classList.remove('survol');
+  zoneSurvolee = z;
+  if (z) z.classList.add('survol');
+}
+const zoneSous = e => { const z = e.target instanceof Element ? e.target.closest('.depot') : null; return z && z._recevoir && !z.classList.contains('occupe') ? z : null; };
+document.addEventListener('dragover', e => {
+  if (!avecFichiers(e)) return;
+  e.preventDefault();
+  const z = zoneSous(e);
+  e.dataTransfer.dropEffect = z ? 'copy' : 'none';
+  survoler(z);
+});
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) survoler(null); });
+document.addEventListener('drop', e => {
+  if (!avecFichiers(e)) return;
+  e.preventDefault();
+  const z = zoneSous(e);
+  survoler(null);
+  if (z && e.dataTransfer.files.length) z._recevoir(Array.from(e.dataTransfer.files));
+});
 async function vue(f, debut, n) { return new DataView(await f.slice(debut, debut + n).arrayBuffer()); }
 const cc4 = (v, o) => String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3));
 function boites(v, debut, fin) {
@@ -365,11 +426,16 @@ const TYPE_PAR_EXT = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime
 const nomSansExtension = n => n.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 100);
 function typeFichier(f) { return f.type || TYPE_PAR_EXT[(f.name.split('.').pop() || '').toLowerCase()] || ''; }
 
-/* Champ d'import : image (visuel, photo de soirée, fond d'agenda) ou vidéo. */
-function champMedia({ genre, valeur, facultatif, change }) {
+/* Champ d'import : image (visuel, photo de soirée, fond d'agenda) ou vidéo.
+   cadre : { largeur, hauteur, contenir?, conseil? } (ou une fonction qui le renvoie) = où l'écran affiche
+   l'image ; la vignette en prend le format (on y voit le recadrage) et le champ le rappelle.
+   On peut glisser un fichier sur le champ ; surplus(fichiers) reçoit les fichiers en trop d'un dépôt multiple. */
+function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 150], surplus }) {
   const video = genre === 'video';
-  const racine = h('div', { class: 'media' });
-  const vignette = h('div', { class: 'media-vignette' });
+  const racine = h('div', { class: 'media depot' });
+  const vide = h('span', { class: 'media-vide' }, h('b'), h('small', { text: video ? 'Glisser une vidéo ici' : 'Glisser une image ici' }));
+  const vignette = h('div', { class: 'media-vignette', 'aria-hidden': 'true', onclick: () => { if (!bouton.disabled) entree.click(); } }, vide);
+  const format = h('div', { class: 'format' });
   const info = h('div', { class: 'aide' });
   const barre = h('div', { class: 'barre', hidden: true }, h('i'));
   const controle = h('ul', { class: 'controle', hidden: true });
@@ -380,33 +446,58 @@ function champMedia({ genre, valeur, facultatif, change }) {
   const bouton = h('button', { type: 'button', class: 'btn', onclick: () => entree.click(), disabled: !E.r2 },
     video ? 'Choisir une vidéo…' : 'Choisir une image…');
   const retirer = facultatif ? h('button', { type: 'button', class: 'btn btn-danger pt', onclick: () => { change(null); montrer(null); } }, 'Retirer') : null;
+  let courant = null, dims = null;
+  const cadreActuel = () => typeof cadre === 'function' ? cadre() : cadre;
+  // Le format du cadre peut changer (nombre de dates d'une série, cadrage d'une image) : l'éditeur rappelle majCadre.
+  function majCadre() {
+    const c = cadreActuel();
+    if (!c) { format.hidden = true; return; }
+    const r = c.largeur / c.hauteur, w = Math.min(boite[0], Math.round(boite[1] * r));
+    Object.assign(vignette.style, { width: w + 'px', height: Math.round(w / r) + 'px', aspectRatio: 'auto', backgroundSize: c.contenir ? 'contain' : 'cover' });
+    vide.firstChild.textContent = c.largeur + ' × ' + c.hauteur;
+    const img = courant && !video ? (courant.largeur ? courant : dims) : null;
+    remplacer(format,
+      h('p', {}, h('b', { text: 'À l’écran : ' + c.largeur + ' × ' + c.hauteur + ' px' }), ', ' + nomFormat(c.largeur, c.hauteur) + (c.conseil ? ' · ' + c.conseil : '')),
+      img && h('ul', { class: 'controle' }, verdictCadre(img, c).map(([e, t]) => h('li', { class: e, text: t }))));
+    format.hidden = false;
+  }
+  racine.majCadre = majCadre;
   function montrer(v) {
+    courant = v; dims = null;
     const src = v && (video ? v.poster : v.src);
     vignette.style.backgroundImage = src ? 'url("' + src + '")' : '';
+    vide.hidden = !!src;
     if (retirer) retirer.hidden = !v;
     info.textContent = !v ? (video ? 'Aucune vidéo.' : 'Aucune image.')
       : video ? [v.largeur && v.largeur + ' × ' + v.hauteur, v.duree && Math.round(v.duree) + ' s', v.taille && mo(v.taille)].filter(Boolean).join(' · ')
-        : [v.largeur && v.largeur + ' × ' + v.hauteur + ' px', v.taille && mo(v.taille)].filter(Boolean).join(' · ');
+        : [v.fichier, v.taille && mo(v.taille)].filter(Boolean).join(' · ');
+    // images importées sans leurs dimensions : on les lit pour pouvoir juger le format
+    if (v && !video && v.src && !v.largeur) {
+      const i = new Image();
+      i.onload = () => { if (courant === v) { dims = { largeur: i.naturalWidth, hauteur: i.naturalHeight }; majCadre(); } };
+      i.src = v.src;
+    }
+    majCadre();
   }
-  entree.addEventListener('change', async () => {
-    const f = entree.files[0];
-    entree.value = '';
-    if (!f) return;
+  let occupe = false;
+  async function importer(f) {
     const type = typeFichier(f);
     controle.hidden = true; encart.hidden = true; bouton.disabled = true;
+    occupe = true; racine.classList.add('occupe');
     const progresser = x => { barre.hidden = false; barre.firstChild.style.width = Math.round(x * 100) + '%'; };
     try {
       if (!video) {
-        if (!type.startsWith('image/')) throw new Error('Choisissez une image JPEG, PNG ou WebP.');
+        if (!type.startsWith('image/')) throw new Error('« ' + f.name + ' » n’est pas une image : choisissez un JPEG, PNG ou WebP.');
         info.textContent = 'Préparation de l’image…';
         const p = await preparerImage(f);
         info.textContent = 'Envoi…';
         const r = await televerser(p.blob, f.name, progresser);
         const v = { src: r.src, largeur: p.largeur, hauteur: p.hauteur, taille: r.taille, fichier: nomSansExtension(f.name) };
         change(v); montrer(v);
-        if (p.avertissement) annoncer(p.avertissement, true);
+        const c = cadreActuel(), flou = c && verdictCadre(v, c).find(([e, t]) => e === 'a' && /petite/.test(t));
+        if (flou) annoncer(flou[1], true);
       } else {
-        if (!type.startsWith('video/')) throw new Error('Choisissez une vidéo MP4 ou MOV.');
+        if (!type.startsWith('video/')) throw new Error('« ' + f.name + ' » n’est pas une vidéo : choisissez un MP4 ou un MOV.');
         info.textContent = 'Contrôle du format…';
         const a = await analyserVideo(f), verdict = verdictVideo(a);
         remplacer(controle, ...verdict.lignes.map(([e, t]) => h('li', { class: e, text: t })));
@@ -427,10 +518,25 @@ function champMedia({ genre, valeur, facultatif, change }) {
       annoncer(e.message, true);
     } finally {
       bouton.disabled = !E.r2; barre.hidden = true;
+      occupe = false; racine.classList.remove('occupe');
     }
+  }
+  // Dépôt (glisser-déposer) : le premier fichier ici, les autres à surplus() s'il existe.
+  racine._recevoir = fichiers => {
+    if (!E.r2 || !fichiers.length) return;
+    if (occupe) { annoncer('Un import est déjà en cours ici.', true); return; }
+    const [f, ...reste] = fichiers;
+    importer(f);
+    if (reste.length) { if (surplus) surplus(reste); else annoncer('Un seul fichier par emplacement : « ' + f.name + ' » a été retenu.', true); }
+  };
+  entree.addEventListener('change', () => {
+    const f = entree.files[0];
+    entree.value = '';
+    if (f) importer(f);
   });
+  if (!E.r2) racine.classList.add('occupe');
+  racine.append(h('div', { class: 'media-ligne' }, vignette, h('div', { class: 'actions' }, bouton, retirer)), format, info, barre, controle, encart, entree);
   montrer(valeur);
-  racine.append(h('div', { class: 'media-ligne' }, vignette, h('div', { class: 'actions' }, bouton, retirer)), info, barre, controle, encart, entree);
   if (!E.r2) racine.append(h('p', { class: 'erreur', text: 'Import impossible : le stockage Cloudflare R2 n’est pas encore activé.' }));
   return racine;
 }
@@ -888,6 +994,16 @@ function champsSerie(d, changer) {
     lignes.lastChild.querySelector('input[type="text"]').focus();
   } }, '+ Ajouter une date');
   const compte = h('small');
+  // Nombre d'affiches à l'écran (dates à venir, 4 au plus) : il fixe le cadre des photos.
+  const nAffiches = () => Math.max(1, etapesApercu({ type: 'serie', donnees: d })[0].dates.length);
+  const cadrePhoto = () => G.cadreSerie(nAffiches());
+  const formats = [1, 3, 4].map(n => { const c = G.cadreSerie(n); return c.largeur + ' × ' + c.hauteur + ' px ' + (n === 1 ? 'pour 1 ou 2 dates' : 'pour ' + n); });
+  // Plusieurs images déposées sur une date : les suivantes vont aux dates suivantes.
+  const repartir = (i, reste) => {
+    const medias = Array.from(lignes.querySelectorAll('.date-serie .media')).slice(i + 1);
+    reste.slice(0, medias.length).forEach((f, k) => medias[k]._recevoir([f]));
+    if (reste.length > medias.length) annoncer(plur(reste.length - medias.length, 'image') + ' en trop : ajoutez d’abord les dates correspondantes, puis déposez-les.', true);
+  };
   function majChoix() {
     const t = auj(), deja = new Set(d.dates.map(x => x.date + '|' + x.nom));
     const soirees = E.contenus.filter(c => c.type === 'soiree' && c.statut === 'actif' && c.donnees.date && c.donnees.date >= t && !deja.has(c.donnees.date + '|' + (c.donnees.nom || c.titre)))
@@ -901,9 +1017,12 @@ function champsSerie(d, changer) {
   function remplir() {
     remplacer(lignes, ...d.dates.map((x, i) => {
       const pm = MENTIONS.includes(x.mention) || !x.mention;
-      return h('div', { class: 'date-serie' + (x.date && x.date < auj() ? ' passee' : '') },
+      const media = champMedia({ genre: 'image', valeur: x.photo, facultatif: true, change: v => { x.photo = v; changer(); },
+        cadre: cadrePhoto, boite: [168, 150], surplus: reste => repartir(i, reste) });
+      // toute la carte de la date reçoit les images déposées
+      const carte = h('div', { class: 'date-serie depot' + (x.date && x.date < auj() ? ' passee' : '') },
         h('span', { class: 'num', text: String(i + 1) }),
-        h('div', { class: 'date-serie-photo' }, champMedia({ genre: 'image', valeur: x.photo, facultatif: true, change: v => { x.photo = v; changer(); } })),
+        h('div', { class: 'date-serie-photo' }, media),
         h('div', { class: 'date-serie-champs' },
           h('div', { class: 'grille2' },
             h('input', { type: 'date', value: x.date || '', 'aria-label': 'Date', oninput: e => { x.date = e.target.value; changer(); } }),
@@ -913,6 +1032,8 @@ function champsSerie(d, changer) {
             h('option', { value: '', text: 'Sans mention' }), MENTIONS.map(m => h('option', { value: m, text: m, selected: x.mention === m })),
             !pm && h('option', { value: x.mention, text: x.mention, selected: true }))),
         h('button', { type: 'button', class: 'btn carre btn-danger', 'aria-label': 'Retirer cette date', onclick: () => { d.dates.splice(i, 1); remplir(); changer(); } }, '×'));
+      carte._recevoir = f => media._recevoir(f);
+      return carte;
     }));
     majChoix();
   }
@@ -929,7 +1050,8 @@ function champsSerie(d, changer) {
     ligneTexte('titre', 'Titre', 'Rap au 6MIC', 'Affiché en très grand ; la taille du texte s’adapte toute seule.'),
     h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Couleur de fond' }), fondSeg),
     h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Dates mises en avant (3 ou 4 conseillées)' }), lignes,
-      h('div', { class: 'actions' }, ajouter, choixSoiree), compte)
+      h('div', { class: 'actions' }, ajouter, choixSoiree), compte,
+      h('small', { text: 'Photos : glissez-les sur chaque date (plusieurs d’un coup sur la première : elles se répartissent dans l’ordre). Le cadre dépend du nombre de dates à venir : ' + enListe(formats) + '. Gardez le sujet au centre : quand une date passe, les affiches restantes s’élargissent.' }))
   ];
 }
 // Line-up : programme d'une soirée (passages : heure, rôle, nom), date, lieu, titre, photo de la tête d'affiche.
@@ -985,8 +1107,9 @@ function champsLineup(d, changer) {
         h('div', { class: 'actions' }, ajout),
         h('small', { text: 'Rangés par heure à l’écran ; un passage après minuit (00:30) compte pour la même soirée. 8 passages au plus.' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo de la tête d’affiche (facultative)' }),
-        champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); } }),
-        h('small', { text: 'Affichée sur la moitié droite de l’écran, sujet au centre. Sans photo : aplat dégradé du 6MIC.' })));
+        champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
+          cadre: Object.assign({ conseil: 'côté droit de l’écran, bord gauche fondu au noir : sujet au centre ou à droite' }, G.CADRES.lineup) }),
+        h('small', { text: 'Sans photo : aplat dégradé du 6MIC.' })));
   }
   rendre();
   return boite;
@@ -1006,6 +1129,7 @@ function vueEditeur(id, typeNouveau) {
     const e = etapes[pageApercu];
     const vide = ed.type === 'image' && !d.src ? 'Importez une image pour la voir ici.' : null;
     ap.rendre(e, vide);
+    document.querySelectorAll('.editeur .media').forEach(m => m.majCadre && m.majCadre());
     const duree = ed.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s (durée de la vidéo)' : '—') : (ed.duree || R.DUREES[ed.type]) + ' s' + (ed.type === 'agenda' && etapes.length > 1 ? ' par page' : '');
     infoApercu.textContent = 'Durée à l’écran : ' + duree + (ed.type === 'soiree' && d.date && d.date < auj() ? ' · Date passée : cette soirée ne s’affiche plus.' : '');
     remplacer(pager, 
@@ -1035,7 +1159,8 @@ function vueEditeur(id, typeNouveau) {
     champs.push(texte('nom', 'Nom du concert', { aide: 'Affiché en très grand ; la taille du texte s’adapte toute seule.' }),
       h('div', { class: 'grille2' }, texte('date', 'Date', { type: 'date', aide: 'La soirée disparaît des écrans le lendemain à 6 h.' }), texte('heure', 'Heure', { type: 'time' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo' }),
-        champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); } }), h('small', { text: 'Idéal : 1920 × 1080 px ou plus, sujet à droite (le texte est à gauche).' })),
+        champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
+          cadre: Object.assign({ conseil: 'plein écran, sujet à droite : le texte occupe la gauche' }, G.CADRES.soiree) })),
       texte('infos', 'Infos', { multi: true, max: 300, aide: 'Deux ou trois lignes : ouverture des portes, tarifs, première partie…' }));
     const autre = !!d.mention && !MENTIONS.includes(d.mention);
     const libre = h('input', { type: 'text', id: 'f-mention-libre', value: autre ? d.mention : '', maxLength: 40, hidden: !autre, placeholder: 'Mention', oninput: e => { d.mention = e.target.value; changer(); } });
@@ -1075,15 +1200,17 @@ function vueEditeur(id, typeNouveau) {
           h('button', { type: 'button', class: 'btn', onclick: importer }, 'Ajouter les soirées enregistrées')),
         h('small', { text: 'Les dates passées disparaissent seules. 8 dates au plus par page ; au-delà, les pages s’enchaînent.' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo de fond (facultative)' }),
-        champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); } })));
+        champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
+          cadre: Object.assign({ conseil: 'en fond, très assombrie : une image simple suffit' }, G.CADRES.agenda) })));
   } else if (ed.type === 'serie') {
     champs.push(...champsSerie(d, changer));
   } else if (ed.type === 'lineup') {
     champs.push(champsLineup(d, changer));
   } else if (ed.type === 'image') {
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Image' }),
-      champMedia({ genre: 'image', valeur: d.src ? d : null, change: v => { Object.assign(d, v || { src: null }); changer(); } }),
-      h('small', { text: 'JPEG, PNG ou WebP, idéalement 1920 × 1080 px. Les visuels de Declinator conviennent.' })));
+      champMedia({ genre: 'image', valeur: d.src ? d : null, change: v => { Object.assign(d, v || { src: null }); changer(); },
+        cadre: () => Object.assign({ contenir: d.ajustement === 'ajuster', conseil: d.ajustement === 'ajuster' ? 'image entière, sans recadrage' : 'plein écran, recadrée si le format diffère' }, G.CADRES.image) }),
+      h('small', { text: 'JPEG, PNG ou WebP. Les visuels 1920 × 1080 de Declinator conviennent tels quels.' })));
     const seg = h('div', { class: 'seg', role: 'group' }, [['remplir', 'Remplir l’écran (recadrer)'], ['ajuster', 'Image entière (bandes noires)']].map(([k, t]) =>
       h('button', { type: 'button', 'aria-pressed': String(d.ajustement === k), onclick: e => { d.ajustement = k; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer(); } }, t)));
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Cadrage' }), seg));

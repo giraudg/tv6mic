@@ -155,12 +155,24 @@
     if (service && x.date === lendemain(service)) { return { texte: 'Demain' + h, proche: true }; }
     return { texte: JOURS_COURTS[p.j] + ' ' + (p.n === 1 ? '1er' : p.n) + ' ' + MOIS_COURTS[p.m] + h, proche: false };
   }
+  // Cadre de la photo à l'écran, en pixels : le back-office l'indique à l'import et y recadre ses vignettes.
+  var CADRES = {
+    soiree: { largeur: 1920, hauteur: 1080 },   // plein cadre (zoom lent de 8 %)
+    agenda: { largeur: 1920, hauteur: 1080 },   // fond très assombri
+    lineup: { largeur: 820, hauteur: 1080 },    // panneau de droite, bord gauche fondu au noir
+    image: { largeur: 1920, hauteur: 1080 }
+  };
+  // Série : 1680 px partagés entre les affiches (écart 48 px), 816 px au plus ; photo 3:4, 470 px de haut au plus.
+  function cadreSerie(n) {
+    n = Math.max(1, n);
+    var largeur = Math.min(816, Math.floor((1680 - (n - 1) * 48) / n));
+    return { largeur: largeur, hauteur: Math.min(n <= 2 ? 440 : 470, Math.round(largeur * 4 / 3)) };
+  }
   function serie(etape, url) {
     var c = etape.contenu, d = c.donnees || {}, dates = etape.dates || [], n = Math.max(1, dates.length);
     var g = el('div', 'g g-serie g-f-' + (FONDS_SERIE[d.fond] ? d.fond : 'violet') + ' g-s-' + n);
     var tete = el('div', 'g-s-tete'), rang = el('div', 'g-s-cartes'), titre, noms = [], i, x, carte, photo, corps, q, nom;
-    // largeur des affiches : 1680 px partagés (écart 48 px), 816 px au plus ; photo 3:4, 470 px de haut au plus
-    var largeur = Math.min(816, Math.floor((1680 - (n - 1) * 48) / n)), hauteur = Math.min(n <= 2 ? 440 : 470, Math.round(largeur * 4 / 3));
+    var cadre = cadreSerie(n), largeur = cadre.largeur, hauteur = cadre.hauteur;
     var tailleNom = n <= 2 ? 72 : (n === 3 ? 66 : 64);
     g.appendChild(el('div', 'g-s-rayons'));
     g.appendChild(logo('g-logo a a0'));
@@ -287,7 +299,7 @@
 
   racine.Gabarits = {
     soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, veille: veille, identification: identification,
-    FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, minutesSoiree: minutesSoiree,
+    FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe
   };
