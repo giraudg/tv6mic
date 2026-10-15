@@ -65,6 +65,14 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
 - **Flux et boucles** : nom des écrans, contenu par défaut, adresse MagicINFO, simulation de la boucle à une date et une heure,
   ordre de passage par glisser-déposer.
 - **Journal** : qui a modifié quoi et quand.
+- **Réglages** : couleurs primaire, secondaire et dégradé (nommables, aperçu en direct, contrôle de lisibilité), qui habillent
+  les écrans (variables CSS posées par `Gabarits.appliquerReglages`) et le back-office ; listes de choix réglables : rôles du
+  line-up (libellé, ordre, mise en valeur par défaut), mentions (rouge ou non), salles. Les rôles sont enregistrés par clé ;
+  renommer une mention ou une salle met à jour les contenus qui l'utilisent ; un élément utilisé s'archive au lieu d'être
+  supprimé. Valeurs d'origine : `REGLAGES_DEFAUT` dans `src/worker.js` (seule source) ; enregistrement dans `meta` (clé
+  `reglages`, versionnée), transmis aux écrans avec la programmation.
+- **Import** : glisser-déposer sur chaque champ image ou vidéo (plusieurs affiches d'un coup sur une série) ; la vignette
+  prend le format du cadre à l'écran (`Gabarits.CADRES`, `cadreSerie`) et l'import signale recadrage et netteté.
 - **Images** : converties en JPEG dans le navigateur (2560 px au plus sur le grand côté), puis débarrassées de leur profil ICC
   (Chromium 56 affiche en couleurs « postérisées » les JPEG portant le profil sRGB compact ajouté par Chrome).
 - **Vidéos** : le navigateur lit l'en-tête MP4 (codec, profil, taille, cadence, débit, son) et refuse un fichier incompatible
@@ -75,7 +83,7 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
 
 - **Cloudflare Workers** avec ressources statiques : `public/` est servi tel quel, `src/worker.js` gère l'API.
 - **Cloudflare D1** (base `tv-6mic`) : `flux`, `contenus`, `diffusions`, `diffusion_flux`, `ecrans`, `journal`, `meta`
-  (`version` de la programmation, à incrémenter à chaque modification pour que les écrans la rechargent).
+  (`version` de la programmation, à incrémenter à chaque modification pour que les écrans la rechargent ; `reglages`).
 - **Cloudflare R2** (compartiment `tv-6mic-medias`, liaison `MEDIAS`) : images et vidéos importées, clés `m/AAAA-MM/…`,
   servies sous `/medias/` avec cache Cloudflare. Les fichiers d'essai du lot 1 restent dans `public/test-medias/`.
 
