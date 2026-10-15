@@ -167,7 +167,11 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 
 /* ---------- éditeur de contenu ---------- */
 .editeur { display: grid; gap: 24px; align-items: start; }
-@media (min-width: 1100px) { .editeur { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); } }
+@media (min-width: 1100px) {
+  .editeur { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); grid-template-areas: "contenu apercu" "prog apercu"; grid-template-rows: auto 1fr; }
+  .ed-contenu { grid-area: contenu; } .ed-apercu { grid-area: apercu; align-self: start; } .ed-prog { grid-area: prog; align-self: start; }
+}
+.barre-ed { display: none; }
 .panneau { border: 1px solid #000; padding: 20px; display: grid; gap: 16px; background: #fff; min-width: 0; }
 .panneau > .panneau-t { margin: -20px -20px 0; padding: 14px 20px 14px; background: var(--rose-clair); border-bottom: 1px solid #000; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .panneau.bleu > .panneau-t { background: var(--bleu-clair); }
@@ -209,7 +213,6 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .dates-ag { display: grid; gap: 6px; }
 .date-ag { display: grid; grid-template-columns: 150px 1fr 160px 34px; gap: 6px; align-items: center; }
 .date-ag.passee input { color: var(--gris); }
-@media (max-width: 640px) { .date-ag { grid-template-columns: 1fr 1fr; } }
 .diffs { list-style: none; margin: 0; padding: 0; display: grid; }
 .diffs li { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--filet); }
 .diffs li:first-child { border-top: 0; }
@@ -351,7 +354,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
   .etat-sync { padding-bottom: 0; }
   .ah-tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0;
     background: #000; padding-bottom: env(safe-area-inset-bottom, 0px); overflow: visible; max-width: none; }
-  .ah-tabs button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 9px 2px 8px;
+  .ah-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; height: 56px; padding: 0 2px;
     background: #000; color: rgba(255, 255, 255, .72); font-size: 11px; font-weight: 600; line-height: 1.1; }
   .ah-tabs button:hover { background: #000; }
   .ah-tabs button[aria-pressed="true"] { background: #000; color: #fff; box-shadow: inset 0 3px 0 var(--magenta); }
@@ -370,14 +373,6 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
   .tete > .actions .btn { white-space: normal; text-align: center; }
   .nouveau { display: flex; flex-wrap: wrap; gap: 6px; }
   .nouveau .btn { flex: 1 1 28%; }
-  .date-serie { grid-template-columns: 22px minmax(0, 1fr) 36px; }
-  .passage, .passage:has(> input[type="text"]:not(.passage-nom)) { grid-template-columns: 100px minmax(0, 1fr) 36px; }
-  .passage > :nth-child(n+3):not(.btn) { grid-column: 1 / 3; }
-  .passage > .passage-niveau { grid-column: 1 / 3; }
-  .passage > .btn { grid-row: 1; grid-column: 3; }
-  .date-serie-photo { grid-column: 2; }
-  .date-serie-champs { grid-column: 2; }
-  .date-serie > .btn { grid-row: 1; grid-column: 3; }
   .nouveau .lbl { display: none; }
   .nouveau .btn { padding: 9px 2px; font-size: 14px; }
 
@@ -440,5 +435,89 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
   .ligne-r > span:empty { display: none; }
   .ligne-r .btn.pt { justify-self: start; }
   .ligne-r { gap: 6px 8px; }
-  .reglages-pied { bottom: calc(58px + env(safe-area-inset-bottom, 0px)); margin-inline: -16px; }
+  .reglages-pied { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); margin-inline: -16px; }
+}
+
+/* ---------- téléphone : saisie confortable, un bloc par élément, actions sous le pouce ---------- */
+@media (max-width: 640px) {
+  /* 16 px : Safari ne zoome plus sur chaque champ ; 44 px : la taille d'un doigt */
+  input[type="text"], input[type="password"], input[type="date"], input[type="time"], input[type="number"], input[type="url"], input[type="search"], select, textarea {
+    font-size: 16px; min-height: 44px; }
+  /* Safari dimensionne les champs date et heure sur leur contenu, sans tenir compte de la colonne : ils débordaient sur
+     le champ voisin. Sans apparence native, ils prennent la largeur prévue (le sélecteur natif s'ouvre toujours). */
+  input[type="date"], input[type="time"] { -webkit-appearance: none; appearance: none; display: block; text-align: left; line-height: 1.35; }
+  input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+  .btn { min-height: 44px; }
+  .btn.pt { min-height: 36px; }
+  .btn.carre { width: 44px; height: 44px; }
+  .seg button { min-height: 42px; }
+  .panneau { padding: 16px 14px; gap: 14px; }
+  .panneau > .panneau-t { margin: -16px -14px 0; padding: 12px 14px; }
+  .grille2:has(input[type="time"]) { grid-template-columns: minmax(0, 1fr) 118px; }
+
+  /* lignes répétées (dates d'agenda, passages, dates de série) : une carte par élément */
+  .dates-ag, .passages { gap: 10px; }
+  .date-ag { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; padding: 10px; border: 1px solid #000; background: #fff; }
+  .date-ag > input[type="date"] { grid-column: 1; grid-row: 1; }
+  .date-ag > .btn { grid-column: 2; grid-row: 1; }
+  .date-ag > input[type="text"], .date-ag > select { grid-column: 1 / -1; }
+  .passage, .passage:has(> input[type="text"]:not(.passage-nom)) { grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 8px; padding: 10px; border: 1px solid #000; background: #fff; }
+  .passage.tete { box-shadow: inset 4px 0 0 var(--magenta); }
+  .passage > input[type="time"] { grid-column: 1; }
+  .passage > select[aria-label="Rôle"] { grid-column: 2 / 4; }
+  .passage > input[type="text"] { grid-column: 1 / -1; }
+  .passage > .passage-niveau { grid-column: 1 / 3; }
+  .passage > .btn { grid-column: 3; }
+  .date-serie { grid-template-columns: 26px minmax(0, 1fr) 44px; padding: 10px; gap: 10px; }
+  .date-serie > .btn { grid-row: 1; grid-column: 3; }
+  .date-serie-photo { grid-column: 2; grid-row: 1; }
+  .date-serie-champs { grid-column: 1 / -1; }
+
+  /* titre de page : actions secondaires en ligne ; l'action principale passe dans la barre du bas */
+  .tete > .actions > .principal { display: none; }
+  .tete > .actions:not(:has(> :not(.principal):not(.sep))) { display: none; }
+  .tete > .actions > * { flex: 1 1 28%; }
+  .barre-ed { position: sticky; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px;
+    margin: 0 -16px; padding: 10px 16px; background: #fff; border-top: 1px solid #000; }
+  .barre-ed .btn-noir[disabled] { opacity: 1; background: var(--brume2); border-color: var(--brume2); color: var(--gris); }
+  .reglages-pied, .selection { bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  .selection { margin-inline: -16px; }
+
+  /* Flux et boucles : date et heure côte à côte, « Maintenant » dessous */
+  .simu { display: grid; grid-template-columns: minmax(0, 1fr) 118px; gap: 10px; padding: 12px; }
+  .simu > .btn, .simu > .aide { grid-column: 1 / -1; }
+
+  /* fenêtres : plein écran (formulaire long), sauf les confirmations */
+  .dlg:not(.petit) { width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; box-shadow: none; }
+  .dlg-p { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .dlg-p > :only-child { grid-column: 1 / -1; }
+  .dlg-p > .sep { display: none; }
+  .dlg-p > .btn-danger:first-child:nth-last-child(4) { grid-column: 1 / -1; }   /* un seul « Retirer » : sur toute la largeur */
+
+  /* calendrier : repères dans la grille, programmation du jour dessous */
+  .cal-tel .cal-c { min-height: 56px; padding: 5px 4px 6px; gap: 5px; }
+  .cal-tel .cal-n { font-size: 15px; }
+  .cal-tel .cal-c.jour { background: #000; color: #fff; }
+  .cal-tel .cal-c.jour .cal-n { color: #fff; }
+  .cal-pts { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+  .cal-pt { display: block; width: 8px; height: 8px; border-radius: 50%; }
+  .cal-pt.prio-pt { box-shadow: 0 0 0 2px var(--rouge); }
+  .cal-etoile { font-size: 10px; line-height: 8px; color: var(--magenta); }
+  .cal-c.jour .cal-etoile { color: #fff; }
+  .cal-tel .cal-plus { font-size: 10px; line-height: 8px; }
+  .cal-jour { border: 1px solid #000; display: grid; gap: 10px; padding: 14px; }
+  .cal-jour-t { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .cal-jour-t h2 { font-family: var(--cond); font-weight: 700; text-transform: uppercase; font-size: 26px; line-height: 1; }
+  .cal-jour-concert { font-size: 14px; font-weight: 600; color: var(--magenta); }
+  .cal-jour-l { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .cal-jour-l button { width: 100%; min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #000; background: #fff; text-align: left; }
+  .cal-jour-n { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+  .cal-jour-n b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-jour-n small { font-size: 12px; }
+  .cal-jour-f { font-size: 22px; color: var(--gris); }
+  .cal-plusieurs { justify-self: start; }
+}
+@media (max-width: 640px) {
+  /* la notification passe au-dessus des barres collantes (enregistrement, sélection de jours) */
+  body:has(.barre-ed, .reglages-pied:not([hidden]), .selection:not([hidden])) .toast { bottom: calc(128px + env(safe-area-inset-bottom, 0px)); }
 }

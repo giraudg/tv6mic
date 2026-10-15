@@ -1241,7 +1241,7 @@ function vueEditeur(id, typeNouveau) {
   }
 
   /* actions */
-  const enregistrer = h('button', { type: 'button', class: 'btn btn-noir', disabled: !!ed.id, onclick: () => sauver() }, ed.id ? 'Enregistrer' : 'Créer le contenu');
+  const enregistrer = h('button', { type: 'button', class: 'btn btn-noir principal', disabled: !!ed.id, onclick: () => sauver() }, ed.id ? 'Enregistrer' : 'Créer le contenu');
   async function sauver(apres) {
     if ((ed.type === 'image' || ed.type === 'video') && !d.src) { annoncer('Importez d’abord le fichier.', true); return; }
     if (ed.type === 'soiree' && !d.nom.trim()) { annoncer('Indiquez le nom du concert.', true); $('#f-nom').focus(); return; }
@@ -1310,17 +1310,26 @@ function vueEditeur(id, typeNouveau) {
       }));
     })()) : null;
 
+  // Téléphone : barre collante en bas (aperçu, enregistrer) ; le bouton du haut est masqué, celui-ci le reflète.
+  const enregistrerBas = h('button', { type: 'button', class: 'btn btn-noir', onclick: () => enregistrer.click() });
+  const refleter = () => { enregistrerBas.disabled = enregistrer.disabled; enregistrerBas.textContent = enregistrer.textContent; };
+  new MutationObserver(refleter).observe(enregistrer, { attributes: true, attributeFilter: ['disabled'], childList: true, subtree: true, characterData: true });
+  refleter();
+  const colle = h('div', { class: 'colle ed-apercu' }, h('p', { class: 'lbl', text: 'Aperçu à l’écran' }), ap.noeud, pager, infoApercu);
   afficher(
     h('div', { class: 'tete' },
       h('div', null, h('p', { class: 'surtitre' }, h('a', { href: '#contenus', text: '← Contenus' }), ' · ', TYPES[ed.type], ed.statut === 'archive' ? ' · archivé' : ''),
         h('h1', { class: 'titre', text: ed.id ? ed.titre : 'Nouveau contenu : ' + TYPES[ed.type].toLowerCase() })),
       actions),
+    // contenu, aperçu, programmation : deux colonnes sur grand écran (aperçu à droite), à la suite sur téléphone
     h('div', { class: 'editeur' },
-      h('div', { style: { display: 'grid', gap: '24px', minWidth: 0 } },
-        h('section', { class: 'panneau' }, h('div', { class: 'panneau-t' }, h('h2', { text: 'Contenu' })),
-          champ('Nom dans le back-office', champTitre, 'Rempli automatiquement ; modifiable.'), champs),
-        prog),
-      h('div', { class: 'colle' }, h('p', { class: 'lbl', text: 'Aperçu à l’écran' }), ap.noeud, pager, infoApercu)));
+      h('section', { class: 'panneau ed-contenu' }, h('div', { class: 'panneau-t' }, h('h2', { text: 'Contenu' })),
+        champ('Nom dans le back-office', champTitre, 'Rempli automatiquement ; modifiable.'), champs),
+      colle,
+      prog && Object.assign(prog, { className: prog.className + ' ed-prog' })),
+    h('div', { class: 'barre-ed' },
+      h('button', { type: 'button', class: 'btn', onclick: () => colle.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, 'Aperçu'),
+      enregistrerBas));
   majApercu();
   if (ouvrirProgrammation && ouvrirProgrammation === ed.id) { ouvrirProgrammation = null; dialogueDiffusion({ contenu: ed.id }); }
 }
@@ -1477,7 +1486,10 @@ function decalerMois(mois, n) {
 }
 
 /* ================= vue : calendrier ================= */
-const cal = { mois: null, flux: 'tous', sel: [] };
+const cal = { mois: null, flux: 'tous', sel: [], jour: null, plusieurs: false };
+// Téléphone : la grille du mois ne montre que des repères ; la programmation du jour touché s'affiche dessous.
+const TELEPHONE = matchMedia('(max-width: 640px)');
+TELEPHONE.addEventListener('change', () => { if (surVue('calendrier') && !document.querySelector('dialog[open]')) vueCalendrier(); });
 let calGlisse = null;
 document.addEventListener('pointerup', () => { calGlisse = null; });
 function vueCalendrier(arg) {
@@ -1489,6 +1501,9 @@ function vueCalendrier(arg) {
   const grille = h('div', { class: 'cal', role: 'grid' }, ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map(j => h('div', { class: 'cal-j', title: j }, h('span', { class: 'long', text: j }), h('span', { class: 'court', text: j.slice(0, 3) }))));
   const diffs = E.diffusions.filter(d => (cal.flux === 'tous' || d.flux.includes(cal.flux)) && (E.contenuParId.get(d.contenu) || {}).statut === 'actif');
   const soirees = E.contenus.filter(c => c.type === 'soiree' && c.statut === 'actif' && c.donnees.date);
+  const tel = TELEPHONE.matches;
+  if (tel && (!cal.jour || cal.jour.slice(0, 7) !== cal.mois)) cal.jour = t.slice(0, 7) === cal.mois ? t : premier;
+  const jourBoite = h('section', { class: 'cal-jour' });
   const barre = h('div', { class: 'selection', hidden: !cal.sel.length });
   const majSel = () => {
     grille.querySelectorAll('.cal-c').forEach(c => c.classList.toggle('sel', cal.sel.includes(c.dataset.date)));
@@ -1501,6 +1516,7 @@ function vueCalendrier(arg) {
     }
   };
   let nbSemaines = 0;
+  const jours = new Map();
   for (let d = debut; ; d = R.ajouterJours(d, 1)) {
     const p = parts(d);
     if (p.j === 1 && d > premier && (p.m + 1 !== m || p.a !== a)) break;
@@ -1509,14 +1525,20 @@ function vueCalendrier(arg) {
       .sort((u, v) => (v.x.prioritaire - u.x.prioritaire) || ((u.x.plages ? u.x.plages[0][0] : '') < (v.x.plages ? v.x.plages[0][0] : '') ? -1 : 1));
     const visibles = items.filter(({ x, c }) => !((c.type === 'soiree' || c.type === 'lineup') && c.donnees.date && c.donnees.date < d) && !((c.type === 'agenda' || c.type === 'serie') && !(c.donnees.dates || []).some(z => z.date >= d)));
     const concerts = soirees.filter(c => c.donnees.date === d);
-    const cellule = h('div', { class: 'cal-c' + (p.m + 1 !== m ? ' hors' : '') + (d === t ? ' auj' : '') + (d < t ? ' passe' : ''), 'data-date': d, role: 'gridcell' },
-      h('span', { class: 'cal-n', text: p.n === 1 ? '1er ' + MC[p.m] : String(p.n) }),
-      concerts.map(c => h('span', { class: 'cal-plus', text: '★ ' + (c.donnees.nom || c.titre) })),
-      visibles.slice(0, 5).map(({ x, c }) => h('button', { type: 'button', class: 'cal-e t-' + c.type + (x.prioritaire ? ' prio' : ''), title: c.titre + ' — ' + resumeDiffusion(x),
+    jours.set(d, { visibles, concerts });
+    const cellule = h('div', { class: 'cal-c' + (p.m + 1 !== m ? ' hors' : '') + (d === t ? ' auj' : '') + (d < t ? ' passe' : '') + (tel && d === cal.jour && !cal.plusieurs ? ' jour' : ''), 'data-date': d, role: 'gridcell' },
+      h('span', { class: 'cal-n', text: p.n === 1 && !tel ? '1er ' + MC[p.m] : String(p.n) }),
+      // téléphone : un repère par programmation (couleur du type), une étoile les jours de concert
+      tel ? h('span', { class: 'cal-pts' }, concerts.length ? h('span', { class: 'cal-etoile', text: '★' }) : null,
+        visibles.slice(0, 6).map(({ x, c }) => h('i', { class: 'cal-pt t-' + c.type + (x.prioritaire ? ' prio-pt' : '') })),
+        visibles.length > 6 && h('span', { class: 'cal-plus', text: '+' + (visibles.length - 6) })) : null,
+      !tel && concerts.map(c => h('span', { class: 'cal-plus', text: '★ ' + (c.donnees.nom || c.titre) })),
+      !tel && visibles.slice(0, 5).map(({ x, c }) => h('button', { type: 'button', class: 'cal-e t-' + c.type + (x.prioritaire ? ' prio' : ''), title: c.titre + ' — ' + resumeDiffusion(x),
         text: (x.plages ? x.plages[0][0] + ' ' : '') + c.titre, onclick: e => { e.stopPropagation(); cal.sel = []; majSel(); dialogueDiffusion({ diffusion: x, jour: d }); } })),
-      visibles.length > 5 && h('span', { class: 'cal-plus', text: '+ ' + (visibles.length - 5) + ' autres' }));
+      !tel && visibles.length > 5 && h('span', { class: 'cal-plus', text: '+ ' + (visibles.length - 5) + ' autres' }));
     cellule.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
+      if (tel && !cal.plusieurs) { cal.jour = d; grille.querySelectorAll('.cal-c').forEach(c => c.classList.toggle('jour', c.dataset.date === d)); majJour(); return; }
       // Ctrl / ⌘ / Maj + clic, ou toucher sur tablette : ajoute ou retire un jour
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.pointerType === 'touch') { const i = cal.sel.indexOf(d); if (i >= 0) cal.sel.splice(i, 1); else cal.sel.push(d); cal.sel.sort(); majSel(); return; }
       calGlisse = d; cal.sel = [d]; majSel();
@@ -1530,6 +1552,27 @@ function vueCalendrier(arg) {
     });
     grille.append(cellule);
   }
+  // programmation du jour choisi (téléphone)
+  function majJour() {
+    if (!tel) return;
+    if (cal.plusieurs) {
+      remplacer(jourBoite, h('div', { class: 'cal-jour-t' }, h('h2', { text: 'Plusieurs jours' }),
+        h('button', { type: 'button', class: 'btn pt', onclick: () => { cal.plusieurs = false; cal.sel = []; vueCalendrier(); } }, 'Terminer')),
+        h('p', { class: 'aide', text: 'Touchez les jours à programmer, puis « Programmer » dans la barre du bas.' }));
+      return;
+    }
+    const d = cal.jour, x = jours.get(d) || { visibles: [], concerts: [] }, p = parts(d);
+    remplacer(jourBoite,
+      h('div', { class: 'cal-jour-t' }, h('h2', { text: JOURS[p.j] + ' ' + (p.n === 1 ? '1er' : p.n) + ' ' + MOIS[p.m] }),
+        h('button', { type: 'button', class: 'btn btn-violet', onclick: () => dialogueDiffusion({ jours: [d] }) }, '+ Programmer')),
+      x.concerts.map(c => h('a', { class: 'cal-jour-concert', href: '#contenu/' + c.id }, '★ Concert : ' + (c.donnees.nom || c.titre))),
+      x.visibles.length ? h('ul', { class: 'cal-jour-l' }, x.visibles.map(({ x: dif, c }) => h('li', null, h('button', { type: 'button', onclick: () => dialogueDiffusion({ diffusion: dif, jour: d }) },
+        h('span', { class: 'puce t-' + c.type, text: TYPES[c.type] }),
+        h('span', { class: 'cal-jour-n' }, h('b', { text: c.titre }), h('small', { text: nomsFlux(dif.flux) + ' · ' + resumeHoraires(dif) })),
+        dif.prioritaire ? h('span', { class: 'puce prio', text: 'Prioritaire' }) : null, h('span', { class: 'cal-jour-f', 'aria-hidden': 'true', text: '›' })))))
+        : h('p', { class: 'aide', text: 'Rien de programmé ce jour' + (cal.flux === 'tous' ? '' : ' sur cet écran') + '.' }),
+      h('button', { type: 'button', class: 'btn pt cal-plusieurs', onclick: () => { cal.plusieurs = true; cal.sel = []; vueCalendrier(); } }, 'Programmer sur plusieurs jours…'));
+  }
   const segFlux = h('div', { class: 'seg', role: 'group', 'aria-label': 'Écran' },
     [['tous', 'Tous les écrans'], ...E.flux.map(f => [f.code, f.nom])].map(([k, n]) => h('button', { type: 'button', 'aria-pressed': String(cal.flux === k), onclick: () => { cal.flux = k; vueCalendrier(); } }, n)));
   afficher(
@@ -1539,10 +1582,10 @@ function vueCalendrier(arg) {
         h('a', { class: 'btn', href: '#calendrier/' + auj().slice(0, 7) }, 'Aujourd’hui'),
         h('a', { class: 'btn carre', href: '#calendrier/' + decalerMois(cal.mois, 1), 'aria-label': 'Mois suivant' }, '›'))),
     h('div', { class: 'cal-barre' }, segFlux),
-    h('p', { class: 'aide', text: 'Glissez sur plusieurs jours (ou Ctrl / ⌘ + clic pour des jours séparés) pour programmer un contenu en série. Cliquez sur une programmation pour la modifier. ★ : date d’une soirée enregistrée.' }),
+    h('p', { class: 'aide', text: tel ? 'Touchez un jour pour voir sa programmation. ★ : date d’une soirée enregistrée.' : 'Glissez sur plusieurs jours (ou Ctrl / ⌘ + clic pour des jours séparés) pour programmer un contenu en série. Cliquez sur une programmation pour la modifier. ★ : date d’une soirée enregistrée.' }),
     h('div', { class: 'legende' }, Object.entries(TYPES).map(([k, n]) => h('span', { class: 'puce t-' + k, text: n })), h('span', { class: 'puce prio', text: 'Prioritaire' })),
-    grille, barre);
-  majSel();
+    Object.assign(grille, { className: 'cal' + (tel ? ' cal-tel' + (cal.plusieurs ? ' cal-multi' : '') : '') }), tel ? jourBoite : null, barre);
+  majSel(); majJour();
 }
 
 /* ================= vue : flux et boucles ================= */
@@ -1653,8 +1696,8 @@ function vueReglages() {
   const r = structuredClone({ couleurs: base.couleurs, roles: base.roles, mentions: base.mentions, salles: base.salles });
   const ed = edition = { id: null, sale: false };
   const usages = usagesReglages();
-  const enregistrer = h('button', { type: 'button', class: 'btn btn-noir', disabled: true, onclick: () => sauver() }, 'Enregistrer');
-  const annuler = h('button', { type: 'button', class: 'btn', disabled: true, onclick: () => { edition = null; vueReglages(); } }, 'Annuler les modifications');
+  const enregistrer = h('button', { type: 'button', class: 'btn btn-noir principal', disabled: true, onclick: () => sauver() }, 'Enregistrer');
+  const annuler = h('button', { type: 'button', class: 'btn principal', disabled: true, onclick: () => { edition = null; vueReglages(); } }, 'Annuler les modifications');
   let minuterie = null;
   // barre d'enregistrement collante, visible dès la première modification (pages longues, téléphone)
   const pied = h('div', { class: 'reglages-pied', hidden: true }, h('span', { text: 'Modifications non enregistrées' }),
