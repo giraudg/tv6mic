@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -400,8 +400,9 @@
   }
   function recevoir(r) {
     inconnu = false;
-    prog = { version: r.version, flux: r.flux, defaut: r.defaut || null, contenus: r.contenus || {}, diffusions: r.diffusions || [] };
+    prog = { version: r.version, flux: r.flux, defaut: r.defaut || null, contenus: r.contenus || {}, diffusions: r.diffusions || [], reglages: r.reglages || null };
     ecrire(K.prog, JSON.stringify(prog));
+    try { Gabarits.appliquerReglages(prog.reglages); } catch (e) { noter('réglages : ' + e.message); }
     gererMedias();
     if (!enRoute) { demarrer(); } else { verifier(); }
   }
@@ -540,6 +541,7 @@
     if (!CODE) { menu(); return; }
     memoire = lireJSON(K.medias) || {};
     prog = lireJSON(K.prog);
+    if (prog && prog.reglages) { try { Gabarits.appliquerReglages(prog.reglages); } catch (e) {} }
     demarrer();                                   // tout de suite : programmation gardée, ou écran « Chargement… »
     if (prog) { gererMedias(); }
     interroger();

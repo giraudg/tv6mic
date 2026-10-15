@@ -14,6 +14,7 @@
    - PUT  /api/admin/flux/{code}, POST /api/admin/flux/{code|tous}/identifier, POST /api/admin/ordre
    - POST /api/admin/medias         import d'un fichier (corps brut) vers R2
    - GET  /api/admin/journal?page=N
+   - PUT  /api/admin/reglages       couleurs du 6MIC et listes de choix (rôles du line-up, mentions, salles)
    Tout le reste est servi depuis public/ (lecteur, back-office, diagnostic, médias d'essai). */
 
 const COOKIE = 'tv6mic_admin';
@@ -24,7 +25,6 @@ const ID_VALIDE = /^[a-z0-9-]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video'];
-const ROLES_LINEUP = ['ouverture', 'premiere', 'tete', 'dj', 'fermeture', 'autre'];
 const NIVEAUX_LINEUP = ['vedette', 'forte', 'normale', 'discrete'];   // vide = selon le rôle
 const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
@@ -120,7 +120,9 @@ async function programme(req, env, ctx, code) {
     }
   }
   const diffusions = lignes.map(diffusionVersJson);
-  return json({ ...base, defaut: flux.contenu_defaut && contenus[flux.contenu_defaut] ? flux.contenu_defaut : null, contenus, diffusions });
+  const r = await lireReglages(env);
+  const reglages = { couleurs: r.couleurs, roles: r.roles.map(x => ({ cle: x.cle, libelle: x.libelle, niveau: x.niveau })), mentions: r.mentions.map(x => ({ libelle: x.libelle, alerte: x.alerte })) };
+  return json({ ...base, defaut: flux.contenu_defaut && contenus[flux.contenu_defaut] ? flux.contenu_defaut : null, contenus, diffusions, reglages });
 }
 
 function diffusionVersJson(l) {
@@ -211,6 +213,7 @@ async function admin(req, env, url) {
   if (p === '/api/admin/diffusions' && m === 'POST') return enregistrerDiffusion(req, env, qui, null);
   if (p === '/api/admin/ordre' && m === 'POST') return ordonner(req, env, qui);
   if (p === '/api/admin/retirer-ecran' && m === 'POST') return retirerEcran(req, env, qui);
+  if (p === '/api/admin/reglages' && m === 'PUT') return modifierReglages(req, env, qui);
 
   let r = p.match(/^\/api\/admin\/contenus\/([a-z0-9-]+)(\/dupliquer)?$/);
   if (r) {
@@ -328,13 +331,14 @@ async function connexion(req, env, url, secret) {
 /* ---- lecture ---- */
 async function etat(env, qui) {
   const db = env.DB;
-  const [flux, contenus, diffusions, liens, ecrans, version] = await Promise.all([
+  const [flux, contenus, diffusions, liens, ecrans, version, reglages] = await Promise.all([
     db.prepare('SELECT code, nom, ordre, contenu_defaut, identifier_jusqua FROM flux ORDER BY ordre, nom').all(),
     db.prepare('SELECT id, type, titre, donnees, duree, statut, cree_le, modifie_le FROM contenus ORDER BY modifie_le DESC').all(),
     db.prepare('SELECT * FROM diffusions ORDER BY debut, cree_le').all(),
     db.prepare('SELECT diffusion_id, flux_code FROM diffusion_flux').all(),
     db.prepare('SELECT * FROM ecrans').all(),
-    db.prepare("SELECT valeur FROM meta WHERE cle = 'version'").first('valeur')
+    db.prepare("SELECT valeur FROM meta WHERE cle = 'version'").first('valeur'),
+    lireReglages(env)
   ]);
   const parDiffusion = {};
   for (const l of liens.results) (parDiffusion[l.diffusion_id] = parDiffusion[l.diffusion_id] || []).push(l.flux_code);
@@ -343,7 +347,8 @@ async function etat(env, qui) {
     flux: flux.results,
     contenus: contenus.results.map(c => ({ ...c, donnees: lireJSON(c.donnees, {}) })),
     diffusions: diffusions.results.map(d => ({ ...diffusionVersJson(d), flux: parDiffusion[d.id] || [] })),
-    ecrans: ecrans.results
+    ecrans: ecrans.results,
+    reglages, reglagesDefaut: REGLAGES_DEFAUT
   });
 }
 async function journal(env, url) {
@@ -413,7 +418,7 @@ function motifValide(m) {
   }
   return r;
 }
-function validerDonnees(type, d) {
+function validerDonnees(type, d, reglages) {
   if (!d || typeof d !== 'object') throw refus('Données manquantes.');
   if (type === 'soiree') {
     const photo = source(d.photo, 'photo', false);
@@ -440,7 +445,7 @@ function validerDonnees(type, d) {
       if (!x || typeof x !== 'object') throw refus('Passage ' + (i + 1) + ' invalide.');
       const h = heure(x.heure, 'heure du passage ' + (i + 1));
       if (!h) throw refus('Indiquez l’heure du passage ' + (i + 1) + '.');
-      return { heure: h, role: ROLES_LINEUP.indexOf(x.role) >= 0 ? x.role : 'autre', libelle: chaine(x.libelle, 40, 'intitulé du passage ' + (i + 1)), nom: chaine(x.nom, 120, 'nom du passage ' + (i + 1)),
+      return { heure: h, role: (reglages || REGLAGES_DEFAUT).roles.some(r => r.cle === x.role) ? x.role : 'autre', libelle: chaine(x.libelle, 40, 'intitulé du passage ' + (i + 1)), nom: chaine(x.nom, 120, 'nom du passage ' + (i + 1)),
         niveau: NIVEAUX_LINEUP.indexOf(x.niveau) >= 0 ? x.niveau : '' };
     });
     const photo = source(d.photo, 'photo', false);
@@ -471,13 +476,146 @@ function validerDonnees(type, d) {
     analyse: d.analyse && typeof d.analyse === 'object' && JSON.stringify(d.analyse).length <= 3000 ? d.analyse : null
   };
 }
-function validerContenu(c, typeImpose) {
+function validerContenu(c, typeImpose, reglages) {
   const type = typeImpose || c.type;
   if (TYPES.indexOf(type) < 0) throw refus('Type de contenu inconnu.');
   const titre = chaine(c.titre, 120, 'nom du contenu') || 'Sans titre';
   const duree = c.duree === null || c.duree === undefined || c.duree === '' ? null : Math.round(nombre(c.duree, 3, 600));
   const statut = c.statut === 'archive' ? 'archive' : 'actif';
-  return { type, titre, donnees: validerDonnees(type, c.donnees), duree, statut };
+  return { type, titre, donnees: validerDonnees(type, c.donnees, reglages), duree, statut };
+}
+
+/* ---- réglages : couleurs du 6MIC et listes de choix ----
+   Une seule source pour les valeurs par défaut : ici. Le back-office et les écrans reçoivent les réglages
+   complets (avec ces valeurs quand rien n'est enregistré). Les rôles sont enregistrés par clé dans les
+   line-up : les renommer suffit. Mentions et salles sont enregistrées en texte : un renommage est reporté
+   dans les contenus qui les utilisent. Un élément utilisé ne se supprime pas : il s'archive. */
+const TEINTE_VALIDE = /^#[0-9a-f]{6}$/;
+const REGLAGES_DEFAUT = {
+  couleurs: { primaire: { nom: 'Rose', valeur: '#e744a8' }, secondaire: { nom: 'Violet', valeur: '#8e63ff' }, degrade: ['#e744a8', '#a94fd6', '#8e63ff'] },
+  roles: [
+    { cle: 'ouverture', libelle: 'Ouverture des portes', niveau: 'normale' },
+    { cle: 'premiere', libelle: 'Première partie', niveau: 'normale' },
+    { cle: 'tete', libelle: 'Tête d’affiche', niveau: 'vedette' },
+    { cle: 'dj', libelle: 'DJ set', niveau: 'normale' },
+    { cle: 'fermeture', libelle: 'Fermeture', niveau: 'normale' },
+    { cle: 'autre', libelle: '', niveau: 'normale' }   // intitulé saisi passage par passage
+  ],
+  mentions: [
+    { cle: 'complet', libelle: 'Complet', alerte: true }, { cle: 'dernieres', libelle: 'Dernières places', alerte: false },
+    { cle: 'nouvelle', libelle: 'Nouvelle date', alerte: false }, { cle: 'annule', libelle: 'Annulé', alerte: true },
+    { cle: 'gratuit', libelle: 'Gratuit', alerte: false }, { cle: 'gratuit-resa', libelle: 'Gratuit sur réservation', alerte: false }
+  ],
+  salles: [{ cle: 'grande-salle', libelle: 'Grande salle' }, { cle: 'club', libelle: 'Club' }]
+};
+const ROLES_FIXES = REGLAGES_DEFAUT.roles.map(r => r.cle);   // ne se suppriment pas (le préremplissage s'en sert)
+const LISTES = { roles: 40, mentions: 30, salles: 20 };
+async function lireReglages(env) {
+  const brut = lireJSON(await env.DB.prepare("SELECT valeur FROM meta WHERE cle = 'reglages'").first('valeur'), null);
+  const r = brut && typeof brut === 'object' ? brut : {};
+  return {
+    version: r.version || 0, modifie_le: r.modifie_le || null, par: r.par || null,
+    couleurs: r.couleurs || REGLAGES_DEFAUT.couleurs,
+    roles: r.roles || REGLAGES_DEFAUT.roles, mentions: r.mentions || REGLAGES_DEFAUT.mentions, salles: r.salles || REGLAGES_DEFAUT.salles
+  };
+}
+function validerReglages(c) {
+  if (!c || typeof c !== 'object') throw refus('Réglages manquants.');
+  const teinte = (v, nom) => { if (typeof v !== 'string' || !TEINTE_VALIDE.test(v.toLowerCase())) throw refus('Couleur invalide : ' + nom + '.'); return v.toLowerCase(); };
+  const k = c.couleurs || {};
+  const couleur = (x, nom) => ({ nom: chaine(x && x.nom, 20, 'nom de la couleur ' + nom) || nom, valeur: teinte(x && x.valeur, nom) });
+  if (!Array.isArray(k.degrade) || k.degrade.length !== 3) throw refus('Le dégradé compte trois couleurs.');
+  const couleurs = { primaire: couleur(k.primaire, 'primaire'), secondaire: couleur(k.secondaire, 'secondaire'), degrade: k.degrade.map((v, i) => teinte(v, 'dégradé ' + (i + 1))) };
+  const liste = (nom, fabrique) => {
+    const l = c[nom];
+    if (!Array.isArray(l) || !l.length) throw refus('Liste vide : ' + nom + '.');
+    if (l.length > LISTES[nom]) throw refus('Trop d’éléments dans la liste ' + nom + ' (' + LISTES[nom] + ' au plus).');
+    const vus = new Set(), libelles = new Set();
+    return l.map((x, i) => {
+      if (!x || typeof x !== 'object' || typeof x.cle !== 'string' || !/^[a-z0-9-]{1,24}$/.test(x.cle) || vus.has(x.cle)) throw refus('Élément ' + (i + 1) + ' invalide (' + nom + ').');
+      vus.add(x.cle);
+      const e = fabrique(x, i);
+      const lib = e.libelle.toLowerCase();
+      if (lib && libelles.has(lib)) throw refus('« ' + e.libelle + ' » figure deux fois.');
+      libelles.add(lib);
+      if (x.archive === true) e.archive = true;
+      return e;
+    });
+  };
+  const roles = liste('roles', (x, i) => {
+    const libelle = chaine(x.libelle, 40, 'rôle ' + (i + 1));
+    if (!libelle && x.cle !== 'autre') throw refus('Le rôle ' + (i + 1) + ' n’a pas de libellé.');
+    return { cle: x.cle, libelle, niveau: NIVEAUX_LINEUP.indexOf(x.niveau) >= 0 ? x.niveau : 'normale' };
+  });
+  for (const f of ROLES_FIXES) if (!roles.some(r => r.cle === f)) throw refus('Le rôle « ' + REGLAGES_DEFAUT.roles.find(r => r.cle === f).libelle + ' » ne peut pas être supprimé : archivez-le.');
+  const autre = roles.find(r => r.cle === 'autre'); if (autre.archive) delete autre.archive;   // l'intitulé libre reste toujours possible
+  const mentions = liste('mentions', (x, i) => {
+    const libelle = chaine(x.libelle, 40, 'mention ' + (i + 1));
+    if (!libelle) throw refus('La mention ' + (i + 1) + ' n’a pas de libellé.');
+    return { cle: x.cle, libelle, alerte: x.alerte === true };
+  });
+  const salles = liste('salles', (x, i) => {
+    const libelle = chaine(x.libelle, 40, 'salle ' + (i + 1));
+    if (!libelle) throw refus('La salle ' + (i + 1) + ' n’a pas de nom.');
+    return { cle: x.cle, libelle };
+  });
+  return { couleurs, roles, mentions, salles };
+}
+// Textes de mention et de salle d'un contenu (pour les renommages et les suppressions).
+function mentionsDe(type, d) {
+  if (type === 'soiree') return [d.mention];
+  if (type === 'agenda' || type === 'serie') return (d.dates || []).map(x => x && x.mention);
+  return [];
+}
+function renommer(type, d, mentions, salles) {
+  let change = false;
+  const m = v => { if (v && mentions.has(v)) { change = true; return mentions.get(v); } return v; };
+  if (type === 'soiree') d.mention = m(d.mention);
+  if (type === 'agenda' || type === 'serie') for (const x of d.dates || []) if (x) x.mention = m(x.mention);
+  if (type === 'lineup' && d.lieu && salles.has(d.lieu)) { d.lieu = salles.get(d.lieu); change = true; }
+  return change;
+}
+async function modifierReglages(req, env, qui) {
+  const corps = await lireCorps(req);
+  const avant = await lireReglages(env);
+  if (Number(corps.version) !== avant.version) throw new ErreurHttp(409, 'Les réglages ont été modifiés entre-temps (autre onglet ou autre personne). Rechargez la page pour voir la dernière version.');
+  const r = validerReglages(corps.reglages);
+  const { results } = await env.DB.prepare('SELECT id, type, titre, donnees FROM contenus').all();
+  const contenus = results.map(c => ({ ...c, donnees: lireJSON(c.donnees, {}) }));
+  // suppressions : seulement pour les éléments qui ne servent nulle part
+  const supprimes = (nom) => avant[nom].filter(a => !r[nom].some(b => b.cle === a.cle));
+  for (const a of supprimes('roles')) {
+    const n = contenus.filter(c => c.type === 'lineup' && (c.donnees.passages || []).some(p => p.role === a.cle)).length;
+    if (n) throw refus('Le rôle « ' + a.libelle + ' » sert dans ' + n + ' line-up : archivez-le plutôt que de le supprimer.');
+  }
+  for (const a of supprimes('mentions')) {
+    const n = contenus.filter(c => mentionsDe(c.type, c.donnees).includes(a.libelle)).length;
+    if (n) throw refus('La mention « ' + a.libelle + ' » sert dans ' + n + ' contenu' + (n > 1 ? 's' : '') + ' : archivez-la plutôt que de la supprimer.');
+  }
+  for (const a of supprimes('salles')) {
+    const n = contenus.filter(c => c.type === 'lineup' && c.donnees.lieu === a.libelle).length;
+    if (n) throw refus('La salle « ' + a.libelle + ' » sert dans ' + n + ' line-up : archivez-la plutôt que de la supprimer.');
+  }
+  // renommages de mentions et de salles : reportés dans les contenus
+  const renommes = nom => new Map(avant[nom].map(a => [a, r[nom].find(b => b.cle === a.cle)]).filter(([a, b]) => b && a.libelle !== b.libelle).map(([a, b]) => [a.libelle, b.libelle]));
+  const mentions = renommes('mentions'), salles = renommes('salles');
+  const requetes = [];
+  if (mentions.size || salles.size) {
+    for (const c of contenus) {
+      if (renommer(c.type, c.donnees, mentions, salles)) {
+        requetes.push(env.DB.prepare("UPDATE contenus SET donnees = ?, modifie_le = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").bind(JSON.stringify(c.donnees), c.id));
+      }
+    }
+  }
+  const enregistre = { ...r, version: avant.version + 1, modifie_le: new Date().toISOString(), par: qui.nom };
+  requetes.push(env.DB.prepare("INSERT INTO meta (cle, valeur) VALUES ('reglages', ?) ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur").bind(JSON.stringify(enregistre)));
+  // résumé pour le journal
+  const quoi = [];
+  if (JSON.stringify(r.couleurs) !== JSON.stringify(avant.couleurs)) quoi.push('couleurs');
+  for (const [nom, mot] of [['roles', 'rôles du line-up'], ['mentions', 'mentions'], ['salles', 'salles']]) if (JSON.stringify(r[nom]) !== JSON.stringify(avant[nom])) quoi.push(mot);
+  const ren = [...mentions, ...salles].map(([a, b]) => a + ' → ' + b);
+  await ecrire(env, qui, requetes, 'Réglages modifiés', (quoi.join(', ') || 'aucun changement') + (ren.length ? ' ; renommé : ' + ren.join(', ') + ' (' + (requetes.length - 1) + ' contenu' + (requetes.length > 2 ? 's' : '') + ' mis à jour)' : ''));
+  return json({ reglages: await lireReglages(env), contenusModifies: requetes.length - 1 });
 }
 
 /* ---- contenus ---- */
@@ -495,7 +633,7 @@ async function verifierFichiers(env, donnees, avant) {
   }
 }
 async function creerContenu(req, env, qui) {
-  const c = validerContenu(await lireCorps(req));
+  const c = validerContenu(await lireCorps(req), null, await lireReglages(env));
   await verifierFichiers(env, c.donnees, null);
   const id = nouvelId('c');
   await ecrire(env, qui, [
@@ -507,7 +645,7 @@ async function modifierContenu(req, env, qui, id) {
   const avant = await lireContenu(env, id);
   const corps = await lireCorps(req);
   if (corps.modifie_le && corps.modifie_le !== avant.modifie_le) throw new ErreurHttp(409, 'Ce contenu a été modifié entre-temps (autre onglet ou autre personne). Rechargez la page pour voir la dernière version.');
-  const c = validerContenu(corps, avant.type);
+  const c = validerContenu(corps, avant.type, await lireReglages(env));
   await verifierFichiers(env, c.donnees, avant.donnees);
   await ecrire(env, qui, [
     env.DB.prepare("UPDATE contenus SET titre = ?, donnees = ?, duree = ?, statut = ?, modifie_le = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?")

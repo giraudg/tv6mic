@@ -27,6 +27,9 @@
   --g-cond: "zuume-cut", "TV Anton", Impact, "Arial Narrow", sans-serif;
   --g-degrade: linear-gradient(100deg, #c23d97 0%, #a94fd6 55%, #8e63ff 100%);
   --g-violet: #8e63ff; --g-rouge: #dc2626; --g-gris: #a9a6b3; --g-trait: #3d3946; --g-nuit: #0b0a0d;
+  /* couleurs du 6MIC : valeurs d'origine, remplacées par les Réglages (Gabarits.appliquerReglages) */
+  --g-primaire: #e744a8; --g-secondaire: #8e63ff; --g-primaire-halo: rgba(231, 68, 168, .3);
+  --g-degrade-v: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%);
 }
 
 .g { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; color: #fff;
@@ -78,10 +81,10 @@
    son bord « chargé » (traits, rayons) touche le bord choisi de l'écran. */
 .g-deco { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; pointer-events: none; }
 .g-deco-m { position: absolute; left: 0; top: 0; -webkit-transform-origin: 0 0; transform-origin: 0 0; }
-.g-c-rose .g-deco-m { background-color: #e744a8; }
-.g-c-violet .g-deco-m { background-color: #8e63ff; }
+.g-c-rose .g-deco-m { background-color: var(--g-primaire); }
+.g-c-violet .g-deco-m { background-color: var(--g-secondaire); }
 .g-c-blanc .g-deco-m { background-color: #fff; }
-.g-c-degrade .g-deco-m { background-image: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%); }
+.g-c-degrade .g-deco-m { background-image: var(--g-degrade-v); }
 
 /* Faisceaux : motif « focus » du site (traits du logo), 1080 × 1440 ; ses traits partent du bord gauche. */
 .g-d-faisceaux .g-deco-m { width: 810px; height: 1080px; opacity: .92;
@@ -144,13 +147,13 @@
 .g-page { position: absolute; right: 120px; bottom: 34px; font-size: 26px; font-weight: 600; color: var(--g-gris); letter-spacing: .06em; }
 
 /* 4. Série : aplat de couleur + texture rayonnante (design system), affiches côte à côte */
-.g-serie { background: #8e63ff; }
-.g-f-rose { background: #e744a8; }
-.g-f-degrade { background: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%); }
+.g-serie { background: var(--g-secondaire); }
+.g-f-rose { background: var(--g-primaire); }
+.g-f-degrade { background: var(--g-degrade-v); }
 .g-f-noir { background: #0b0a0d; }
 .g-s-rayons { position: absolute; left: 0; top: 0; width: 1920px; height: 1154px; background: #fff; opacity: .3;
   -webkit-mask: url(/motifs/rayons.webp) left top / 100% 100% no-repeat; mask: url(/motifs/rayons.webp) left top / 100% 100% no-repeat; }
-.g-f-noir .g-s-rayons { background: #8e63ff; opacity: .75; }
+.g-f-noir .g-s-rayons { background: var(--g-secondaire); opacity: .75; }
 .g-s-tete { position: absolute; left: 120px; top: 78px; width: 1300px; }
 .g-s-accroche { margin-bottom: 10px; font-size: 34px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1.1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -166,7 +169,7 @@
 .g-s-photo { position: relative; overflow: hidden; background: #111 center / cover no-repeat; }
 .g-s-vide { background: #0b0a0d; }
 .g-s-vide-m { position: absolute; right: 0; top: 0; width: 75%; height: 100%; opacity: .9;
-  background-image: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%);
+  background-image: var(--g-degrade-v);
   -webkit-mask: url(/logo/motif-6mic.svg) left top / cover no-repeat; mask: url(/logo/motif-6mic.svg) left top / cover no-repeat;
   -webkit-transform: scaleX(-1); transform: scaleX(-1); }
 .g-s-mention { position: absolute; left: 0; top: 24px; padding: 10px 16px 8px; background: var(--g-violet);
@@ -175,7 +178,7 @@
 .g-s-corps { height: 150px; padding: 22px 24px 20px; overflow: hidden; }
 .g-s-quand { font-size: 24px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .g-s-3 .g-s-quand { font-size: 30px; }
-.g-s-proche { color: #e744a8; }
+.g-s-proche { color: var(--g-primaire); }
 /* padding-top : place des accents des capitales (É, È) que couperait overflow: hidden avec line-height < 1 */
 .g-s-nom { margin-top: 4px; padding-top: .14em; font-family: var(--g-cond); font-weight: 700; font-size: 66px; line-height: .92; text-transform: uppercase; overflow: hidden; }
 /* hauteur du texte sous la photo = date + 14 px + deux lignes de nom (taille max × 0,92 × 2), selon le nombre d'affiches */
@@ -187,7 +190,7 @@
 /* 5. Line-up : frise horaire à gauche, photo de la tête d'affiche à droite */
 .g-lineup { background: #0b0a0d; }
 .g-l-panneau { position: absolute; right: 0; top: 0; width: 820px; height: 1080px; background: #111 center / cover no-repeat; }
-.g-l-sansphoto { background: linear-gradient(180deg, #e744a8 0%, #a94fd6 55%, #8e63ff 100%); }
+.g-l-sansphoto { background: var(--g-degrade-v); }
 .g-l-motif { position: absolute; right: 0; top: 0; width: 810px; height: 1080px; background: #000; opacity: .3;
   -webkit-mask: url(/logo/motif-6mic.svg) left top / 100% 100% no-repeat; mask: url(/logo/motif-6mic.svg) left top / 100% 100% no-repeat;
   -webkit-transform: scaleX(-1); transform: scaleX(-1); }
@@ -219,11 +222,11 @@
 /* mise en valeur (choisie, ou selon le rôle : la tête d'affiche en vedette). Le point reste centré sur le trait. */
 .g-l-v-vedette .g-l-point { width: 34px; height: 34px; margin: 0 36px 0 22px; background: var(--g-degrade); box-shadow: none; }
 .g-l-v-vedette .g-l-nom { font-size: 96px; }
-.g-l-v-vedette .g-l-role { color: #e744a8; }
+.g-l-v-vedette .g-l-role { color: var(--g-primaire); }
 .g-l-v-vedette.g-l-seul .g-l-role { font-size: 52px; color: #fff; }
-.g-l-v-forte .g-l-point { width: 30px; height: 30px; margin: 0 38px 0 24px; background: #8e63ff; box-shadow: none; }
+.g-l-v-forte .g-l-point { width: 30px; height: 30px; margin: 0 38px 0 24px; background: var(--g-secondaire); box-shadow: none; }
 .g-l-v-forte .g-l-nom { font-size: 82px; }
-.g-l-v-forte .g-l-role { color: #8e63ff; }
+.g-l-v-forte .g-l-role { color: var(--g-secondaire); }
 .g-l-v-forte.g-l-seul .g-l-role { font-size: 46px; color: #fff; }
 .g-l-v-discrete .g-l-heure { font-size: 56px; color: #a9a6b3; }
 .g-l-v-discrete .g-l-point { width: 18px; height: 18px; margin: 0 44px 0 30px; box-shadow: inset 0 0 0 4px #3d3946; }
@@ -235,10 +238,10 @@
 .joue .g-l-passe { -webkit-animation-name: g-glisse-passe; animation-name: g-glisse-passe; }
 @-webkit-keyframes g-glisse-passe { from { opacity: 0; -webkit-transform: translate3d(-90px, 0, 0); } to { opacity: .32; -webkit-transform: translate3d(0, 0, 0); } }
 @keyframes g-glisse-passe { from { opacity: 0; transform: translate3d(-90px, 0, 0); } to { opacity: .32; transform: translate3d(0, 0, 0); } }
-.g-l-encours .g-l-point { background: #e744a8; box-shadow: 0 0 0 10px rgba(231, 68, 168, .3); }
-.g-l-encours .g-l-heure { color: #e744a8; }
-.g-l-badge { display: inline-block; margin-left: 18px; padding: 6px 12px 5px; background: #e744a8; color: #fff; font-size: 20px; letter-spacing: .08em; vertical-align: 4px; }
-.g-l-badge-suivant { background: transparent; box-shadow: inset 0 0 0 3px #8e63ff; color: #fff; }
+.g-l-encours .g-l-point { background: var(--g-primaire); box-shadow: 0 0 0 10px var(--g-primaire-halo); }
+.g-l-encours .g-l-heure { color: var(--g-primaire); }
+.g-l-badge { display: inline-block; margin-left: 18px; padding: 6px 12px 5px; background: var(--g-primaire); color: #fff; font-size: 20px; letter-spacing: .08em; vertical-align: 4px; }
+.g-l-badge-suivant { background: transparent; box-shadow: inset 0 0 0 3px var(--g-secondaire); color: #fff; }
 .g-l-6 .g-l-heure, .g-l-7 .g-l-heure, .g-l-8 .g-l-heure { font-size: 60px; }
 .g-l-7 .g-l-role, .g-l-8 .g-l-role { font-size: 22px; }
 .g-l-6 .g-l-v-discrete .g-l-heure, .g-l-7 .g-l-v-discrete .g-l-heure, .g-l-8 .g-l-v-discrete .g-l-heure { font-size: 46px; }

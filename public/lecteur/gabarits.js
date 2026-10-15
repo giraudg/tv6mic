@@ -62,6 +62,69 @@
     return boite;
   }
 
+  /* Réglages du 6MIC (couleurs, rôles du line-up, mentions), reçus avec la programmation et modifiés dans
+     le back-office. Sans réglages (programmation gardée d'une version précédente), les valeurs d'origine
+     de la feuille de style et des listes ci-dessous s'appliquent. */
+  var REG = null;
+  var ORIGINE = { primaire: '#e744a8', secondaire: '#8e63ff', degrade: ['#e744a8', '#a94fd6', '#8e63ff'] };
+  function rvb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+  function hexa(c) {
+    var t = '#', i, v;
+    for (i = 0; i < 3; i++) { v = Math.max(0, Math.min(255, Math.round(c[i]))).toString(16); t += v.length < 2 ? '0' + v : v; }
+    return t;
+  }
+  function melanger(a, b, t) { var x = rvb(a), y = rvb(b); return hexa([x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t]); }
+  // contraste WCAG entre deux couleurs (1 à 21)
+  function contraste(a, b) {
+    function l(h) { var c = rvb(h), i, v, r = []; for (i = 0; i < 3; i++) { v = c[i] / 255; r.push(v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); } return 0.2126 * r[0] + 0.7152 * r[1] + 0.0722 * r[2]; }
+    var x = l(a), y = l(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  }
+  function variablesCouleurs(k) {
+    var d = k.degrade, p = k.primaire.valeur, c = rvb(p);
+    var origine = d[0] === ORIGINE.degrade[0] && d[1] === ORIGINE.degrade[1] && d[2] === ORIGINE.degrade[2];
+    return {
+      '--g-primaire': p, '--g-secondaire': k.secondaire.valeur, '--g-violet': k.secondaire.valeur,
+      '--g-primaire-halo': 'rgba(' + c[0] + ', ' + c[1] + ', ' + c[2] + ', .3)',
+      '--g-degrade-v': 'linear-gradient(180deg, ' + d[0] + ' 0%, ' + d[1] + ' 55%, ' + d[2] + ' 100%)',
+      // bandeaux (texte blanc) : début assombri ; valeur d'origine du design system si le dégradé n'a pas changé
+      '--g-degrade': 'linear-gradient(100deg, ' + (origine ? '#c23d97' : melanger(d[0], '#000000', 0.14)) + ' 0%, ' + d[1] + ' 55%, ' + d[2] + ' 100%)'
+    };
+  }
+  // Réglages utilisés pour les libellés (sans toucher aux couleurs de la page).
+  function utiliserReglages(r) { REG = r && r.couleurs ? r : null; }
+  // Réglages complets : libellés, et couleurs posées sur la page (ou sur un nœud, pour un aperçu).
+  function appliquerReglages(r, noeud) {
+    utiliserReglages(r);
+    var st = (noeud || document.documentElement).style, v, k;
+    v = variablesCouleurs(REG ? REG.couleurs : { primaire: { valeur: ORIGINE.primaire }, secondaire: { valeur: ORIGINE.secondaire }, degrade: ORIGINE.degrade });
+    for (k in v) { if (v.hasOwnProperty(k)) { st.setProperty(k, v[k]); } }
+  }
+  function roleReglage(cle) {
+    var l = REG && REG.roles, i;
+    if (l) { for (i = 0; i < l.length; i++) { if (l[i].cle === cle) { return l[i]; } } }
+    return null;
+  }
+  function libelleRole(cle) { var r = roleReglage(cle); return r ? r.libelle : (ROLES_LINEUP[cle] !== undefined ? ROLES_LINEUP[cle] : ''); }
+  // Mention en rouge : selon les réglages ; texte libre inconnu : « complet » ou « annulé » dans le texte.
+  function mentionAlerte(t) {
+    var l = REG && REG.mentions, i;
+    if (!t) { return false; }
+    if (l) { for (i = 0; i < l.length; i++) { if (l[i].libelle === t) { return !!l[i].alerte; } } }
+    return /complet|annul/i.test(t);
+  }
+  // Nom d'une couleur de la charte (fonds de série, motifs) : les couleurs primaire et secondaire se renomment.
+  function nomCouleur(k) {
+    var c = REG && REG.couleurs;
+    if (k === 'rose') { return c ? c.primaire.nom : 'Rose'; }
+    if (k === 'violet') { return c ? c.secondaire.nom : 'Violet'; }
+    return { degrade: 'Dégradé', blanc: 'Blanc', noir: 'Noir', aucun: 'Aucun' }[k] || k;
+  }
+  function teinteDe(k) {
+    var c = REG ? REG.couleurs : { primaire: { valeur: ORIGINE.primaire }, secondaire: { valeur: ORIGINE.secondaire }, degrade: ORIGINE.degrade };
+    return { rose: c.primaire.valeur, violet: c.secondaire.valeur, degrade: c.degrade[0], blanc: '#ffffff' }[k] || c.primaire.valeur;
+  }
+
   /* Motifs du design system 6MIC, posés sur la photo des soirées.
      faisceaux : traits du logo (motif « focus », vectoriel) ; rayons : texture rayonnante des aplats du site ;
      hachures : traits à 41,3° des affiches de l'agenda. Chaque motif se colore (masque CSS) et se place sur un bord. */
@@ -103,7 +166,7 @@
     deco = motif(d);
     if (deco) { g.appendChild(deco); }
     g.appendChild(logo('g-logo a a0'));
-    if (d.mention) { g.appendChild(el('div', 'g-mention a a0' + (/complet|annul/i.test(d.mention) ? ' g-rouge' : ''), d.mention)); }
+    if (d.mention) { g.appendChild(el('div', 'g-mention a a0' + (mentionAlerte(d.mention) ? ' g-rouge' : ''), d.mention)); }
     if (d.date) { bloc.appendChild(el('div', 'g-date a a1', dateLongue(d.date) + (d.heure ? ' · ' + heureTexte(d.heure) : ''))); }
     nom = el('div', 'g-nom a a2', d.nom || c.titre);
     bloc.appendChild(nom);
@@ -133,7 +196,7 @@
       quand.appendChild(el('span', 'g-m', MOIS_COURTS[p.m]));
       ligne.appendChild(quand);
       ligne.appendChild(el('div', 'g-quoi', x.nom));
-      if (x.mention) { ligne.appendChild(el('div', 'g-etiq' + (/complet|annul/i.test(x.mention) ? ' g-rouge' : ''), x.mention)); }
+      if (x.mention) { ligne.appendChild(el('div', 'g-etiq' + (mentionAlerte(x.mention) ? ' g-rouge' : ''), x.mention)); }
       liste.appendChild(ligne);
     }
     g.appendChild(liste);
@@ -189,7 +252,7 @@
       photo = el('div', 'g-s-photo' + (x.photo && x.photo.src ? '' : ' g-s-vide'));
       photo.style.height = hauteur + 'px';
       if (x.photo && x.photo.src) { fond(photo, x.photo.src, url); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
-      if (x.mention) { photo.appendChild(el('div', 'g-s-mention' + (/complet|annul/i.test(x.mention) ? ' g-rouge' : ''), x.mention)); }
+      if (x.mention) { photo.appendChild(el('div', 'g-s-mention' + (mentionAlerte(x.mention) ? ' g-rouge' : ''), x.mention)); }
       carte.appendChild(photo);
       corps = el('div', 'g-s-corps');
       corps.appendChild(el('div', 'g-s-quand' + (q.proche ? ' g-s-proche' : ''), q.texte));
@@ -213,7 +276,7 @@
   // Mise en valeur d'un passage, choisie librement ; sans choix, elle suit le rôle (la tête d'affiche en vedette).
   var NIVEAUX_LINEUP = { vedette: 'Vedette', forte: 'Forte', normale: 'Normale', discrete: 'Discrète' };
   var TAILLES_NIVEAU = { vedette: [96, 72], forte: [82, 64], normale: [68, 56], discrete: [48, 40] };
-  function niveauParDefaut(role) { return role === 'tete' ? 'vedette' : 'normale'; }
+  function niveauParDefaut(role) { var r = roleReglage(role); return r && NIVEAUX_LINEUP[r.niveau] ? r.niveau : (role === 'tete' ? 'vedette' : 'normale'); }
   function niveauPassage(p) { return p && NIVEAUX_LINEUP[p.niveau] ? p.niveau : niveauParDefaut(p && p.role); }
   // Nom mis en avant (titre par défaut) : le premier passage en vedette, sinon la première tête d'affiche.
   function vedetteDe(passages) {
@@ -261,13 +324,13 @@
       p = passages[i];
       etat = maintenant === null ? '' : (i < courant ? ' g-l-passe' : (i === courant ? ' g-l-encours' : (i === courant + 1 ? ' g-l-suivant' : '')));
       niveau = niveauPassage(p);
-      ligne = el('div', 'g-l-ligne g-l-r-' + (ROLES_LINEUP[p.role] !== undefined ? p.role : 'autre') + ' g-l-v-' + niveau + etat + (p.nom ? '' : ' g-l-seul'));
+      ligne = el('div', 'g-l-ligne g-l-r-' + (/^[a-z0-9-]+$/.test(p.role || '') ? p.role : 'autre') + ' g-l-v-' + niveau + etat + (p.nom ? '' : ' g-l-seul'));
       ligne.style.height = hauteurLigne + 'px';
       ligne.style.webkitAnimationDelay = ligne.style.animationDelay = (0.35 + i * 0.12).toFixed(2) + 's';
       ligne.appendChild(el('div', 'g-l-heure', p.heure));
       ligne.appendChild(el('div', 'g-l-point'));
       texte = el('div', 'g-l-texte');
-      role = el('div', 'g-l-role', p.libelle || ROLES_LINEUP[p.role] || '');
+      role = el('div', 'g-l-role', p.libelle || libelleRole(p.role) || '');
       if (i === courant) { role.appendChild(el('span', 'g-l-badge', 'En ce moment')); }
       else if (maintenant !== null && i === courant + 1) { role.appendChild(el('span', 'g-l-badge g-l-badge-suivant', 'À suivre')); }
       texte.appendChild(role);
@@ -317,6 +380,8 @@
     soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, veille: veille, identification: identification,
     FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, NIVEAUX_LINEUP: NIVEAUX_LINEUP, niveauPassage: niveauPassage, niveauParDefaut: niveauParDefaut, vedetteDe: vedetteDe, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
-    MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe
+    MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe,
+    appliquerReglages: appliquerReglages, utiliserReglages: utiliserReglages, variablesCouleurs: variablesCouleurs, libelleRole: libelleRole,
+    mentionAlerte: mentionAlerte, nomCouleur: nomCouleur, teinteDe: teinteDe, melanger: melanger, contraste: contraste
   };
 }(this));

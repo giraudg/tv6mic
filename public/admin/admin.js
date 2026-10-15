@@ -32,7 +32,10 @@ const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 
 const MC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 const TYPES = { soiree: 'Soirée', lineup: 'Line-up', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo' };
 const SEMAINE = [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'J'], [5, 'V'], [6, 'S'], [7, 'D']];
-const MENTIONS = ['Complet', 'Dernières places', 'Nouvelle date', 'Annulé', 'Gratuit', 'Gratuit sur réservation'];
+// Listes de choix : celles des Réglages (éléments archivés exclus).
+const actifs = l => l.filter(x => !x.archive);
+const mentionsChoix = () => actifs(E.reglages.mentions).map(m => m.libelle);
+const sallesChoix = () => actifs(E.reglages.salles).map(x => x.libelle);
 
 const auj = () => R.heureParis(Date.now()).date;
 function parts(date) { const p = date.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2])); return { a: p[0], m: p[1] - 1, n: p[2], j: d.getUTCDay() }; }
@@ -80,9 +83,19 @@ async function recharger() {
   e.contenuParId = new Map(e.contenus.map(c => [c.id, c]));
   e.fluxParCode = new Map(e.flux.map(f => [f.code, f]));
   E = e; chargeLe = Date.now();
+  appliquerCouleurs(E.reglages);
   remplacer($('#sync'), h('i'), 'Programmation v' + E.version + ' · à jour');
 }
 const maintenant = () => Date.now() + decalage;
+// Couleurs des Réglages : gabarits (aperçus) et habillage du back-office (en-tête, accents).
+function appliquerCouleurs(r) {
+  G.appliquerReglages(r);
+  const k = r.couleurs, st = document.documentElement.style;
+  const perso = k.primaire.valeur !== E.reglagesDefaut.couleurs.primaire.valeur || k.secondaire.valeur !== E.reglagesDefaut.couleurs.secondaire.valeur;
+  const v = { '--magenta': k.primaire.valeur, '--violet': k.secondaire.valeur, '--violet-f': G.melanger(k.secondaire.valeur, '#000000', 0.25),
+    '--violet-clair': G.melanger(k.secondaire.valeur, '#ffffff', 0.86), '--rose-clair': G.melanger(k.primaire.valeur, '#ffffff', 0.86) };
+  for (const [n, x] of Object.entries(v)) { if (perso) st.setProperty(n, x); else st.removeProperty(n); }
+}
 function progFlux(code) {
   const f = E.fluxParCode.get(code), contenus = {};
   const diffusions = E.diffusions.filter(d => d.flux.includes(code) && (E.contenuParId.get(d.contenu) || {}).statut === 'actif');
@@ -568,7 +581,7 @@ async function naviguer() {
   if (bloquerRoute) { bloquerRoute = false; return; }
   const [nom, arg] = (location.hash.slice(1) || 'ecrans').split('/');
   if (edition && edition.sale && !(nom === 'contenu' && arg === edition.id)) {
-    if (!(await demander('Modifications non enregistrées', 'Quitter ce contenu sans enregistrer vos modifications ?', 'Quitter sans enregistrer', true))) {
+    if (!(await demander('Modifications non enregistrées', 'Quitter cette page sans enregistrer vos modifications ?', 'Quitter sans enregistrer', true))) {
       bloquerRoute = true; location.hash = route; return;
     }
   }
@@ -590,6 +603,7 @@ async function naviguer() {
     else if (nom === 'calendrier') vueCalendrier(arg);
     else if (nom === 'flux') vueFlux();
     else if (nom === 'journal') vueJournal(1);
+    else if (nom === 'reglages') vueReglages();
     else vueEcrans();
   } catch (e) {
     console.error(e);
@@ -908,7 +922,7 @@ function champMotif(d, changer, apercuNoeud) {
   const pastillePerso = h('i', { class: 'pastille p-perso' });
   const boutonPerso = h('button', { type: 'button', 'data-v': 'perso', onclick: () => {
     // on part de la couleur affichée (le dégradé commence par le rose)
-    if (!estTeinte(reglage.couleur)) teinte(G.TEINTES[reglage.couleur] || '#e744a8');
+    if (!estTeinte(reglage.couleur)) teinte(G.teinteDe(reglage.couleur));
   } }, pastillePerso, 'Personnalisée');
   const nuancier = h('input', { type: 'color', 'aria-label': 'Nuancier', value: '#e744a8', oninput: e => teinte(e.target.value) });
   const code = h('input', { type: 'text', class: 'code-teinte', maxLength: 7, spellcheck: false, autocomplete: 'off', 'aria-label': 'Code couleur', placeholder: '#e744a8',
@@ -946,9 +960,9 @@ function champMotif(d, changer, apercuNoeud) {
     d.motif = null; Object.assign(reglage, G.motifDe(d)); maj(); changer();
   } }, 'Revenir au motif par défaut');
   const boite = h('fieldset', { class: 'motif' }, h('legend', { text: 'Motif 6MIC' }),
-    ligne('type', G.MOTIFS, 'Motif'), ligne('position', G.POSITIONS, 'Position'), ligne('couleur', G.COULEURS, 'Couleur', boutonPerso), rangPerso,
+    ligne('type', G.MOTIFS, 'Motif'), ligne('position', G.POSITIONS, 'Position'), ligne('couleur', Object.fromEntries(Object.keys(G.COULEURS).map(k => [k, G.nomCouleur(k)])), 'Couleur', boutonPerso), rangPerso,
     h('small', null, 'Les motifs du design system 6MIC, posés sur la photo. Par défaut : ' + G.MOTIFS[G.MOTIF_DEFAUT.type].toLowerCase() + ', ' +
-      G.POSITIONS[G.MOTIF_DEFAUT.position].toLowerCase() + ', ' + G.COULEURS[G.MOTIF_DEFAUT.couleur].toLowerCase() + '. ', defaut));
+      G.POSITIONS[G.MOTIF_DEFAUT.position].toLowerCase() + ', ' + G.nomCouleur(G.MOTIF_DEFAUT.couleur).toLowerCase() + '. ', defaut));
   maj();
   return boite;
 }
@@ -1014,7 +1028,7 @@ function champsSerie(d, changer) {
   }
   function remplir() {
     remplacer(lignes, ...d.dates.map((x, i) => {
-      const pm = MENTIONS.includes(x.mention) || !x.mention;
+      const pm = mentionsChoix().includes(x.mention) || !x.mention;
       const media = champMedia({ genre: 'image', valeur: x.photo, facultatif: true, change: v => { x.photo = v; changer(); },
         cadre: cadrePhoto, boite: [168, 150], surplus: reste => repartir(i, reste) });
       // toute la carte de la date reçoit les images déposées
@@ -1027,7 +1041,7 @@ function champsSerie(d, changer) {
             h('input', { type: 'time', value: x.heure || '', 'aria-label': 'Heure', oninput: e => { x.heure = e.target.value; changer(); } })),
           h('input', { type: 'text', value: x.nom || '', maxLength: 120, placeholder: 'Nom de l’artiste ou de la soirée', 'aria-label': 'Nom', oninput: e => { x.nom = e.target.value; changer(); } }),
           h('select', { 'aria-label': 'Mention', onchange: e => { x.mention = e.target.value; changer(); } },
-            h('option', { value: '', text: 'Sans mention' }), MENTIONS.map(m => h('option', { value: m, text: m, selected: x.mention === m })),
+            h('option', { value: '', text: 'Sans mention' }), mentionsChoix().map(m => h('option', { value: m, text: m, selected: x.mention === m })),
             !pm && h('option', { value: x.mention, text: x.mention, selected: true }))),
         h('button', { type: 'button', class: 'btn carre btn-danger', 'aria-label': 'Retirer cette date', onclick: () => { d.dates.splice(i, 1); remplir(); changer(); } }, '×'));
       carte._recevoir = f => media._recevoir(f);
@@ -1036,7 +1050,7 @@ function champsSerie(d, changer) {
     majChoix();
   }
   remplir();
-  const fondSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Couleur de fond' }, Object.entries(G.FONDS_SERIE).map(([k, t]) =>
+  const fondSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Couleur de fond' }, Object.keys(G.FONDS_SERIE).map(k => [k, G.nomCouleur(k)]).map(([k, t]) =>
     h('button', { type: 'button', 'data-v': k, 'aria-pressed': String((d.fond || 'violet') === k), onclick: e => {
       d.fond = k; fondSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
     } }, h('i', { class: 'pastille p-' + (k === 'noir' ? 'noir' : k) }), t)));
@@ -1054,7 +1068,6 @@ function champsSerie(d, changer) {
 }
 // Line-up : programme d'une soirée (passages : heure, rôle, nom), date, lieu, titre, photo de la tête d'affiche.
 // « Préremplir depuis une soirée » reprend la date, la photo et les noms (« TÊTE + PREMIÈRE PARTIE »).
-const LIEUX = ['Grande salle', 'Club'];
 const NIVEAU_PICTO = { vedette: '★★★', forte: '★★', normale: '★', discrete: '·' };
 function champsLineup(d, changer) {
   d.passages = d.passages || [];
@@ -1079,7 +1092,7 @@ function champsLineup(d, changer) {
     const lignes = d.passages.map((p, i) => h('div', { class: 'passage' + (G.niveauPassage(p) === 'vedette' ? ' tete' : '') },
       h('input', { type: 'time', value: p.heure || '', 'aria-label': 'Heure', oninput: e => { p.heure = e.target.value; changer(); } }),
       h('select', { 'aria-label': 'Rôle', onchange: e => { p.role = e.target.value; rendre(); changer(); } },
-        Object.entries(G.ROLES_LINEUP).map(([k, l]) => h('option', { value: k, text: l || 'Autre…', selected: p.role === k }))),
+        E.reglages.roles.filter(r => !r.archive || r.cle === p.role).map(r => h('option', { value: r.cle, text: r.cle === 'autre' ? 'Autre…' : r.libelle + (r.archive ? ' (archivé)' : ''), selected: p.role === r.cle }))),
       p.role === 'autre' && h('input', { type: 'text', value: p.libelle || '', maxLength: 40, placeholder: 'Intitulé (Entracte, Dédicaces…)', 'aria-label': 'Intitulé', oninput: e => { p.libelle = e.target.value; changer(); } }),
       h('input', { type: 'text', class: 'passage-nom', value: p.nom || '', maxLength: 120, 'aria-label': 'Nom',
         placeholder: p.role === 'ouverture' || p.role === 'fermeture' ? 'Nom (facultatif)' : 'Nom de l’artiste', oninput: e => { p.nom = e.target.value; changer(); } }),
@@ -1102,7 +1115,7 @@ function champsLineup(d, changer) {
           h('small', { text: 'Le jour J, l’écran signale le passage en cours et le suivant.' })),
         h('div', { class: 'champ' }, h('label', { for: 'f-lieu', text: 'Salle (facultative)' }),
           h('input', { id: 'f-lieu', type: 'text', value: d.lieu || '', maxLength: 40, list: 'lieux-6mic', placeholder: 'Grande salle, Club…', oninput: e => { d.lieu = e.target.value; changer(); } }),
-          h('datalist', { id: 'lieux-6mic' }, LIEUX.map(l => h('option', { value: l }))))),
+          h('datalist', { id: 'lieux-6mic' }, sallesChoix().map(l => h('option', { value: l }))))),
       h('div', { class: 'champ' }, h('label', { for: 'f-titre', text: 'Titre (facultatif)' }),
         h('input', { id: 'f-titre', type: 'text', value: d.titre || '', maxLength: 80, placeholder: 'Vide : nom de la tête d’affiche', oninput: e => { d.titre = e.target.value; changer(); } })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Passages' }), h('div', { class: 'passages' }, lignes),
@@ -1164,10 +1177,10 @@ function vueEditeur(id, typeNouveau) {
         champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
           cadre: Object.assign({ conseil: 'plein écran, sujet à droite : le texte occupe la gauche' }, G.CADRES.soiree) })),
       texte('infos', 'Infos', { multi: true, max: 300, aide: 'Deux ou trois lignes : ouverture des portes, tarifs, première partie…' }));
-    const autre = !!d.mention && !MENTIONS.includes(d.mention);
+    const autre = !!d.mention && !mentionsChoix().includes(d.mention);
     const libre = h('input', { type: 'text', id: 'f-mention-libre', value: autre ? d.mention : '', maxLength: 40, hidden: !autre, placeholder: 'Mention', oninput: e => { d.mention = e.target.value; changer(); } });
     const sel = h('select', { id: 'f-mention', onchange: e => { const v = e.target.value; libre.hidden = v !== '*'; d.mention = v === '*' ? libre.value : v; changer(); } },
-      h('option', { value: '', text: 'Aucune' }), MENTIONS.map(m => h('option', { value: m, text: m, selected: d.mention === m })), h('option', { value: '*', text: 'Autre…', selected: autre }));
+      h('option', { value: '', text: 'Aucune' }), mentionsChoix().map(m => h('option', { value: m, text: m, selected: d.mention === m })), h('option', { value: '*', text: 'Autre…', selected: autre }));
     champs.push(h('div', { class: 'grille2' }, h('div', { class: 'champ' }, h('label', { for: 'f-mention', text: 'Mention' }), sel, libre),
       texte('billetterie', 'Lien billetterie', { type: 'url', max: 300, placeholder: 'https://', aide: 'Affiche un QR code. Laisser vide pour ne pas en mettre.' })));
     champs.push(champMotif(d, changer, ap.noeud));
@@ -1175,12 +1188,12 @@ function vueEditeur(id, typeNouveau) {
     const lignes = h('div', { class: 'dates-ag' });
     const remplir = () => {
       remplacer(lignes, ...d.dates.map((x, i) => {
-        const pm = MENTIONS.includes(x.mention) || !x.mention;
+        const pm = mentionsChoix().includes(x.mention) || !x.mention;
         return h('div', { class: 'date-ag' + (x.date && x.date < auj() ? ' passee' : '') },
           h('input', { type: 'date', value: x.date, 'aria-label': 'Date', oninput: e => { x.date = e.target.value; changer(); } }),
           h('input', { type: 'text', value: x.nom, maxLength: 120, placeholder: 'Nom', 'aria-label': 'Nom', oninput: e => { x.nom = e.target.value; changer(); } }),
           h('select', { 'aria-label': 'Mention', onchange: e => { x.mention = e.target.value; changer(); } },
-            h('option', { value: '', text: 'Sans mention' }), MENTIONS.map(m => h('option', { value: m, text: m, selected: x.mention === m })),
+            h('option', { value: '', text: 'Sans mention' }), mentionsChoix().map(m => h('option', { value: m, text: m, selected: x.mention === m })),
             !pm && h('option', { value: x.mention, text: x.mention, selected: true })),
           h('button', { type: 'button', class: 'btn carre btn-danger', 'aria-label': 'Retirer cette date', onclick: () => { d.dates.splice(i, 1); remplir(); changer(); } }, '×'));
       }));
@@ -1618,6 +1631,220 @@ async function retirerDeLEcran(c, f) {
 }
 
 /* ================= vue : journal ================= */
+/* ================= vue : réglages ================= */
+// Couleurs du 6MIC et listes de choix (rôles du line-up, mentions, salles). Un brouillon est modifié, puis
+// enregistré d'un coup ; les écrans le reçoivent avec la programmation (version suivante).
+const ROLES_FIXES = ['ouverture', 'premiere', 'tete', 'dj', 'fermeture', 'autre'];
+const nouvelleCle = (prefixe, l) => { let c; do { c = prefixe + '-' + Math.random().toString(36).slice(2, 8); } while (l.some(x => x.cle === c)); return c; };
+function usagesReglages() {
+  const roles = new Map(), mentions = new Map(), salles = new Map();
+  const plus = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+  for (const c of E.contenus) {
+    const d = c.donnees;
+    if (c.type === 'lineup') { new Set((d.passages || []).map(p => p.role)).forEach(r => plus(roles, r)); if (d.lieu) plus(salles, d.lieu); }
+    const ms = c.type === 'soiree' ? [d.mention] : c.type === 'agenda' || c.type === 'serie' ? (d.dates || []).map(x => x && x.mention) : [];
+    new Set(ms.filter(Boolean)).forEach(m => plus(mentions, m));
+  }
+  return { roles, mentions, salles };
+}
+const ratio = x => x.toFixed(1).replace('.', ',') + ':1';
+function vueReglages() {
+  const base = E.reglages;
+  const r = structuredClone({ couleurs: base.couleurs, roles: base.roles, mentions: base.mentions, salles: base.salles });
+  const ed = edition = { id: null, sale: false };
+  const usages = usagesReglages();
+  const enregistrer = h('button', { type: 'button', class: 'btn btn-noir', disabled: true, onclick: () => sauver() }, 'Enregistrer');
+  const annuler = h('button', { type: 'button', class: 'btn', disabled: true, onclick: () => { edition = null; vueReglages(); } }, 'Annuler les modifications');
+  let minuterie = null;
+  // barre d'enregistrement collante, visible dès la première modification (pages longues, téléphone)
+  const pied = h('div', { class: 'reglages-pied', hidden: true }, h('span', { text: 'Modifications non enregistrées' }),
+    h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', onclick: () => annuler.click() }, 'Annuler'),
+      h('button', { type: 'button', class: 'btn btn-noir', onclick: () => sauver() }, 'Enregistrer')));
+  const changer = () => {
+    ed.sale = true; enregistrer.disabled = false; annuler.disabled = false; pied.hidden = false;
+    clearTimeout(minuterie); minuterie = setTimeout(majApercus, 200);
+  };
+
+  /* ---- couleurs ---- */
+  const k = r.couleurs;
+  const suit = { v: k.degrade[0] === k.primaire.valeur && k.degrade[2] === k.secondaire.valeur };
+  const pickers = {};
+  function champTeinte(lire, ecrire, titre) {
+    const code = h('input', { type: 'text', class: 'code-teinte', value: lire(), maxLength: 7, spellcheck: false, 'aria-label': titre + ' (code)' });
+    const pick = h('input', { type: 'color', value: lire(), 'aria-label': titre });
+    pick.addEventListener('input', () => { ecrire(pick.value); code.value = pick.value; });
+    code.addEventListener('input', () => { const v = code.value.trim().toLowerCase(); if (/^#[0-9a-f]{6}$/.test(v)) { ecrire(v); pick.value = v; } });
+    return { pick, code, maj: () => { pick.value = lire(); code.value = lire(); } };
+  }
+  // le dégradé suit la primaire et la secondaire (milieu : leur mélange) tant que la case est cochée
+  function suivre() {
+    if (!suit.v) return;
+    k.degrade[0] = k.primaire.valeur; k.degrade[2] = k.secondaire.valeur; k.degrade[1] = G.melanger(k.primaire.valeur, k.secondaire.valeur, 0.5);
+    [0, 1, 2].forEach(i => pickers['d' + i].maj());
+  }
+  const couleur = (cle, titre) => {
+    const t = champTeinte(() => k[cle].valeur, v => { k[cle].valeur = v; suivre(); majDegrade(); changer(); }, titre);
+    const nom = h('input', { type: 'text', value: k[cle].nom, maxLength: 20, 'aria-label': 'Nom de la couleur ' + titre.toLowerCase(), placeholder: 'Nom affiché',
+      oninput: e => { k[cle].nom = e.target.value; changer(); } });
+    pickers[cle] = t;
+    return h('div', { class: 'champ' }, h('span', { class: 'lbl', text: titre }), h('div', { class: 'perso' }, t.pick, t.code, nom));
+  };
+  const barre = h('div', { class: 'barre-degrade' });
+  const etapesDegrade = ['Début', 'Milieu', 'Fin'].map((t, i) => {
+    const x = champTeinte(() => k.degrade[i], v => { k.degrade[i] = v; majDegrade(); changer(); }, 'Dégradé, ' + t.toLowerCase());
+    pickers['d' + i] = x;
+    return h('div', { class: 'perso' }, h('span', { class: 'etape-d', text: t }), x.pick, x.code);
+  });
+  const coche = h('input', { type: 'checkbox', checked: suit.v, onchange: e => { suit.v = e.target.checked; suivre(); majDegrade(); changer(); } });
+  const controles = h('ul', { class: 'controle' });
+  function majDegrade() {
+    barre.style.background = 'linear-gradient(90deg, ' + k.degrade[0] + ', ' + k.degrade[1] + ' 55%, ' + k.degrade[2] + ')';
+    pickers.d0.pick.disabled = pickers.d0.code.disabled = pickers.d2.pick.disabled = pickers.d2.code.disabled = suit.v;
+    // lisibilité : texte blanc sur les couleurs (badges, bandeaux), couleurs en texte sur le fond nuit des écrans
+    const l = [], nuit = '#0b0a0d';
+    const blanc = (c, ou) => { const x = G.contraste('#ffffff', c); l.push([x >= 3 ? 'v' : 'a', (x >= 3 ? 'Texte blanc lisible ' : 'Texte blanc peu lisible ') + ou + ' (' + ratio(x) + (x >= 3 ? ')' : ', 3:1 au moins conseillé)')]); };
+    blanc(k.primaire.valeur, 'sur la primaire');
+    blanc(k.secondaire.valeur, 'sur la secondaire');
+    const bandeau = Math.min(...[G.melanger(k.degrade[0], '#000000', 0.14), k.degrade[1], k.degrade[2]].map(c => G.contraste('#ffffff', c)));
+    l.push([bandeau >= 3 ? 'v' : 'a', (bandeau >= 3 ? 'Bandeaux en dégradé lisibles' : 'Bandeaux en dégradé peu lisibles en blanc') + ' (' + ratio(bandeau) + ')']);
+    for (const [c, nom] of [[k.primaire.valeur, 'La primaire'], [k.secondaire.valeur, 'La secondaire']]) {
+      const x = G.contraste(c, nuit);
+      if (x < 3) l.push(['a', nom + ' se lit mal en texte sur le fond noir des écrans (' + ratio(x) + ')']);
+    }
+    remplacer(controles, l.map(([e, t]) => h('li', { class: e, text: t })));
+  }
+  const panneauCouleurs = h('section', { class: 'panneau' },
+    h('div', { class: 'panneau-t' }, h('h2', { text: 'Couleurs du 6MIC' }),
+      h('button', { type: 'button', class: 'btn pt', onclick: () => {
+        Object.assign(r.couleurs, structuredClone(E.reglagesDefaut.couleurs));
+        remplacerCouleurs();
+      } }, 'Revenir aux couleurs d’origine')),
+    h('p', { class: 'aide', text: 'Elles habillent les écrans (badges, vedettes, fonds de série, motifs, bandeaux) et le back-office. Le nom remplace « Rose » et « Violet » dans les choix de couleur des contenus.' }),
+    couleur('primaire', 'Couleur primaire'), couleur('secondaire', 'Couleur secondaire'),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Dégradé' }), barre, etapesDegrade,
+      h('label', { class: 'coche' }, coche, 'Le dégradé suit les couleurs primaire et secondaire')),
+    controles);
+  function remplacerCouleurs() {
+    k.primaire = r.couleurs.primaire; k.secondaire = r.couleurs.secondaire; k.degrade = r.couleurs.degrade;
+    suit.v = k.degrade[0] === k.primaire.valeur && k.degrade[2] === k.secondaire.valeur; coche.checked = suit.v;
+    ['primaire', 'secondaire', 'd0', 'd1', 'd2'].forEach(x => pickers[x].maj());
+    panneauCouleurs.querySelectorAll('input[aria-label^="Nom de la couleur"]').forEach((n, i) => { n.value = k[i ? 'secondaire' : 'primaire'].nom; });
+    majDegrade(); changer();
+  }
+
+  /* ---- aperçus : brouillon des réglages, sans toucher au reste de la page ---- */
+  const apLineup = apercu(), apSerie = apercu();
+  function majApercus() {
+    const t = auj(), demain = R.ajouterJours(t, 1);
+    const alerte = actifs(r.mentions).find(m => m.alerte), simple = actifs(r.mentions).find(m => !m.alerte);
+    const role = c => c;   // rôles d'origine (même archivés) : leur libellé du brouillon s'affiche
+    G.utiliserReglages(r);
+    try {
+      apLineup.rendre({ cle: 'apercu', type: 'lineup', duree: 12, service: t, minutes: 21 * 60 + 40, contenu: { id: 'apercu', type: 'lineup', titre: 'Aperçu', donnees: { titre: '', date: t, lieu: (actifs(r.salles)[0] || {}).libelle || '', photo: null, passages: [
+        { heure: '19:30', role: role('ouverture'), nom: '', niveau: 'discrete' }, { heure: '20:15', role: role('premiere'), nom: 'Yellow Record', niveau: 'forte' },
+        { heure: '21:15', role: role('premiere'), nom: 'La Locale', niveau: '' }, { heure: '22:30', role: role('tete'), nom: 'Benjamin Biolay', niveau: '' },
+        { heure: '00:30', role: role('dj'), nom: 'DJ Résident', niveau: '' }] } } });
+      const dates = [{ date: t, heure: '20:30', nom: 'Kery James', mention: alerte ? alerte.libelle : '' }, { date: demain, heure: '20:00', nom: 'Nèg’ Marrons', mention: '' },
+        { date: R.ajouterJours(t, 9), heure: '20:30', nom: 'Danyl', mention: simple ? simple.libelle : '' }];
+      apSerie.rendre({ cle: 'apercu', type: 'serie', duree: 12, service: t, dates, contenu: { id: 'apercu', type: 'serie', titre: 'Aperçu', donnees: { accroche: 'Vous aimez le rap ?', titre: 'Rap au 6MIC', fond: fondApercu.v, dates } } });
+    } finally { G.utiliserReglages(E.reglages); }
+    for (const ap of [apLineup, apSerie]) for (const [n, v] of Object.entries(G.variablesCouleurs(r.couleurs))) ap.noeud.style.setProperty(n, v);
+  }
+  const fondApercu = { v: 'rose' };
+  const segFond = h('div', { class: 'seg', role: 'group', 'aria-label': 'Fond de la série en aperçu' }, Object.keys(G.FONDS_SERIE).map(f =>
+    h('button', { type: 'button', 'aria-pressed': String(f === fondApercu.v), onclick: e => {
+      fondApercu.v = f; segFond.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); majApercus();
+    } }, f === 'rose' ? 'Primaire' : f === 'violet' ? 'Secondaire' : G.nomCouleur(f))));
+
+  /* ---- listes ---- */
+  function editeurListe(nom, o) {
+    const boite = h('div', { class: 'liste-r' });
+    const l = r[nom];
+    const rendre = () => remplacer(boite, l.map((x, i) => {
+      const n = o.usage(x), avant = base[nom].find(a => a.cle === x.cle);
+      const renomme = avant && avant.libelle !== x.libelle && n && o.reporte;
+      const bouger = (d) => { const j = i + d; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; rendre(); changer(); };
+      return h('div', { class: 'ligne-r' + (x.archive ? ' archive' : '') },
+        h('div', { class: 'ordre' },
+          h('button', { type: 'button', 'aria-label': 'Monter', disabled: i === 0, onclick: () => bouger(-1) }, '↑'),
+          h('button', { type: 'button', 'aria-label': 'Descendre', disabled: i === l.length - 1, onclick: () => bouger(1) }, '↓')),
+        h('div', { class: 'ligne-r-nom' },
+          h('input', { type: 'text', value: x.libelle, maxLength: 40, 'aria-label': o.mot, placeholder: o.placeholder(x), disabled: !!o.fige && o.fige(x),
+            oninput: e => { x.libelle = e.target.value; changer(); if (o.reporte) majNote(); } }),
+          x.archive && h('span', { class: 'puce puce-gris', text: 'Archivé' }),
+          renomme && h('small', { class: 'attention', text: 'Renommé : ' + plur(n, o.motUsage) + ' mis à jour à l’enregistrement.' })),
+        o.extra ? o.extra(x) : h('span'),
+        h('span', { class: 'usage', text: n ? plur(n, o.motUsage) : 'inutilisé' }),
+        o.archivable(x) ? h('button', { type: 'button', class: 'btn pt', onclick: () => { if (x.archive) delete x.archive; else x.archive = true; rendre(); changer(); } }, x.archive ? 'Réactiver' : 'Archiver') : h('span'),
+        h('button', { type: 'button', class: 'btn carre btn-danger', 'aria-label': 'Supprimer « ' + (x.libelle || o.mot) + ' »', disabled: !o.supprimable(x) || n > 0,
+          title: n ? 'Utilisé : archivez-le plutôt' : (!o.supprimable(x) ? 'Élément d’origine : archivez-le plutôt' : null),
+          onclick: () => { l.splice(i, 1); rendre(); changer(); } }, '×'));
+    }));
+    // la note de renommage suit la saisie sans redessiner la ligne (le curseur reste dans le champ)
+    const majNote = () => { clearTimeout(majNote.m); majNote.m = setTimeout(() => { const f = document.activeElement, pos = f && f.selectionStart; const idx = [...boite.querySelectorAll('input[type=text]')].indexOf(f); rendre(); if (idx >= 0) { const n = boite.querySelectorAll('input[type=text]')[idx]; n.focus(); try { n.setSelectionRange(pos, pos); } catch { /* */ } } }, 600); };
+    const ajout = h('button', { type: 'button', class: 'btn', onclick: () => {
+      if (l.length >= o.max) { annoncer(o.max + ' éléments au plus.', true); return; }
+      l.push(Object.assign({ cle: nouvelleCle(o.prefixe, l), libelle: '' }, o.nouveau || {})); rendre(); changer();
+      boite.lastChild.querySelector('input[type=text]').focus();
+    } }, '+ ' + o.ajouter);
+    rendre();
+    return h('section', { class: 'panneau' }, h('div', { class: 'panneau-t' }, h('h2', { text: o.titre })),
+      h('p', { class: 'aide', text: o.aide }), boite, h('div', { class: 'actions' }, ajout));
+  }
+  const listeRoles = editeurListe('roles', {
+    titre: 'Rôles du line-up', mot: 'Rôle', ajouter: 'Ajouter un rôle', prefixe: 'r', max: 40, motUsage: 'line-up', nouveau: { niveau: 'normale' },
+    aide: 'Proposés pour chaque passage d’un line-up. La mise en valeur par défaut s’applique quand un passage est en « Auto ». Renommer un rôle change aussi les line-up déjà faits.',
+    placeholder: x => x.cle === 'autre' ? 'Autre : intitulé saisi à chaque passage' : 'Libellé du rôle',
+    fige: x => x.cle === 'autre', usage: x => usages.roles.get(x.cle) || 0, archivable: x => x.cle !== 'autre', supprimable: x => !ROLES_FIXES.includes(x.cle),
+    extra: x => h('select', { 'aria-label': 'Mise en valeur par défaut', title: 'Mise en valeur par défaut', onchange: e => { x.niveau = e.target.value; changer(); } },
+      Object.entries(G.NIVEAUX_LINEUP).map(([v, t]) => h('option', { value: v, text: t, selected: x.niveau === v })))
+  });
+  const listeMentions = editeurListe('mentions', {
+    titre: 'Mentions', mot: 'Mention', ajouter: 'Ajouter une mention', prefixe: 'm', max: 30, motUsage: 'contenu', reporte: true, nouveau: { alerte: false },
+    aide: 'Proposées sur les soirées, agendas et séries (un texte libre reste possible). En rouge : sur fond d’alerte à l’écran, comme Complet ou Annulé.',
+    placeholder: () => 'Libellé de la mention', usage: x => usages.mentions.get((base.mentions.find(a => a.cle === x.cle) || x).libelle) || 0,
+    archivable: () => true, supprimable: () => true,
+    extra: x => {
+      const chip = h('span', { class: 'chip-mention' + (x.alerte ? ' rouge' : ''), text: x.libelle || 'Mention' });
+      return h('div', { class: 'mention-style' }, chip, h('label', { class: 'coche' },
+        h('input', { type: 'checkbox', checked: !!x.alerte, onchange: e => { x.alerte = e.target.checked; chip.classList.toggle('rouge', x.alerte); changer(); } }), 'En rouge'));
+    },
+  });
+  const listeSalles = editeurListe('salles', {
+    titre: 'Salles', mot: 'Salle', ajouter: 'Ajouter une salle', prefixe: 's', max: 20, motUsage: 'line-up', reporte: true,
+    aide: 'Proposées pour le lieu d’un line-up (un texte libre reste possible).',
+    placeholder: () => 'Nom de la salle', usage: x => usages.salles.get((base.salles.find(a => a.cle === x.cle) || x).libelle) || 0,
+    archivable: () => true, supprimable: () => true
+  });
+
+  async function sauver() {
+    for (const [nom, mot] of [['roles', 'rôle'], ['mentions', 'mention'], ['salles', 'salle']]) {
+      const vide = r[nom].findIndex(x => !x.libelle.trim() && x.cle !== 'autre');
+      if (vide >= 0) { annoncer('Un ' + (mot === 'rôle' ? 'rôle' : mot === 'salle' ? 'nom de salle' : 'libellé de mention') + ' est vide (ligne ' + (vide + 1) + ').', true); return; }
+    }
+    enregistrer.disabled = true; pied.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    try {
+      const res = await api('PUT', '/api/admin/reglages', { version: base.version, reglages: r });
+      ed.sale = false;
+      await recharger();
+      annoncer('Réglages enregistrés' + (res.contenusModifies ? ' (' + plur(res.contenusModifies, 'contenu mis à jour', 'contenus mis à jour') + ')' : '') + '. Les écrans les appliquent sous une minute.');
+      if (surVue('reglages')) vueReglages();
+    } catch (e) { enregistrer.disabled = false; pied.querySelectorAll('button').forEach(b => { b.disabled = false; }); annoncer(e.message, true); }
+  }
+
+  afficher(
+    h('div', { class: 'tete' }, h('div', null, h('p', { class: 'surtitre', text: 'Couleurs et listes de choix' }), h('h1', { class: 'titre', text: 'Réglages' })),
+      h('div', { class: 'actions' }, annuler, enregistrer)),
+    base.modifie_le && h('p', { class: 'aide', text: 'Dernière modification le ' + heureIso(base.modifie_le) + (base.par ? ' par ' + base.par : '') + '.' }),
+    h('div', { class: 'reglages' },
+      h('div', { class: 'reglages-couleurs' }, panneauCouleurs,
+        h('section', { class: 'apercus' }, h('p', { class: 'lbl', text: 'Aperçu, avant enregistrement' }), apLineup.noeud, apSerie.noeud,
+          h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Fond de la série' }), segFond))),
+      listeRoles, listeMentions, listeSalles),
+    pied);
+  majDegrade(); majApercus();
+}
+
 async function vueJournal(page) {
   afficher(h('p', { class: 'chargement', text: 'Chargement du journal…' }));
   let j;
