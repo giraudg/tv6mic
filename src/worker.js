@@ -144,15 +144,17 @@ function entier(v) {
 
 async function enregistrerSignal(db, code, s, maintenant) {
   await db.prepare(
-    `INSERT INTO ecrans (flux_code, vu_le, lecteur, version, contenu, memoire, video, erreur, demarre_le, chargements, taille, agent)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+    `INSERT INTO ecrans (flux_code, vu_le, lecteur, version, contenu, memoire, video, erreur, demarre_le, chargements, taille, agent, trace)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
      ON CONFLICT (flux_code) DO UPDATE SET
        vu_le = excluded.vu_le, lecteur = excluded.lecteur, version = excluded.version, contenu = excluded.contenu,
        memoire = excluded.memoire, video = excluded.video, erreur = excluded.erreur, demarre_le = excluded.demarre_le,
-       chargements = excluded.chargements, taille = excluded.taille, agent = COALESCE(excluded.agent, ecrans.agent)`
+       chargements = excluded.chargements, taille = excluded.taille, agent = COALESCE(excluded.agent, ecrans.agent),
+       trace = COALESCE(excluded.trace, ecrans.trace)`
   ).bind(
     code, maintenant, texte(s.lecteur, 20), entier(s.version), texte(s.contenu, 120), entier(s.memoire),
-    texte(s.video, 10), texte(s.erreur, 300), entier(s.demarre), entier(s.chargements), texte(s.taille, 20), texte(s.agent, 300)
+    texte(s.video, 10), texte(s.erreur, 300), entier(s.demarre), entier(s.chargements), texte(s.taille, 20), texte(s.agent, 300),
+    texte(s.trace, 2000)
   ).run();
 }
 

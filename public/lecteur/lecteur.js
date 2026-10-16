@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3.0';
+  var VERSION = '1.3.1';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -45,11 +45,21 @@
   function lireJSON(cle) { try { return JSON.parse(lire(cle) || 'null'); } catch (e) { return null; } }
   function maintenant() { return Date.now() + decalage; }
   function rien() {}
+  function horodatage() {
+    var h = Regles.heureParis(maintenant());
+    return ('0' + Math.floor(h.minutes / 60)).slice(-2) + ':' + ('0' + h.minutes % 60).slice(-2) + ':' + ('0' + h.secondes).slice(-2);
+  }
   function noter(message) {
-    var h = Regles.heureParis(maintenant()), t = ('0' + Math.floor(h.minutes / 60)).slice(-2) + ':' + ('0' + h.minutes % 60).slice(-2) + ':' + ('0' + h.secondes).slice(-2);
-    erreurs.push(t + ' ' + message);
+    erreurs.push(horodatage() + ' ' + message);
     if (erreurs.length > 20) { erreurs.shift(); }
+    tracer('! ' + message);
     if (W.console && W.console.log) { W.console.log('[tv6mic] ' + message); }
+  }
+  // Journal vidéo, envoyé avec le signal : diagnostic à distance d'une vidéo qui ne s'affiche pas.
+  var traceVideo = [];
+  function tracer(message) {
+    traceVideo.push(horodatage() + ' ' + message);
+    if (traceVideo.length > 16) { traceVideo.shift(); }
   }
   W.addEventListener('error', function (e) {
     noter('JS ' + (e.message || 'erreur') + (e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : ''));
@@ -87,10 +97,16 @@
       void n.offsetWidth;
       n.style.transition = n.style.webkitTransition = '';
     }
-    zHaut++;
-    n.style.zIndex = zHaut;
-    if (cible.type === 'video') { n.style.transition = n.style.webkitTransition = fondu ? 'opacity .5s ease' : 'none'; }
-    n.classList.add('visible');
+    if (cible.type === 'video' && fondu && precedent && precedent.type === 'couche') {
+      // fondu vers une vidéo : la vidéo apparaît sous la couche, qui s'efface (l'opacité ne touche jamais la vidéo)
+      n.style.zIndex = (parseInt(noeudDe(precedent).style.zIndex, 10) || zHaut) - 1;
+      n.classList.add('visible');
+      noeudDe(precedent).classList.remove('visible');
+    } else {
+      zHaut++;
+      n.style.zIndex = zHaut;
+      n.classList.add('visible');
+    }
     actif = cible;
     if (precedent && !estActif(precedent)) {
       setTimeout(function () { cacher(precedent, clePrec); }, cible.type === 'couche' || fondu ? 700 : 80);
@@ -120,6 +136,15 @@
 
   /* ---------- médias : URL locale (mémoire de l'écran) ou réseau ---------- */
   function urlDe(src) { return blobs[chemin(src)] || src; }
+  // Vidéos : depuis la mémoire de l'écran, sauf si cet écran n'y arrive pas (appris au premier échec, gardé 7 jours).
+  function videoReseau() { var s = lireJSON(K.video); return !!(s && s.source === 'reseau' && s.lecteur === VERSION && Date.now() - (s.sourceLe || 0) < 7 * 86400000); }
+  function retenirReseau() {
+    var s = lireJSON(K.video) || {};
+    s.source = 'reseau'; s.sourceLe = Date.now(); s.lecteur = VERSION;
+    ecrire(K.video, JSON.stringify(s));
+    tracer('vidéos lues depuis le réseau désormais');
+  }
+  function absolue(src) { try { return new W.URL(src, W.location.href).href; } catch (e) { return src; } }
   function resoudre(etape, fin) {
     var srcs = sourcesDe(etape.contenu), reste = srcs.length, i, termine = false;
     var garde2 = setTimeout(function () { finir(); }, 4000);
@@ -240,21 +265,23 @@
     v.__cle = etape.cle; v.__actif = false;
     v.muted = !d.son;
     v.preload = 'auto';
-    v.onplaying = v.onended = v.onloadedmetadata = null;
+    v.onplaying = v.onended = v.onloadedmetadata = v.oncanplay = null;
     v.onerror = function () {                       // erreur pendant le préchargement
       if (v.__actif) { return; }
       noter('préchargement refusé : ' + etape.cle + ' (' + codeErreur(v) + ')');
       if (v.error && v.error.code === 3 && videos[1 - indexDe(v)].getAttribute('src')) { echecVideo(); }
       liberer(indexDe(v));
     };
-    v.src = url(d.src);
+    v.src = videoReseau() ? absolue(d.src) : url(d.src);
+    v.__source = v.src.indexOf('blob:') === 0 ? 'mémoire' : 'réseau';
+    v.__repli = false;
     try { v.load(); } catch (e) {}
   }
   function liberer(i) {
     var v = videos[i];
     v.classList.remove('visible');
     v.__cle = null; v.__actif = false;
-    v.onplaying = v.onended = v.onerror = v.onloadedmetadata = null;
+    v.onplaying = v.onended = v.onerror = v.onloadedmetadata = v.oncanplay = null;
     try { v.pause(); } catch (e) {}
     if (v.getAttribute('src')) { v.removeAttribute('src'); try { v.load(); } catch (e2) {} }
     if (preparee && preparee.index === i) { preparee = null; }
@@ -280,6 +307,14 @@
   function jouerVideo(e, n, liste, ecoule) {
     var d = e.contenu.donnees || {}, i, v, depuisCouche = !actif || actif.type === 'couche';
     preparee = null;
+    // Rien à l'écran (page rechargée) : l'image fixe de la vidéo couvre le chargement au lieu d'un écran noir.
+    if (!actif && d.poster) {
+      var ic = coucheLibre();
+      vider(couches[ic]);
+      couches[ic].appendChild(Gabarits.image({ contenu: { donnees: { src: d.poster } } }, urlDe).noeud);
+      montrer({ type: 'couche', index: ic });
+      depuisCouche = true;
+    }
     if (modeVideo === 'simple' && actif && actif.type === 'video') {
       couvrirAvecPoster(d, function () { if (n === jeton) { jouerVideo(e, n, liste, ecoule); } });
       return;
@@ -300,25 +335,69 @@
       avancer();
     }
     function lancer() {
-      var parti = false, p, reste = Math.max((e.duree || d.duree || 120) - (ecoule || 0), 0);
+      var parti = false, reste = Math.max((e.duree || d.duree || 120) - (ecoule || 0), 0), t0 = Date.now();
       v = videos[i];
       v.__actif = true;
+      tracer('vidéo ' + e.cle + ' : ' + (v.__source || '?') + (v.readyState ? ', préchargée (état ' + v.readyState + ')' : '') + (ecoule > 1 ? ', reprise à ' + Math.round(ecoule) + ' s' : ''));
+      v.onloadedmetadata = function () {
+        tracer('métadonnées ' + v.videoWidth + '×' + v.videoHeight + ' en ' + (Date.now() - t0) + ' ms');
+        if (ecoule > 1) { try { v.currentTime = ecoule; } catch (x2) {} }
+      };
+      v.oncanplay = function () { v.oncanplay = null; tracer('prête en ' + (Date.now() - t0) + ' ms'); };
       v.onplaying = function () {
         if (n !== jeton || parti) { return; }
         parti = true;
         clearTimeout(garde);
+        tracer('lecture en ' + (Date.now() - t0) + ' ms (' + v.__source + ')');
+        if (v.__repli) { retenirReseau(); }
         montrer({ type: 'video', index: i }, depuisCouche);
+        // trois secondes plus tard : l'image avance-t-elle vraiment ? (une vidéo noire « qui joue » se voit ici)
+        var c0 = v.currentTime, f0 = v.webkitDecodedFrameCount || 0;
+        setTimeout(function () {
+          if (n !== jeton) { return; }
+          tracer('après 3 s : temps ' + (v.currentTime - c0).toFixed(1) + ' s, images ' + ((v.webkitDecodedFrameCount || 0) - f0) + ' (perdues ' + (v.webkitDroppedFrameCount || 0) + '), ' +
+            v.videoWidth + '×' + v.videoHeight + ', visible ' + (v.classList.contains('visible') ? 'oui' : 'non'));
+        }, 3000);
         garde = setTimeout(function () { if (n === jeton) { noter('vidéo trop longue : ' + e.cle); avancer(); } }, (reste + 15) * 1000);
         setTimeout(function () { if (n === jeton) { preparerSuivante(liste, e); } }, depuisCouche ? 900 : 300);
       };
       v.onended = function () { if (n === jeton) { avancer(); } };
-      v.onerror = function () { if (n === jeton) { echec('vidéo illisible', v.error && v.error.code === 3); } };
-      garde = setTimeout(function () { if (n === jeton && !parti) { echec('vidéo bloquée', true); } }, 8000);
-      if (ecoule > 1) {                               // reprise après rechargement : repartir où on en était
-        if (v.readyState >= 1) { try { v.currentTime = ecoule; } catch (x) {} }
-        else { v.onloadedmetadata = function () { v.onloadedmetadata = null; try { v.currentTime = ecoule; } catch (x2) {} }; }
+      v.onerror = function () {
+        if (n !== jeton) { return; }
+        tracer('erreur ' + codeErreur(v) + ' (' + v.__source + ')');
+        if (!parti && repli()) { return; }
+        echec('vidéo illisible', v.error && v.error.code === 3);
+      };
+      // Pas de lecture : depuis la mémoire, on réessaie aussitôt depuis le réseau ; sinon on passe.
+      function attendre(ms) {
+        garde = setTimeout(function () {
+          if (n !== jeton || parti) { return; }
+          tracer('bloquée après ' + (Date.now() - t0) + ' ms : état ' + v.readyState + ', réseau ' + v.networkState + ', temps ' + v.currentTime.toFixed(1));
+          if (repli()) { return; }
+          echec('vidéo bloquée', true);
+        }, ms);
       }
-      try { p = v.play(); if (p && p['catch']) { p['catch'](function (err) { noter('lecture refusée : ' + (err && err.name)); }); } } catch (x3) {}
+      function repli() {
+        if (v.__repli || v.__source !== 'mémoire') { return false; }
+        v.__repli = true; v.__source = 'réseau';
+        tracer('repli : lecture depuis le réseau');
+        clearTimeout(garde);
+        v.src = absolue(d.src);
+        try { v.load(); } catch (x4) {}
+        jouer();
+        attendre(10000);
+        return true;
+      }
+      function jouer() {
+        var p;
+        try {
+          p = v.play();
+          if (p && p['catch']) { p['catch'](function (err) { if (n === jeton && !parti) { noter('lecture refusée : ' + (err && err.name) + (err && err.message ? ' (' + String(err.message).slice(0, 80) + ')' : '')); } }); }
+        } catch (x3) { tracer('play() : ' + x3.message); }
+      }
+      attendre(v.__source === 'mémoire' ? 5000 : 10000);
+      if (ecoule > 1 && v.readyState >= 1) { try { v.currentTime = ecoule; } catch (x) {} }
+      jouer();
     }
   }
 
@@ -374,7 +453,8 @@
     clearTimeout(minuterieReseau);
     var t0 = Date.now(), signal = {
       lecteur: VERSION, version: prog ? prog.version : 0, contenu: courante ? courante.cle : null,
-      memoire: totalMemoire(), video: modeVideo, erreur: erreurs.length ? erreurs[erreurs.length - 1] : null,
+      memoire: totalMemoire(), video: modeVideo + (videoReseau() ? '-net' : ''), erreur: erreurs.length ? erreurs.slice(-3).join(' | ').slice(-300) : null,
+      trace: traceVideo.length ? traceVideo.join(' | ').slice(-1900) : null,
       demarre: demarreLe, chargements: chargements, taille: W.innerWidth + 'x' + W.innerHeight
     };
     if (premierSignal) { signal.agent = navigator.userAgent; }

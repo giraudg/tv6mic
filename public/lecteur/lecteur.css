@@ -5,11 +5,13 @@ body { cursor: none; -webkit-font-smoothing: antialiased; }
 
 /* ---- scène : 1920 × 1080, réduite par zoom (transform: scale ne s'affiche pas sur ces écrans) ---- */
 #scene { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
-.couche, .video { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; opacity: 0; }
-.couche { overflow: hidden; -webkit-transition: opacity .6s ease; transition: opacity .6s ease; }
-.couche.visible, .video.visible { opacity: 1; }
-.video { background: #000; object-fit: contain; }
-.video.visible { -webkit-transition: none; transition: none; }
+.couche, .video { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+.couche { opacity: 0; overflow: hidden; -webkit-transition: opacity .6s ease; transition: opacity .6s ease; }
+.couche.visible { opacity: 1; }
+/* Vidéos montrées et cachées par visibility, jamais par opacité : sur les téléviseurs Samsung, l'image est dessinée
+   sur un plan matériel sous la page (méthode validée sur l'écran le 13 octobre, diagnostic « deux lecteurs »). */
+.video { visibility: hidden; background: #000; object-fit: contain; }
+.video.visible { visibility: visible; }
 
 /* Suivi technique (?debug=1) */
 #suivi { position: fixed; right: 8px; bottom: 8px; z-index: 100001; max-width: 46%; padding: 8px 12px; background: rgba(0, 0, 0, .78);
