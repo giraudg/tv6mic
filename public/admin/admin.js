@@ -370,15 +370,15 @@ function verdictVideo(a) {
   const l = [];
   let refus = false;
   const n = (etat, texte) => { l.push([etat, texte]); if (etat === 'x') refus = true; };
-  if (a.illisible || !a.codec) { n('x', 'Fichier illisible : ce n’est pas une vidéo MP4 ou MOV.'); return { lignes: l, refus }; }
+  if (a.illisible || !a.codec) { n('x', 'Format non lu par les écrans (ce n’est pas un MP4 ou un MOV H.264)'); return { lignes: l, refus }; }
   if (a.codec === 'avc1' || a.codec === 'avc3') n('v', 'Codec H.264');
-  else if (a.codec === 'hvc1' || a.codec === 'hev1') n('x', 'Codec HEVC (H.265, vidéos d’iPhone) : à exporter en H.264');
-  else n('x', 'Codec « ' + a.codec + ' » non lu par les écrans : à exporter en H.264');
+  else if (a.codec === 'hvc1' || a.codec === 'hev1') n('x', 'Codec HEVC (H.265, vidéos d’iPhone) : non lu par les écrans');
+  else n('x', 'Codec « ' + a.codec + ' » non lu par les écrans');
   if (a.profil) {
     if ([66, 77, 100].includes(a.profil)) n('v', 'Profil ' + ({ 66: 'Baseline', 77: 'Main', 100: 'High' })[a.profil] + (a.niveau ? ', niveau ' + a.niveau : ''));
-    else n('x', 'Profil H.264 ' + a.profil + ' (10 bits ou 4:2:2) : à exporter en 8 bits, profil High');
+    else n('x', 'Profil H.264 ' + a.profil + ' (10 bits ou 4:2:2) : non lu par les écrans');
   }
-  if (a.largeur > 1920 || a.hauteur > 1080) n('x', a.largeur + ' × ' + a.hauteur + ' px : à réduire en 1920 × 1080');
+  if (a.largeur > 1920 || a.hauteur > 1080) n('x', a.largeur + ' × ' + a.hauteur + ' px : plus grand que les écrans (1920 × 1080)');
   else if (a.largeur < 1280 || a.hauteur < 720) n('a', a.largeur + ' × ' + a.hauteur + ' px : basse définition, image floue');
   else n('v', a.largeur + ' × ' + a.hauteur + ' px');
   if (a.ips) {
@@ -418,6 +418,67 @@ function posterVideo(f) {
     v.src = u;
   });
 }
+/* Conversion des vidéos au format des écrans, dans le navigateur (WebCodecs) : H.264 8 bits, 1920 × 1080 au plus,
+   24, 25 ou 30 images par seconde constantes, environ 5 Mbit/s, son AAC, « fast start ». La bibliothèque Mediabunny
+   (MPL-2.0, public/vendor/) n'est chargée qu'au moment d'une conversion ; l'encodeur AAC en WebAssembly ne l'est
+   que si le navigateur n'en a pas (Firefox, Chrome sous Linux). */
+const CONVERSION = { debit: 5e6, debitMin: 2e6, son: 128000, cleImage: 2, tailleMax: 75 * 1048576 };
+const conversionsEnCours = new Set();   // annulations possibles (quitter la page pendant une conversion)
+function ipsCible(ips) {
+  if (!ips) return 30;
+  if (ips > 30.5) return Math.abs(ips - 50) < 2 ? 25 : 30;   // 50 → 25 ; 60, 59,94, 120… → 30
+  return ips < 24.5 ? 24 : ips < 27 ? 25 : 30;              // 23,976 → 24 ; 29,97 et cadence variable → 30
+}
+const conversionPossible = () => typeof VideoEncoder !== 'undefined' && typeof VideoDecoder !== 'undefined';
+async function convertirVideo(fichier, duree, progression) {
+  const M = await import('mediabunny');
+  const input = new M.Input({ formats: M.ALL_FORMATS, source: new M.BlobSource(fichier) });
+  const piste = await input.getPrimaryVideoTrack();
+  if (!piste) throw new Error('Ce fichier ne contient pas d’image vidéo lisible.');
+  const son = await input.getPrimaryAudioTrack();
+  if (son && !(await M.canEncodeAudio('aac', { numberOfChannels: 2, sampleRate: 48000, quality: new M.Quality({ bitrate: CONVERSION.son }) }))) {
+    const { registerAacEncoder } = await import('/vendor/mediabunny-aac-encoder-1.61.5.min.mjs');
+    if (!window.aacEnregistre) { registerAacEncoder(); window.aacEnregistre = true; }
+  }
+  const stats = await piste.computePacketStats(150);
+  const ips = ipsCible(stats.averagePacketRate);
+  // 16:9 jusqu'à 1920 × 1080 : taille gardée ; sinon cadre 1920 × 1080 (bandes noires si le format diffère)
+  const w = piste.displayWidth, ht = piste.displayHeight;
+  const garde = Math.abs(w / ht - 16 / 9) < 0.02 && w <= 1920 && w >= 1280;
+  const [lw, lh] = garde ? [w - w % 2, ht - ht % 2] : [1920, 1080];
+  // débit : 5 Mbit/s en 1080p, au prorata des pixels ; abaissé pour une vidéo longue (75 Mo au plus)
+  const secondes = duree || (await input.computeDuration()) || 0;
+  let debit = Math.max(CONVERSION.debitMin, CONVERSION.debit * lw * lh / (1920 * 1080));
+  if (secondes) debit = Math.max(CONVERSION.debitMin, Math.min(debit, (CONVERSION.tailleMax * 8 / secondes) * 0.92 - (son ? CONVERSION.son : 0)));
+  const qualite = new M.Quality({ bitrate: Math.round(debit), bitrateMode: 'variable' });
+  if (!(await M.canEncodeVideo('avc', { width: lw, height: lh, quality: qualite, frameRate: ips })))
+    throw Object.assign(new Error('Ce navigateur ne sait pas encoder en H.264 : utilisez Chrome ou Edge à jour.'), { exporter: true });
+  const output = new M.Output({ format: new M.Mp4OutputFormat({ fastStart: 'in-memory' }), target: new M.BufferTarget() });
+  const conv = await M.Conversion.init({
+    input, output, tracks: 'primary', showWarnings: false, tags: {},
+    video: { codec: 'avc', width: lw, height: lh, fit: 'contain', frameRate: ips, quality: qualite, keyFrameInterval: CONVERSION.cleImage, allowTransformationMetadata: false, forceTranscode: true },
+    audio: { codec: 'aac', quality: new M.Quality({ bitrate: CONVERSION.son }) }
+  });
+  const rejetee = conv.discardedTracks.find(t => t.track.isVideoTrack());
+  if (!conv.isValid || rejetee) {
+    const raison = rejetee ? rejetee.reason : '';
+    const nom = { hevc: 'HEVC (vidéos d’iPhone)', av1: 'AV1', vp9: 'VP9', vp8: 'VP8', avc: 'H.264' }[piste.codec] || 'de ce fichier';
+    throw Object.assign(new Error(raison === 'no_encodable_target_codec' ? 'Ce navigateur ne sait pas encoder en H.264 : utilisez Chrome ou Edge à jour.'
+      : 'Ce navigateur ne sait pas lire le codec ' + nom + '. Sur Mac ou sur un PC récent, Chrome, Edge ou Safari le lisent ; sinon, exportez la vidéo avec HandBrake.'), { exporter: true });
+  }
+  const sonRetire = !!son && !conv.utilizedTracks.some(t => t.isAudioTrack());
+  let annule = false;
+  const annuler = () => { annule = true; return conv.cancel(); };
+  conversionsEnCours.add(annuler);
+  conv.onProgress = (x) => progression(x, annuler);
+  progression(0, annuler);
+  try { await conv.execute(); }
+  catch (e) { if (annule || e instanceof M.ConversionCanceledError) throw Object.assign(new Error('Conversion annulée.'), { annulee: true }); throw e; }
+  finally { conversionsEnCours.delete(annuler); }
+  return { blob: new Blob([output.target.buffer], { type: 'video/mp4' }), ips, largeur: lw, hauteur: lh, debit: Math.round(debit), sonRetire };
+}
+const dureeTexte = s => s < 60 ? Math.max(1, Math.round(s)) + ' s' : Math.floor(s / 60) + ' min' + (s % 60 >= 10 && s < 600 ? ' ' + Math.round(s % 60) + ' s' : '');
+
 function televerser(blob, nom, progression) {
   return new Promise((ok, ko) => {
     const x = new XMLHttpRequest();
@@ -435,7 +496,7 @@ function televerser(blob, nom, progression) {
     x.send(blob);
   });
 }
-const TYPE_PAR_EXT = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+const TYPE_PAR_EXT = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 const nomSansExtension = n => n.replace(/\.[a-z0-9]{2,4}$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 100);
 function typeFichier(f) { return f.type || TYPE_PAR_EXT[(f.name.split('.').pop() || '').toLowerCase()] || ''; }
 
@@ -455,7 +516,9 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
   const encart = h('div', { class: 'encart rose', hidden: true },
     h('b', { text: 'Exporter au bon format' }),
     h('span', { text: 'HandBrake (gratuit) : préréglage « Fast 1080p30 », cocher « Web Optimized », vidéo H.264, 30 i/s constants, débit moyen 5000 kbit/s, son AAC. Le détail est dans le cahier des charges (section 4).' }));
-  const entree = h('input', { type: 'file', accept: video ? 'video/mp4,video/quicktime,.mp4,.mov,.m4v' : 'image/jpeg,image/png,image/webp', hidden: true });
+  const choix = h('div', { class: 'choix-conv', hidden: true });
+  const annulerConv = h('button', { type: 'button', class: 'btn pt', hidden: true }, 'Annuler la conversion');
+  const entree = h('input', { type: 'file', accept: video ? 'video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm,.mkv' : 'image/jpeg,image/png,image/webp', hidden: true });
   const bouton = h('button', { type: 'button', class: 'btn', onclick: () => entree.click(), disabled: !E.r2 },
     video ? 'Choisir une vidéo…' : 'Choisir une image…');
   const retirer = facultatif ? h('button', { type: 'button', class: 'btn btn-danger pt', onclick: () => { change(null); montrer(null); } }, 'Retirer') : null;
@@ -510,27 +573,61 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
         const c = cadreActuel(), flou = c && verdictCadre(v, c).find(([e, t]) => e === 'a' && /petite/.test(t));
         if (flou) annoncer(flou[1], true);
       } else {
-        if (!type.startsWith('video/')) throw new Error('« ' + f.name + ' » n’est pas une vidéo : choisissez un MP4 ou un MOV.');
+        if (!type.startsWith('video/')) throw new Error('« ' + f.name + ' » n’est pas une vidéo : choisissez un MP4, un MOV ou un WebM.');
         info.textContent = 'Contrôle du format…';
-        const a = await analyserVideo(f), verdict = verdictVideo(a);
-        remplacer(controle, ...verdict.lignes.map(([e, t]) => h('li', { class: e, text: t })));
+        const lignes = (titre, verdict) => [titre && h('li', { class: 'titre-ctrl', text: titre }), verdict.lignes.map(([e, t]) => h('li', { class: e, text: t }))];
+        let a = await analyserVideo(f), verdict = verdictVideo(a), fichier = f, depart = null, conv = null;
+        remplacer(controle, lignes(null, verdict));
         controle.hidden = false;
-        if (verdict.refus) { encart.hidden = false; info.textContent = 'Vidéo refusée : les écrans ne la liraient pas correctement.'; return; }
+        // Ce que la conversion corrige sans être indispensable : on propose, l'utilisateur choisit.
+        const ameliorable = !verdict.refus && (a.ips > 30.5 || a.cadenceVariable || a.debit > 8.5 || a.taille > 40 * 1048576 || (a.audio && a.audio !== 'mp4a') || a.debutRapide === false);
+        let convertir = verdict.refus;
+        if (ameliorable && conversionPossible()) {
+          info.textContent = 'Cette vidéo passera, mais une conversion la rendra plus fluide et plus légère pour les écrans.';
+          convertir = await new Promise(ok => {
+            remplacer(choix, h('button', { type: 'button', class: 'btn btn-violet', onclick: () => ok(true) }, 'Optimiser pour les écrans (conseillé)'),
+              h('button', { type: 'button', class: 'btn', onclick: () => ok(false) }, 'Importer telle quelle'));
+            choix.hidden = false;
+          });
+          choix.hidden = true;
+        }
+        if (convertir) {
+          if (!conversionPossible()) { encart.hidden = false; throw new Error('Ce navigateur ne sait pas convertir les vidéos : utilisez Chrome ou Edge à jour, ou exportez la vidéo avec HandBrake.'); }
+          info.textContent = 'Conversion au format des écrans… (chargement)';
+          const debut = Date.now();
+          try {
+            conv = await convertirVideo(f, a.duree, (x, annuler) => {
+              annulerConv.hidden = false; annulerConv.onclick = () => { annulerConv.disabled = true; annuler(); };
+              progresser(x);
+              const reste = x > 0.03 ? (Date.now() - debut) / 1000 * (1 - x) / x : null;
+              info.textContent = 'Conversion : ' + Math.round(x * 100) + ' %' + (reste !== null ? ' · encore ' + dureeTexte(reste) : '') + '. Restez sur cette page.';
+            });
+          } catch (e) { if (e.exporter) encart.hidden = false; throw e; }
+          finally { annulerConv.hidden = true; annulerConv.disabled = false; barre.hidden = true; }
+          depart = { codec: a.codec, largeur: a.largeur, hauteur: a.hauteur, ips: a.ips, debit: a.debit, taille: f.size, duree: Math.round((Date.now() - debut) / 1000) };
+          fichier = new File([conv.blob], nomSansExtension(f.name).replace(/\s+/g, '-') + '.mp4', { type: 'video/mp4' });
+          a = await analyserVideo(fichier); verdict = verdictVideo(a);
+          remplacer(controle, lignes('Après conversion (' + mo(f.size) + ' → ' + mo(fichier.size) + ', en ' + dureeTexte(depart.duree) + ')', verdict),
+            conv.sonRetire ? h('li', { class: 'a', text: 'Son retiré : il n’a pas pu être converti' }) : null);
+          if (verdict.refus) throw new Error('Même convertie, la vidéo ne convient pas aux écrans (voir ci-dessus) : raccourcissez-la.');
+        } else if (verdict.refus) { encart.hidden = false; info.textContent = 'Vidéo refusée : les écrans ne la liraient pas correctement.'; return; }
         info.textContent = 'Extraction de l’image fixe…';
         // L'image fixe sert d'aperçu et de secours entre deux vidéos ; sans elle, la vidéo reste utilisable.
-        const p = await posterVideo(f).catch(err => { annoncer('Image fixe non extraite (' + err.message + ') : la vidéo sera importée sans.', true); return null; });
-        const rp = p ? await televerser(p.blob, f.name + '.jpg', null) : null;
+        const p = await posterVideo(fichier).catch(err => { annoncer('Image fixe non extraite (' + err.message + ') : la vidéo sera importée sans.', true); return null; });
+        const rp = p ? await televerser(p.blob, fichier.name + '.jpg', null) : null;
         info.textContent = 'Envoi de la vidéo…';
-        const rv = await televerser(new Blob([f], { type: type === 'video/quicktime' ? 'video/quicktime' : 'video/mp4' }), f.name, progresser);
+        const typeEnvoi = conv ? 'video/mp4' : type === 'video/quicktime' ? 'video/quicktime' : 'video/mp4';
+        const rv = await televerser(new Blob([fichier], { type: typeEnvoi }), fichier.name, progresser);
         const v = { src: rv.src, poster: rp ? rp.src : null, duree: Math.round((a.duree || (p && p.duree) || 0) * 100) / 100, taille: rv.taille, largeur: a.largeur || (p && p.largeur), hauteur: a.hauteur || (p && p.hauteur),
-          fichier: nomSansExtension(f.name), analyse: { codec: a.codec, profil: a.profil, niveau: a.niveau, ips: a.ips, debit: a.debit, avert: verdict.lignes.filter(x => x[0] === 'a').length } };
+          fichier: nomSansExtension(f.name), analyse: { codec: a.codec, profil: a.profil, niveau: a.niveau, ips: a.ips, debit: a.debit, avert: verdict.lignes.filter(x => x[0] === 'a').length, converti: depart || undefined } };
         change(v); montrer(v);
+        if (conv) annoncer('Vidéo convertie et importée : ' + a.largeur + ' × ' + a.hauteur + ', ' + a.ips + ' i/s, ' + mo(rv.taille) + '.');
       }
     } catch (e) {
       info.textContent = e.message;
       annoncer(e.message, true);
     } finally {
-      bouton.disabled = !E.r2; barre.hidden = true;
+      bouton.disabled = !E.r2; barre.hidden = true; choix.hidden = true;
       occupe = false; racine.classList.remove('occupe');
     }
   }
@@ -548,7 +645,7 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
     if (f) importer(f);
   });
   if (!E.r2) racine.classList.add('occupe');
-  racine.append(h('div', { class: 'media-ligne' }, vignette, h('div', { class: 'actions' }, bouton, retirer)), format, info, barre, controle, encart, entree);
+  racine.append(h('div', { class: 'media-ligne' }, vignette, h('div', { class: 'actions' }, bouton, retirer)), format, info, barre, annulerConv, choix, controle, encart, entree);
   montrer(valeur);
   if (!E.r2) racine.append(h('p', { class: 'erreur', text: 'Import impossible : le stockage Cloudflare R2 n’est pas encore activé.' }));
   return racine;
@@ -580,6 +677,12 @@ const surVue = nom => (route.slice(1).split('/')[0] || 'ecrans') === nom;
 async function naviguer() {
   if (bloquerRoute) { bloquerRoute = false; return; }
   const [nom, arg] = (location.hash.slice(1) || 'ecrans').split('/');
+  if (conversionsEnCours.size) {
+    if (!(await demander('Conversion en cours', 'Quitter cette page annule la conversion de la vidéo.', 'Quitter et annuler', true))) {
+      bloquerRoute = true; location.hash = route; return;
+    }
+    for (const annuler of [...conversionsEnCours]) annuler();
+  }
   if (edition && edition.sale && !(nom === 'contenu' && arg === edition.id)) {
     if (!(await demander('Modifications non enregistrées', 'Quitter cette page sans enregistrer vos modifications ?', 'Quitter sans enregistrer', true))) {
       bloquerRoute = true; location.hash = route; return;
@@ -611,7 +714,7 @@ async function naviguer() {
   }
 }
 window.addEventListener('hashchange', naviguer);
-window.addEventListener('beforeunload', e => { if (edition && edition.sale) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if ((edition && edition.sale) || conversionsEnCours.size) { e.preventDefault(); e.returnValue = ''; } });
 document.querySelectorAll('.ah-tabs button').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.vue === 'tableau' ? '#ecrans' : '#' + b.dataset.vue; }));
 
 /* ================= vue : écrans ================= */
@@ -1232,7 +1335,7 @@ function vueEditeur(id, typeNouveau) {
   } else {
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Vidéo' }),
       champMedia({ genre: 'video', valeur: d.src ? d : null, change: v => { Object.assign(d, v || { src: null, poster: null }); changer(); } }),
-      h('small', { text: 'MP4 H.264, 1920 × 1080, 25 ou 30 images par seconde, environ 5 Mbit/s, 60 s au plus conseillé.' })),
+      h('small', { text: 'MP4, MOV ou WebM. Ce que les écrans ne liraient pas (HEVC, 4K, 60 images par seconde, débit trop fort…) est converti à l’import, dans ce navigateur : Chrome ou Edge à jour conseillés. 60 s au plus conseillé.' })),
     h('label', { class: 'coche' }, h('input', { type: 'checkbox', checked: !!d.son, onchange: e => { d.son = e.target.checked; changer(false); } }), 'Diffuser le son de la vidéo'));
   }
   if (ed.type !== 'video') {

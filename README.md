@@ -75,8 +75,14 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
   prend le format du cadre à l'écran (`Gabarits.CADRES`, `cadreSerie`) et l'import signale recadrage et netteté.
 - **Images** : converties en JPEG dans le navigateur (2560 px au plus sur le grand côté), puis débarrassées de leur profil ICC
   (Chromium 56 affiche en couleurs « postérisées » les JPEG portant le profil sRGB compact ajouté par Chrome).
-- **Vidéos** : le navigateur lit l'en-tête MP4 (codec, profil, taille, cadence, débit, son) et refuse un fichier incompatible
-  en expliquant comment l'exporter (HandBrake). La conversion automatique n'est pas encore faite.
+- **Vidéos** : le navigateur lit l'en-tête MP4 (codec, profil, taille, cadence, débit, son). Ce que les écrans ne liraient pas
+  (HEVC, 10 bits, 4K, plus de 60 i/s, plus de 12 Mbit/s ou 80 Mo, autre format que MP4/MOV) est converti à l'import, dans le
+  navigateur (WebCodecs, bibliothèque [Mediabunny](https://mediabunny.dev) 1.61.5, MPL-2.0, dans `public/vendor/`, chargée
+  à la demande) : H.264 8 bits, 1920 × 1080 au plus (bandes noires si le format diffère), 24, 25 ou 30 i/s constants,
+  5 Mbit/s en 1080p (abaissé pour tenir sous 75 Mo), images clés toutes les 2 s, son AAC (encodeur WebAssembly si le
+  navigateur n'en a pas), « fast start ». Une vidéo seulement perfectible (50/60 i/s, cadence variable, débit lourd, son
+  non AAC) : conversion proposée. Le résultat est relu avant l'envoi. HEVC : décodé si la machine le sait (Mac, PC
+  récents) ; sinon, l'encart HandBrake s'affiche.
 - Les médias qui ne servent plus à aucun contenu sont supprimés de R2 à l'enregistrement.
 
 ## Architecture
