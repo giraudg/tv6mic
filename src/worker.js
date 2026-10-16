@@ -166,8 +166,10 @@ async function media(req, env, ctx, cle) {
   const plage = req.headers.get('Range');
   const cache = typeof caches !== 'undefined' ? caches.default : null;
   const cleCache = new Request(new URL(req.url).origin + '/medias/' + cle);
-  if (req.method === 'GET' && !plage && cache) {
-    const r = await cache.match(cleCache).catch(() => null);
+  // Depuis le cache de Cloudflare, plages comprises (les téléviseurs lisent les vidéos par morceaux) : la réponse
+  // partielle est découpée dans le fichier complet mis en cache.
+  if (req.method === 'GET' && cache) {
+    const r = await cache.match(plage ? new Request(cleCache.url, { headers: { Range: plage } }) : cleCache).catch(() => null);
     if (r) return r;
   }
   let objet;
@@ -187,12 +189,27 @@ async function media(req, env, ctx, cle) {
     const debut = r.suffix !== undefined ? objet.size - longueur : (r.offset || 0);
     h.set('Content-Range', `bytes ${debut}-${debut + longueur - 1}/${objet.size}`);
     h.set('Content-Length', String(longueur));
+    // premier passage : le fichier complet part dans le cache, les plages suivantes (et les autres écrans) en profitent
+    if (cache) ctx.waitUntil(mettreEnCache(env, cache, cleCache, cle).catch(() => {}));
     return new Response(objet.body, { status: 206, headers: h });
   }
   h.set('Content-Length', String(objet.size));
   const r = new Response(objet.body, { headers: h });
   if (cache) ctx.waitUntil(cache.put(cleCache, r.clone()).catch(() => {}));
   return r;
+}
+
+async function mettreEnCache(env, cache, cleCache, cle) {
+  if (await cache.match(cleCache)) return;
+  const o = await env.MEDIAS.get(cle);
+  if (!o) return;
+  const h = new Headers();
+  o.writeHttpMetadata(h);
+  h.set('ETag', o.httpEtag);
+  h.set('Cache-Control', 'public, max-age=31536000, immutable');
+  h.set('Accept-Ranges', 'bytes');
+  h.set('Content-Length', String(o.size));
+  await cache.put(cleCache, new Response(o.body, { headers: h }));
 }
 
 /* ================= back-office ================= */

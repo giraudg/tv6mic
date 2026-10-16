@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3.2';
+  var VERSION = '1.3.3';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -297,6 +297,9 @@
   function jouerVideo(e, n, liste, ecoule) {
     var d = e.contenu.donnees || {}, i, v, depuisCouche = !actif || actif.type === 'couche';
     preparee = null;
+    // Page rechargée en pleine vidéo : on la relance du début. Sur les téléviseurs, l'avance jusqu'au point
+    // d'interruption reste bloquée (journal du Hall : « bloquée après 10001 ms, état 1, temps 5.6 »).
+    if (ecoule > 1) { tracer('reprise après rechargement : ' + e.cle + ' relancée du début'); ecoule = 0; }
     // Rien à l'écran (page rechargée) : l'image fixe de la vidéo couvre le chargement au lieu d'un écran noir.
     if (!actif && d.poster) {
       var ic = coucheLibre();
@@ -328,11 +331,8 @@
       var parti = false, reste = Math.max((e.duree || d.duree || 120) - (ecoule || 0), 0), t0 = Date.now();
       v = videos[i];
       v.__actif = true;
-      tracer('vidéo ' + e.cle + (v.readyState ? ' : préchargée (état ' + v.readyState + ')' : '') + (ecoule > 1 ? ', reprise à ' + Math.round(ecoule) + ' s' : ''));
-      v.onloadedmetadata = function () {
-        tracer('métadonnées ' + v.videoWidth + '×' + v.videoHeight + ' en ' + (Date.now() - t0) + ' ms');
-        if (ecoule > 1) { try { v.currentTime = ecoule; } catch (x2) {} }
-      };
+      tracer('vidéo ' + e.cle + (v.readyState ? ' : préchargée (état ' + v.readyState + ')' : ''));
+      v.onloadedmetadata = function () { tracer('métadonnées ' + v.videoWidth + '×' + v.videoHeight + ' en ' + (Date.now() - t0) + ' ms'); };
       v.oncanplay = function () { v.oncanplay = null; tracer('prête en ' + (Date.now() - t0) + ' ms'); };
       v.onplaying = function () {
         if (n !== jeton || parti) { return; }
@@ -369,7 +369,6 @@
           if (p && p['catch']) { p['catch'](function (err) { if (n === jeton && !parti) { noter('lecture refusée : ' + (err && err.name) + (err && err.message ? ' (' + String(err.message).slice(0, 80) + ')' : '')); } }); }
         } catch (x3) { tracer('play() : ' + x3.message); }
       }
-      if (ecoule > 1 && v.readyState >= 1) { try { v.currentTime = ecoule; } catch (x) {} }
       jouer();
     }
   }
