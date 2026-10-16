@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3.1';
+  var VERSION = '1.3.2';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -136,14 +136,6 @@
 
   /* ---------- médias : URL locale (mémoire de l'écran) ou réseau ---------- */
   function urlDe(src) { return blobs[chemin(src)] || src; }
-  // Vidéos : depuis la mémoire de l'écran, sauf si cet écran n'y arrive pas (appris au premier échec, gardé 7 jours).
-  function videoReseau() { var s = lireJSON(K.video); return !!(s && s.source === 'reseau' && s.lecteur === VERSION && Date.now() - (s.sourceLe || 0) < 7 * 86400000); }
-  function retenirReseau() {
-    var s = lireJSON(K.video) || {};
-    s.source = 'reseau'; s.sourceLe = Date.now(); s.lecteur = VERSION;
-    ecrire(K.video, JSON.stringify(s));
-    tracer('vidéos lues depuis le réseau désormais');
-  }
   function absolue(src) { try { return new W.URL(src, W.location.href).href; } catch (e) { return src; } }
   function resoudre(etape, fin) {
     var srcs = sourcesDe(etape.contenu), reste = srcs.length, i, termine = false;
@@ -272,9 +264,7 @@
       if (v.error && v.error.code === 3 && videos[1 - indexDe(v)].getAttribute('src')) { echecVideo(); }
       liberer(indexDe(v));
     };
-    v.src = videoReseau() ? absolue(d.src) : url(d.src);
-    v.__source = v.src.indexOf('blob:') === 0 ? 'mémoire' : 'réseau';
-    v.__repli = false;
+    v.src = absolue(d.src);              // toujours depuis le réseau (voir gererMedias)
     try { v.load(); } catch (e) {}
   }
   function liberer(i) {
@@ -338,7 +328,7 @@
       var parti = false, reste = Math.max((e.duree || d.duree || 120) - (ecoule || 0), 0), t0 = Date.now();
       v = videos[i];
       v.__actif = true;
-      tracer('vidéo ' + e.cle + ' : ' + (v.__source || '?') + (v.readyState ? ', préchargée (état ' + v.readyState + ')' : '') + (ecoule > 1 ? ', reprise à ' + Math.round(ecoule) + ' s' : ''));
+      tracer('vidéo ' + e.cle + (v.readyState ? ' : préchargée (état ' + v.readyState + ')' : '') + (ecoule > 1 ? ', reprise à ' + Math.round(ecoule) + ' s' : ''));
       v.onloadedmetadata = function () {
         tracer('métadonnées ' + v.videoWidth + '×' + v.videoHeight + ' en ' + (Date.now() - t0) + ' ms');
         if (ecoule > 1) { try { v.currentTime = ecoule; } catch (x2) {} }
@@ -348,8 +338,7 @@
         if (n !== jeton || parti) { return; }
         parti = true;
         clearTimeout(garde);
-        tracer('lecture en ' + (Date.now() - t0) + ' ms (' + v.__source + ')');
-        if (v.__repli) { retenirReseau(); }
+        tracer('lecture en ' + (Date.now() - t0) + ' ms');
         montrer({ type: 'video', index: i }, depuisCouche);
         // trois secondes plus tard : l'image avance-t-elle vraiment ? (une vidéo noire « qui joue » se voit ici)
         var c0 = v.currentTime, f0 = v.webkitDecodedFrameCount || 0;
@@ -364,30 +353,15 @@
       v.onended = function () { if (n === jeton) { avancer(); } };
       v.onerror = function () {
         if (n !== jeton) { return; }
-        tracer('erreur ' + codeErreur(v) + ' (' + v.__source + ')');
-        if (!parti && repli()) { return; }
+        tracer('erreur ' + codeErreur(v));
         echec('vidéo illisible', v.error && v.error.code === 3);
       };
-      // Pas de lecture : depuis la mémoire, on réessaie aussitôt depuis le réseau ; sinon on passe.
-      function attendre(ms) {
-        garde = setTimeout(function () {
-          if (n !== jeton || parti) { return; }
-          tracer('bloquée après ' + (Date.now() - t0) + ' ms : état ' + v.readyState + ', réseau ' + v.networkState + ', temps ' + v.currentTime.toFixed(1));
-          if (repli()) { return; }
-          echec('vidéo bloquée', true);
-        }, ms);
-      }
-      function repli() {
-        if (v.__repli || v.__source !== 'mémoire') { return false; }
-        v.__repli = true; v.__source = 'réseau';
-        tracer('repli : lecture depuis le réseau');
-        clearTimeout(garde);
-        v.src = absolue(d.src);
-        try { v.load(); } catch (x4) {}
-        jouer();
-        attendre(10000);
-        return true;
-      }
+      // Pas de lecture au bout de 10 s : on passe à la suite (la vidéo est écartée 2 min).
+      garde = setTimeout(function () {
+        if (n !== jeton || parti) { return; }
+        tracer('bloquée après ' + (Date.now() - t0) + ' ms : état ' + v.readyState + ', réseau ' + v.networkState + ', temps ' + v.currentTime.toFixed(1));
+        echec('vidéo bloquée', true);
+      }, 10000);
       function jouer() {
         var p;
         try {
@@ -395,7 +369,6 @@
           if (p && p['catch']) { p['catch'](function (err) { if (n === jeton && !parti) { noter('lecture refusée : ' + (err && err.name) + (err && err.message ? ' (' + String(err.message).slice(0, 80) + ')' : '')); } }); }
         } catch (x3) { tracer('play() : ' + x3.message); }
       }
-      attendre(v.__source === 'mémoire' ? 5000 : 10000);
       if (ecoule > 1 && v.readyState >= 1) { try { v.currentTime = ecoule; } catch (x) {} }
       jouer();
     }
@@ -453,7 +426,7 @@
     clearTimeout(minuterieReseau);
     var t0 = Date.now(), signal = {
       lecteur: VERSION, version: prog ? prog.version : 0, contenu: courante ? courante.cle : null,
-      memoire: totalMemoire(), video: modeVideo + (videoReseau() ? '-net' : ''), erreur: erreurs.length ? erreurs.slice(-3).join(' | ').slice(-300) : null,
+      memoire: totalMemoire(), video: modeVideo, erreur: erreurs.length ? erreurs.slice(-3).join(' | ').slice(-300) : null,
       trace: traceVideo.length ? traceVideo.join(' | ').slice(-1900) : null,
       demarre: demarreLe, chargements: chargements, taille: W.innerWidth + 'x' + W.innerHeight
     };
@@ -504,9 +477,14 @@
     if (!cacheOk || !prog) { return; }
     dernierTri = Date.now();
     var h = Regles.heureParis(maintenant()), limite = Regles.ajouterJours(h.date, 2), ordre = [], utiles = {}, i, d, calc;
+    // Images et images fixes seulement : sur les téléviseurs, une vidéo lue depuis cette mémoire ne charge jamais
+    // (journal du Hall, 16 octobre 2026) ; les vidéos sont lues depuis le réseau, préchargées par le second lecteur.
     function ajouter(c) {
       var s = sourcesDe(c), j, p;
-      for (j = 0; j < s.length; j++) { p = chemin(s[j]); if (!utiles[p]) { utiles[p] = (c.donnees && s[j] === c.donnees.src && c.donnees.taille) || 0; ordre.push(p); } }
+      for (j = 0; j < s.length; j++) {
+        if (c.type === 'video' && c.donnees && s[j] === c.donnees.src) { continue; }
+        p = chemin(s[j]); if (!utiles[p]) { utiles[p] = (c.donnees && s[j] === c.donnees.src && c.donnees.taille) || 0; ordre.push(p); }
+      }
     }
     calc = Regles.etapes(prog, maintenant());
     for (i = 0; i < calc.etapes.length; i++) { if (calc.etapes[i].contenu) { ajouter(calc.etapes[i].contenu); } }

@@ -181,8 +181,10 @@ async function media(req, env, ctx, cle) {
   h.set('Accept-Ranges', 'bytes');
   if (req.method === 'HEAD') { h.set('Content-Length', String(objet.size)); return new Response(null, { headers: h }); }
   if (plage && objet.range) {
-    const debut = objet.range.offset || 0;
-    const longueur = objet.range.length !== undefined ? objet.range.length : objet.size - debut;
+    // R2 renvoie { offset, length } ou, pour « bytes=-N » (la fin du fichier), { suffix: N }
+    const r = objet.range;
+    const longueur = r.suffix !== undefined ? Math.min(r.suffix, objet.size) : (r.length !== undefined ? r.length : objet.size - (r.offset || 0));
+    const debut = r.suffix !== undefined ? objet.size - longueur : (r.offset || 0);
     h.set('Content-Range', `bytes ${debut}-${debut + longueur - 1}/${objet.size}`);
     h.set('Content-Length', String(longueur));
     return new Response(objet.body, { status: 206, headers: h });
