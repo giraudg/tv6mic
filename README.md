@@ -37,7 +37,7 @@ Gabarits (`public/lecteur/gabarits.js` et `gabarits.css`, partagés avec l'aper�
 | --- | --- | --- |
 | `soiree` | `nom`, `date` (AAAA-MM-JJ), `heure` (HH:MM), `photo.src`, `infos` (lignes séparées par `\n`), `mention`, `billetterie` (URL → QR code), `motif` (`type` faisceaux, rayons, hachures ou aucun ; `position` droite, gauche, haut, bas ; `couleur` rose, violet, degrade, blanc ou une teinte `#rrggbb` (pipette) — absent : faisceaux, droite, dégradé) | 10 s |
 | `lineup` | `titre` (vide : tête d'affiche), `date`, `lieu`, `photo.src`, `passages` : 1 à 8 `{ heure, role (ouverture, premiere, tete, dj, fermeture, autre), libelle, nom }`, rangés par heure (après minuit en fin de soirée) ; le jour J, passage en cours et suivant signalés | 12 s |
-| `agenda` | `titre`, `dates` : liste de `{ date, nom, mention }`, `photo.src` facultative ; 8 dates au plus par page | 15 s par page |
+| `agenda` | `titre`, `dates` : liste de `{ date, nom, mention }`, `photo.src` facultative ; 6 dates au plus par page (pages équilibrées), barre de progression façon « story » | 15 s par page |
 | `serie` | `accroche`, `titre`, `fond` (`violet`, `rose`, `degrade`, `noir`), `dates` : 1 à 4 `{ date, heure, nom, mention, photo.src }` ; dates passées masquées, « Ce soir » / « Demain » automatiques | 12 s |
 | `image` | `src`, `ajustement` (`remplir` ou `ajuster`) | 8 s |
 | `video` | `src`, `poster`, `duree` (s), `taille` (octets), `son` (booléen) | durée de la vidéo |

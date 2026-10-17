@@ -92,7 +92,7 @@ test('une soirée s\'arrête après le concert (bascule à 6 h)', () => {
   assert.deepStrictEqual(cles(prog, '2026-10-25', '06:00'), ['veille']);
 });
 
-test('agenda : dates passées masquées, 8 dates par page', () => {
+test('agenda : dates passées masquées, 6 dates par page au plus', () => {
   const dates = [];
   for (let j = 10; j < 20; j++) dates.push({ date: '2026-10-' + j, nom: 'Concert ' + j });
   const prog = { contenus: { ag: contenu('ag', 'agenda', { titre: 'Agenda', dates }) }, diffusions: [diff('1', 'ag')] };
@@ -100,10 +100,31 @@ test('agenda : dates passées masquées, 8 dates par page', () => {
   assert.deepStrictEqual(r.map(e => e.cle), ['ag#1', 'ag#2']);
   assert.strictEqual(r[0].dates.length, 5);   // 10 dates : deux pages de 5
   assert.strictEqual(r[1].dates.length, 5);
-  r = R.etapes(prog, paris('2026-10-13', '12:00')).etapes;
-  assert.deepStrictEqual(r.map(e => e.cle), ['ag#1']);
-  assert.strictEqual(r[0].dates[0].date, '2026-10-13');
+  r = R.etapes(prog, paris('2026-10-15', '12:00')).etapes;
+  assert.deepStrictEqual(r.map(e => e.cle), ['ag#1']);   // 5 dates restantes : une seule page
+  assert.strictEqual(r[0].dates[0].date, '2026-10-15');
   assert.deepStrictEqual(cles(prog, '2026-10-20', '12:00'), ['veille']);
+});
+
+test('agenda : pages équilibrées de 6 dates au plus', () => {
+  const tailles = n => {
+    const dates = [];
+    for (let j = 0; j < n; j++) dates.push({ date: '2026-11-' + String(j + 1).padStart(2, '0'), nom: 'Concert ' + j });
+    const prog = { contenus: { ag: contenu('ag', 'agenda', { titre: 'Agenda', dates }) }, diffusions: [diff('1', 'ag')] };
+    return R.etapes(prog, paris('2026-10-30', '12:00')).etapes.map(e => e.dates.length);
+  };
+  assert.deepStrictEqual(tailles(6), [6]);
+  assert.deepStrictEqual(tailles(7), [4, 3]);
+  assert.deepStrictEqual(tailles(12), [6, 6]);
+  assert.deepStrictEqual(tailles(15), [5, 5, 5]);
+});
+
+test('agenda : même jour, l\'ordre saisi est gardé (même au-delà de 10 dates)', () => {
+  const dates = [];
+  for (let j = 0; j < 14; j++) dates.push({ date: '2026-11-' + (j < 7 ? '05' : '1' + (j - 7)), nom: 'C' + j });
+  const prog = { contenus: { ag: contenu('ag', 'agenda', { titre: 'Agenda', dates: dates.slice().reverse() }) }, diffusions: [diff('1', 'ag')] };
+  const noms = R.etapes(prog, paris('2026-10-30', '12:00')).etapes.flatMap(e => e.dates.map(x => x.nom));
+  assert.deepStrictEqual(noms.slice(0, 7), ['C6', 'C5', 'C4', 'C3', 'C2', 'C1', 'C0']);
 });
 
 test('une diffusion prioritaire remplace la boucle, la plus récente l\'emporte', () => {

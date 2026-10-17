@@ -1316,7 +1316,7 @@ function vueEditeur(id, typeNouveau) {
         h('div', { class: 'actions' },
           h('button', { type: 'button', class: 'btn', onclick: () => { d.dates.push({ date: R.ajouterJours(auj(), 7), nom: '', mention: '' }); remplir(); changer(); lignes.lastChild.querySelector('input[type="text"]').focus(); } }, '+ Ajouter une date'),
           h('button', { type: 'button', class: 'btn', onclick: importer }, 'Ajouter les soirées enregistrées')),
-        h('small', { text: 'Les dates passées disparaissent seules. 8 dates au plus par page ; au-delà, les pages s’enchaînent.' })),
+        h('small', { text: 'Les dates passées disparaissent seules. 6 dates au plus par page ; au-delà, les pages s’enchaînent.' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo de fond (facultative)' }),
         champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
           cadre: Object.assign({ conseil: 'en fond, très assombrie : une image simple suffit' }, G.CADRES.agenda) })));

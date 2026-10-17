@@ -10,7 +10,7 @@
 
   var DUREES = { soiree: 10, lineup: 12, agenda: 15, serie: 12, image: 8, video: 0, veille: 60 };
   var SERIE_MAX = 4;         // dates d'une série
-  var PAR_PAGE = 8;          // dates par page d'agenda
+  var PAR_PAGE = 6;          // dates par page d'agenda (au-delà de 6 lignes, la lecture à distance devient difficile)
   var BASCULE = 6 * 60;      // avant 6 h du matin, on est encore dans la soirée de la veille
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -78,8 +78,13 @@
   /* ---- étapes de la boucle ---- */
   function datesAVenir(c, service) {
     var dates = (c.donnees && c.donnees.dates) || [], r = [], i;
-    for (i = 0; i < dates.length; i++) { if (dates[i] && dates[i].date >= service) { r.push(dates[i]); } }
-    r.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+    for (i = 0; i < dates.length; i++) { if (dates[i] && dates[i].date >= service) { r.push({ d: dates[i], i: i }); } }
+    // même jour : l'heure, puis l'ordre saisi (le tri de Chromium 56 n'est pas stable au-delà de 10 éléments)
+    r.sort(function (a, b) {
+      var x = a.d.date + ' ' + (a.d.heure || ''), y = b.d.date + ' ' + (b.d.heure || '');
+      return x < y ? -1 : (x > y ? 1 : a.i - b.i);
+    });
+    for (i = 0; i < r.length; i++) { r[i] = r[i].d; }
     return r;
   }
   // Contenu affichable : soirée pas encore passée, agenda ou série avec des dates à venir, média présent.

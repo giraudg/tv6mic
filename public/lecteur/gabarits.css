@@ -124,27 +124,40 @@
 .g-titre { position: absolute; left: 120px; bottom: 46px; width: 1300px; padding-top: .16em; white-space: nowrap; overflow: hidden;
   font-family: var(--g-cond); font-weight: 700; font-size: 128px; line-height: .92; text-transform: uppercase; }
 .g-entete .g-logo { top: auto; bottom: 58px; height: 84px; }
-.g-liste { position: absolute; left: 120px; top: 276px; width: 1680px; }
-.g-ligne { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; height: 88px;
+/* Barre façon « story » : un segment par page ; celui de la page affichée se remplit pendant sa durée. */
+.g-histoire { position: absolute; left: 120px; top: 34px; width: 1680px; height: 8px; display: -webkit-flex; display: flex; }
+.g-h-seg { -webkit-flex: 1 1 0%; flex: 1 1 0%; margin-left: 16px; height: 8px; background: rgba(255, 255, 255, .32); overflow: hidden; }
+.g-h-seg:first-child { margin-left: 0; }
+.g-h-rempli { width: 100%; height: 8px; background: #fff; -webkit-transform-origin: 0 50%; transform-origin: 0 50%;
+  -webkit-transform: scaleX(0); transform: scaleX(0); }
+.g-h-fait .g-h-rempli { -webkit-transform: scaleX(1); transform: scaleX(1); }
+.joue .g-h-cours { -webkit-animation: g-remplit linear both; animation: g-remplit linear both; }
+@-webkit-keyframes g-remplit { from { -webkit-transform: scaleX(0); } to { -webkit-transform: scaleX(1); } }
+@keyframes g-remplit { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* 6 lignes au plus : le nom de l'artiste domine ; la date le précède en plus petit (numéro en blanc, jour et mois en gris) */
+.g-liste { position: absolute; left: 120px; top: 272px; width: 1680px; }
+.g-ligne { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; height: 118px;
   border-bottom: 2px solid var(--g-trait); opacity: 0; }
 .joue .g-ligne { -webkit-animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; }
-/* largeur : jour (126) + numéro (82) + mois le plus large (« mars », « janv. » : 122) + 30 px d'air avant le nom */
-.g-quand { -webkit-flex: none; flex: none; width: 360px; font-family: var(--g-cond); font-weight: 700; font-size: 56px; line-height: 1; text-transform: uppercase; white-space: nowrap; }
-.g-quand .g-j { display: inline-block; width: 126px; color: var(--g-gris); }
-.g-quand b { display: inline-block; width: 82px; font-weight: 700; }
-.g-quand .g-m { color: #fff; }
-.g-quoi { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; font-size: 44px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* largeur : jour (108) + numéro (70) + mois le plus large (« mars », « janv. » : 105) + 39 px d'air avant le nom */
+.g-quand { -webkit-flex: none; flex: none; width: 322px; font-family: var(--g-cond); font-weight: 700; font-size: 48px; line-height: 1;
+  text-transform: uppercase; white-space: nowrap; color: var(--g-gris); }
+.g-quand .g-j { display: inline-block; width: 108px; }
+.g-quand b { display: inline-block; width: 70px; font-weight: 700; color: #fff; }
+/* padding-top : place des accents des capitales (É, À…) ; la marge négative garde le nom centré sur la ligne */
+.g-quoi { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; margin-top: -.16em; padding-top: .16em;
+  font-family: var(--g-cond); font-weight: 700; font-size: 76px; line-height: .92; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .g-etiq { -webkit-flex: none; flex: none; margin-left: 28px; padding: 10px 16px 8px; background: var(--g-violet);
-  font-size: 22px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; white-space: nowrap; }
-/* 5 dates ou moins : lignes plus hautes et texte plus grand */
+  font-size: 24px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; white-space: nowrap; }
+/* 4 dates ou moins : lignes plus hautes et texte plus grand */
 .g-court .g-liste { top: 300px; }
-.g-court .g-ligne { height: 128px; }
-.g-court .g-quand { width: 456px; font-size: 72px; }
-.g-court .g-quand .g-j { width: 160px; }
-.g-court .g-quand b { width: 104px; }
-.g-court .g-quoi { font-size: 56px; }
-.g-court .g-etiq { font-size: 26px; padding: 12px 18px 10px; }
-.g-page { position: absolute; right: 120px; bottom: 34px; font-size: 26px; font-weight: 600; color: var(--g-gris); letter-spacing: .06em; }
+.g-court .g-ligne { height: 150px; }
+.g-court .g-quand { width: 400px; font-size: 60px; }
+.g-court .g-quand .g-j { width: 135px; }
+.g-court .g-quand b { width: 88px; }
+.g-court .g-quoi { font-size: 92px; }
+.g-court .g-etiq { font-size: 28px; padding: 12px 18px 10px; }
 
 /* 4. Série : aplat de couleur + texture rayonnante (design system), affiches côte à côte */
 .g-serie { background: var(--g-secondaire); }

@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3.3';
+  var VERSION = '1.3.4';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -223,7 +223,7 @@
       var g, i = coucheLibre();
       try {
         if (e.type === 'soiree') { g = Gabarits.soiree(e, url); }
-        else if (e.type === 'agenda') { g = Gabarits.agenda(e, url); }
+        else if (e.type === 'agenda') { g = Gabarits.agenda(e, url, ecoule); }
         else if (e.type === 'serie') { g = Gabarits.serie(e, url); }
         else if (e.type === 'lineup') { g = Gabarits.lineup(e, url); }
         else if (e.type === 'image') { g = Gabarits.image(e, url); }

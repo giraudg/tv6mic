@@ -176,16 +176,34 @@
     return { noeud: g, ajuster: function () { ajusterTexte(nom, 190, 90, 2); } };
   }
 
-  /* 2. Agenda : titre, puis une ligne par date (8 au plus par page) */
-  function agenda(etape, url) {
-    var c = etape.contenu, d = c.donnees || {}, g = el('div', 'g g-agenda' + (etape.dates.length <= 5 ? ' g-court' : ''));
-    var tete = el('div', 'g-entete'), liste = el('div', 'g-liste'), titre, i, x, p, ligne, quand;
+  /* 2. Agenda : titre, puis une ligne par date (6 au plus par page), le nom de l'artiste en avant.
+     En haut, une barre façon « story » : un segment par page ; celui de la page affichée se remplit pendant sa durée. */
+  function histoire(etape, ecoule) {
+    var b = el('div', 'g-histoire a a0'), pages = Math.max(1, etape.pages || 1), page = etape.page || 1, i, s, r;
+    for (i = 1; i <= pages; i++) {
+      s = el('div', 'g-h-seg' + (i < page ? ' g-h-fait' : ''));
+      r = el('div', 'g-h-rempli');
+      if (i === page) {
+        r.className += ' g-h-cours';
+        r.style.webkitAnimationDuration = r.style.animationDuration = Math.max(1, etape.duree || 15) + 's';
+        // après un rechargement, la page reprend où elle en était : sa barre aussi
+        if (ecoule > 0) { r.style.webkitAnimationDelay = r.style.animationDelay = (-ecoule).toFixed(2) + 's'; }
+      }
+      s.appendChild(r);
+      b.appendChild(s);
+    }
+    return b;
+  }
+  function agenda(etape, url, ecoule) {
+    var c = etape.contenu, d = c.donnees || {}, court = etape.dates.length <= 4, g = el('div', 'g g-agenda' + (court ? ' g-court' : ''));
+    var tete = el('div', 'g-entete'), liste = el('div', 'g-liste'), titre, noms = [], i, x, p, ligne, quand, nom;
     if (d.photo && d.photo.src) { var f = el('div', 'g-fond'); fond(f, d.photo.src, url); g.appendChild(f); }
     tete.appendChild(el('div', 'g-motif'));
     titre = el('div', 'g-titre a a1', d.titre || c.titre);
     tete.appendChild(titre);
     tete.appendChild(logo('g-logo'));
     g.appendChild(tete);
+    g.appendChild(histoire(etape, ecoule || 0));
     for (i = 0; i < etape.dates.length; i++) {
       x = etape.dates[i]; p = parties(x.date);
       ligne = el('div', 'g-ligne');
@@ -195,13 +213,18 @@
       quand.appendChild(el('b', '', p.n));
       quand.appendChild(el('span', 'g-m', MOIS_COURTS[p.m]));
       ligne.appendChild(quand);
-      ligne.appendChild(el('div', 'g-quoi', x.nom));
+      nom = el('div', 'g-quoi', x.nom);
+      noms.push(nom);
+      ligne.appendChild(nom);
       if (x.mention) { ligne.appendChild(el('div', 'g-etiq' + (mentionAlerte(x.mention) ? ' g-rouge' : ''), x.mention)); }
       liste.appendChild(ligne);
     }
     g.appendChild(liste);
-    if (etape.pages > 1) { g.appendChild(el('div', 'g-page a a3', etape.page + ' / ' + etape.pages)); }
-    return { noeud: g, ajuster: function () { ajusterTexte(titre, 128, 64, 1); } };
+    return { noeud: g, ajuster: function () {
+      ajusterTexte(titre, 128, 64, 1);
+      // un nom long se resserre jusqu'à tenir sur la ligne (points de suspension au-delà)
+      for (var j = 0; j < noms.length; j++) { ajusterTexte(noms[j], court ? 92 : 76, court ? 70 : 58, 1); }
+    } };
   }
 
   /* 4. Série : 2 à 4 dates mises en avant (promo thématique, même esthétique, artistes proches de la soirée).
