@@ -115,6 +115,10 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .carte-t h2 { font-family: var(--cond); font-weight: 700; text-transform: uppercase; font-size: 30px; line-height: .95; }
 .carte-c { padding: 12px 14px; display: grid; gap: 10px; }
 .carte-p { padding: 10px 14px; border-top: 1px solid var(--filet); display: flex; flex-wrap: wrap; gap: 8px; }
+.carte-p .suppr-ecran { margin-left: auto; }
+.coche.propose { font-size: 14px; }
+.nouvel-ecran { display: grid; gap: 16px; }
+.nouvel-ecran small { color: var(--gris, #6b6875); }
 .ecran-maint { font-size: 13px; color: var(--gris); }
 .ecran-maint b { color: #000; font-size: 15px; display: block; margin-top: 2px; }
 .boucle { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; counter-reset: b; }

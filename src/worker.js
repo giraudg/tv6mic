@@ -11,7 +11,8 @@
    - POST /api/admin/diffusions, PUT|DELETE /api/admin/diffusions/{id}
    - POST /api/admin/diffusions/{id}/retirer-jour   retire un jour d'une programmation (période coupée en deux si besoin)
    - POST /api/admin/retirer-ecran   retire un contenu de la boucle d'un écran (ses programmations à venir sur cet écran)
-   - PUT  /api/admin/flux/{code}, POST /api/admin/flux/{code|tous}/identifier, POST /api/admin/ordre
+   - POST /api/admin/flux (ajout d'un écran), PUT|DELETE /api/admin/flux/{code}, POST /api/admin/flux/{code|tous}/identifier
+   - POST /api/admin/ordre
    - POST /api/admin/medias         import d'un fichier (corps brut) vers R2
    - GET  /api/admin/journal?page=N
    - PUT  /api/admin/reglages       couleurs du 6MIC et listes de choix (rôles du line-up, mentions, salles)
@@ -235,6 +236,7 @@ async function admin(req, env, url) {
   if (p === '/api/admin/ordre' && m === 'POST') return ordonner(req, env, qui);
   if (p === '/api/admin/retirer-ecran' && m === 'POST') return retirerEcran(req, env, qui);
   if (p === '/api/admin/reglages' && m === 'PUT') return modifierReglages(req, env, qui);
+  if (p === '/api/admin/flux' && m === 'POST') return creerFlux(req, env, qui);
 
   let r = p.match(/^\/api\/admin\/contenus\/([a-z0-9-]+)(\/dupliquer)?$/);
   if (r) {
@@ -252,6 +254,7 @@ async function admin(req, env, url) {
   if (r) {
     if (r[2] && m === 'POST') return identifier(env, qui, r[1]);
     if (!r[2] && m === 'PUT') return modifierFlux(req, env, qui, r[1]);
+    if (!r[2] && m === 'DELETE') return supprimerFlux(env, qui, r[1]);
   }
   throw new ErreurHttp(404, 'Adresse inconnue.');
 }
@@ -353,7 +356,7 @@ async function connexion(req, env, url, secret) {
 async function etat(env, qui) {
   const db = env.DB;
   const [flux, contenus, diffusions, liens, ecrans, version, reglages] = await Promise.all([
-    db.prepare('SELECT code, nom, ordre, contenu_defaut, identifier_jusqua FROM flux ORDER BY ordre, nom').all(),
+    db.prepare('SELECT code, nom, ordre, contenu_defaut, identifier_jusqua, propose FROM flux ORDER BY ordre, nom').all(),
     db.prepare('SELECT id, type, titre, donnees, duree, statut, cree_le, modifie_le FROM contenus ORDER BY modifie_le DESC').all(),
     db.prepare('SELECT * FROM diffusions ORDER BY debut, cree_le').all(),
     db.prepare('SELECT diffusion_id, flux_code FROM diffusion_flux').all(),
@@ -835,6 +838,20 @@ async function ordonner(req, env, qui) {
 }
 
 /* ---- flux ---- */
+// Code d'un nouvel écran : il figure dans l'adresse saisie dans MagicINFO (?flux=bar-1) et ne change plus.
+const CODE_FLUX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+async function creerFlux(req, env, qui) {
+  const b = await lireCorps(req);
+  const nom = chaine(b.nom, 40, 'nom de l’écran');
+  if (!nom) throw refus('Donnez un nom à l’écran.');
+  const code = typeof b.code === 'string' ? b.code.trim() : '';
+  if (code.length < 2 || code.length > 30 || !CODE_FLUX.test(code)) throw refus('Code de l’adresse : 2 à 30 caractères, lettres minuscules sans accent, chiffres et tirets (ex. bar-1).');
+  if (code === 'tous') throw refus('Ce code est réservé.');
+  if (await env.DB.prepare('SELECT 1 FROM flux WHERE code = ?').bind(code).first()) throw new ErreurHttp(409, 'Un écran utilise déjà le code « ' + code + ' ».');
+  await ecrire(env, qui, [env.DB.prepare('INSERT INTO flux (code, nom, ordre, propose) VALUES (?, ?, (SELECT COALESCE(MAX(ordre), 0) + 1 FROM flux), ?)')
+    .bind(code, nom, b.propose ? 1 : 0)], 'Écran ajouté', nom + ' (?flux=' + code + ')');
+  return json({ ok: true, code });
+}
 async function modifierFlux(req, env, qui, code) {
   const b = await lireCorps(req);
   const f = await env.DB.prepare('SELECT * FROM flux WHERE code = ?').bind(code).first();
@@ -842,8 +859,19 @@ async function modifierFlux(req, env, qui, code) {
   const nom = chaine(b.nom, 40, 'nom de l’écran') || f.nom;
   let defaut = b.contenu_defaut ? String(b.contenu_defaut) : null;
   if (defaut) await lireContenu(env, defaut);
-  await ecrire(env, qui, [env.DB.prepare('UPDATE flux SET nom = ?, contenu_defaut = ? WHERE code = ?').bind(nom, defaut, code)],
+  const propose = b.propose === undefined ? f.propose : (b.propose ? 1 : 0);
+  await ecrire(env, qui, [env.DB.prepare('UPDATE flux SET nom = ?, contenu_defaut = ?, propose = ? WHERE code = ?').bind(nom, defaut, propose, code)],
     'Écran modifié', nom + (nom !== f.nom ? ' (ancien nom : ' + f.nom + ')' : ''));
+  return json({ ok: true });
+}
+// Retire un écran : seulement s'il n'a plus aucune programmation (pour ne rien perdre en silence).
+async function supprimerFlux(env, qui, code) {
+  const f = await env.DB.prepare('SELECT nom FROM flux WHERE code = ?').bind(code).first();
+  if (!f) throw new ErreurHttp(404, 'Flux inconnu.');
+  const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM diffusion_flux WHERE flux_code = ?').bind(code).first('n');
+  if (n) throw new ErreurHttp(409, 'L’écran ' + f.nom + ' a encore ' + n + (n > 1 ? ' programmations' : ' programmation') + ' : retirez-les d’abord.');
+  await ecrire(env, qui, [env.DB.prepare('DELETE FROM ecrans WHERE flux_code = ?').bind(code), env.DB.prepare('DELETE FROM flux WHERE code = ?').bind(code)],
+    'Écran supprimé', f.nom + ' (?flux=' + code + ')');
   return json({ ok: true });
 }
 // L'écran affiche le nom de son flux pendant environ 30 s (il interroge toutes les 30 s).

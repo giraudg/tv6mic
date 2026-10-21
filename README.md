@@ -5,7 +5,7 @@ dont la programmation se règle à la journée ou à l'heure. Cahier des charges
 
 | Adresse | Rôle |
 | --- | --- |
-| `https://tv.6mic-aix.fr/?flux=billetterie` | Lecteur de l'écran Billetterie (idem `club`, `hall`, `grande-salle`, `regie`, `reserve`) |
+| `https://tv.6mic-aix.fr/?flux=billetterie` | Lecteur de l'écran Billetterie (idem `club`, `hall`, `grande-salle`, `regie`, `reserve`, et `bar-1` à `bar-4` pour les quatre écrans Samsung QB75C du bar) |
 | `https://tv.6mic-aix.fr/` | Liste des flux (pour tester sur un ordinateur) |
 | `https://tv.6mic-aix.fr/admin/` | Back-office (mot de passe partagé + prénom) |
 | `/api/flux` | Liste des flux (JSON) |
@@ -64,6 +64,9 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
   (clic sur le contenu dans le Calendrier, la période est coupée en deux), ou toute la programmation (éditeur du contenu).
 - **Flux et boucles** : nom des écrans, contenu par défaut, adresse MagicINFO, simulation de la boucle à une date et une heure,
   ordre de passage par glisser-déposer.
+  « + Ajouter un écran » crée un flux (nom, code de l'adresse proposé d'après le nom, définitif) ; « Supprimer » n'est possible
+  que pour un écran sans aucune programmation. « Coché d'office quand on programme un contenu » : l'écran est présélectionné
+  dans une nouvelle programmation (oui pour les écrans de salle, non pour la Réserve et le bar).
 - **Journal** : qui a modifié quoi et quand.
 - **Réglages** : couleurs primaire, secondaire et dégradé (nommables, aperçu en direct, contrôle de lisibilité), qui habillent
   les écrans (variables CSS posées par `Gabarits.appliquerReglages`) et le back-office ; listes de choix réglables : rôles du

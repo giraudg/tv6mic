@@ -1439,9 +1439,11 @@ function vueEditeur(id, typeNouveau) {
 let ouvrirProgrammation = null;
 
 /* ================= fenêtre : programmer un contenu ================= */
+// Écran coché d'office dans une nouvelle programmation (réglage de chaque écran ; la Réserve et le bar ne le sont pas).
+const proposeDOffice = f => f.propose === undefined ? f.code !== 'reserve' : !!f.propose;
 function dialogueDiffusion({ diffusion, contenu, jours, jour }) {
   const x = diffusion ? structuredClone(diffusion) : {
-    id: null, contenu: contenu || '', flux: E.flux.filter(f => f.code !== 'reserve').map(f => f.code),
+    id: null, contenu: contenu || '', flux: E.flux.filter(proposeDOffice).map(f => f.code),
     debut: jours ? jours[0] : auj(), fin: jours ? jours[jours.length - 1] : R.ajouterJours(auj(), 6),
     jours: jours && !contigus(jours) ? jours.slice() : null, semaine: null, plages: null, prioritaire: 0
   };
@@ -1699,7 +1701,9 @@ function vueFlux() {
   const cartes = h('div', { class: 'ecrans' }, E.flux.map(f => carteFlux(f, ms)));
   afficher(
     h('div', { class: 'tete' }, h('div', null, h('p', { class: 'surtitre', text: 'Un flux par écran' }), h('h1', { class: 'titre', text: 'Flux et boucles' })),
-      h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', onclick: () => identifier('tous') }, 'Identifier tous les écrans'))),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn', onclick: () => identifier('tous') }, 'Identifier tous les écrans'),
+        h('button', { type: 'button', class: 'btn btn-noir', onclick: dialogueEcran }, '+ Ajouter un écran'))),
     h('div', { class: 'simu' },
       h('div', { class: 'champ' }, h('label', { for: 's-date', text: 'Voir les boucles le' }), h('input', { id: 's-date', type: 'date', value: simu.date, onchange: e => { simu.date = e.target.value; vueFlux(); } })),
       h('div', { class: 'champ' }, h('label', { for: 's-heure', text: 'à' }), h('input', { id: 's-heure', type: 'time', value: simu.heure, onchange: e => { simu.heure = e.target.value; vueFlux(); } })),
@@ -1750,10 +1754,14 @@ function carteFlux(f, ms) {
   const defaut = h('select', { 'aria-label': 'Contenu par défaut' }, h('option', { value: '', text: 'Logo 6MIC sur fond noir' }),
     E.contenus.filter(c => c.statut === 'actif' || c.id === f.contenu_defaut).map(c => h('option', { value: c.id, selected: c.id === f.contenu_defaut,
       text: TYPES[c.type] + ' : ' + c.titre + (c.statut === 'actif' ? '' : ' (archivé : logo affiché à la place)') })));
-  const sauver = () => ecrire(() => api('PUT', '/api/admin/flux/' + f.code, { nom: nom.value, contenu_defaut: defaut.value || null }), 'Écran enregistré.')
+  const propose = h('input', { type: 'checkbox', checked: proposeDOffice(f) });
+  const sauver = () => ecrire(() => api('PUT', '/api/admin/flux/' + f.code, { nom: nom.value, contenu_defaut: defaut.value || null, propose: propose.checked }), 'Écran enregistré.')
     .then(() => { if (surVue('flux')) vueFlux(); }, () => {});
   nom.addEventListener('change', sauver);
   defaut.addEventListener('change', sauver);
+  propose.addEventListener('change', sauver);
+  // Suppression : seulement un écran sans programmation (le serveur refuse sinon).
+  const nbProg = E.diffusions.filter(d => d.flux.includes(f.code)).length;
   return h('article', { class: 'carte' },
     h('div', { class: 'carte-t' }, h('h2', { text: f.nom }), calc.prioritaire ? h('span', { class: 'puce prio', text: 'Prioritaire en cours' }) : etatEcran(f.code).puce),
     h('div', { class: 'carte-c' },
@@ -1762,10 +1770,51 @@ function carteFlux(f, ms) {
         h('div', { class: 'adresse' }, h('code', { text: adresse }),
           h('button', { type: 'button', class: 'btn pt', onclick: () => navigator.clipboard.writeText(adresse).then(() => annoncer('Adresse copiée.'), () => annoncer(adresse)) }, 'Copier'))),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Quand rien n’est programmé' }), defaut),
+      h('label', { class: 'coche propose' }, propose, 'Coché d’office quand on programme un contenu'),
       h('div', { class: 'lbl', text: 'Boucle le ' + dateMoy(simu.date) + ' à ' + simu.heure }), liste),
     h('div', { class: 'carte-p' },
       h('button', { type: 'button', class: 'btn pt', onclick: () => identifier(f.code) }, 'Identifier'),
-      h('a', { class: 'btn pt', href: '/?flux=' + f.code + '&debug=1', target: '_blank', rel: 'noopener' }, 'Voir le flux ↗')));
+      h('a', { class: 'btn pt', href: '/?flux=' + f.code + '&debug=1', target: '_blank', rel: 'noopener' }, 'Voir le flux ↗'),
+      h('button', { type: 'button', class: 'btn pt btn-danger suppr-ecran', disabled: nbProg > 0,
+        title: nbProg ? 'Retirez d’abord ses ' + plur(nbProg, 'programmation') + ' (passées comprises).' : 'Supprimer cet écran et son adresse',
+        onclick: () => supprimerEcran(f) }, 'Supprimer')));
+}
+
+// Ajout d'un écran : nom libre, code de l'adresse proposé à partir du nom (il ne changera plus).
+function dialogueEcran() {
+  const versCode = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, '');
+  let codeModifie = false;
+  const nom = h('input', { id: 'ne-nom', type: 'text', maxLength: 40, placeholder: 'Bar 5', autocomplete: 'off' });
+  const code = h('input', { id: 'ne-code', type: 'text', maxLength: 30, placeholder: 'bar-5', autocomplete: 'off', autocapitalize: 'off', spellcheck: false });
+  const propose = h('input', { type: 'checkbox', checked: true });
+  const adresse = h('code');
+  const maj = () => { adresse.textContent = location.origin + '/?flux=' + (code.value || '…'); };
+  nom.addEventListener('input', () => { if (!codeModifie) code.value = versCode(nom.value); maj(); });
+  code.addEventListener('input', () => { codeModifie = code.value !== ''; code.value = code.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'); maj(); });
+  maj();
+  const ajouter = async () => {
+    if (!nom.value.trim()) { annoncer('Donnez un nom à l’écran.', true); nom.focus(); return; }
+    try {
+      await ecrire(() => api('POST', '/api/admin/flux', { nom: nom.value, code: code.value, propose: propose.checked }), 'Écran « ' + nom.value.trim() + ' » ajouté.');
+    } catch (e) { if (e.status === 409) annoncer(e.message, true); return; }
+    d.close();
+    if (surVue('flux')) vueFlux();
+  };
+  const d = fenetre({ surtitre: 'Flux et boucles', titre: 'Ajouter un écran', petit: true,
+    corps: h('div', { class: 'nouvel-ecran' },
+      h('div', { class: 'champ' }, h('label', { class: 'lbl', for: 'ne-nom', text: 'Nom de l’écran' }), nom),
+      h('div', { class: 'champ' }, h('label', { class: 'lbl', for: 'ne-code', text: 'Code de l’adresse (ne changera plus)' }), code,
+        h('small', { text: 'Lettres minuscules sans accent, chiffres et tirets. Adresse à saisir dans MagicINFO :' }), h('div', { class: 'adresse' }, adresse)),
+      h('label', { class: 'coche' }, propose, 'Coché d’office quand on programme un contenu')),
+    pied: [h('button', { type: 'button', class: 'btn', onclick: () => d.close() }, 'Annuler'),
+      h('button', { type: 'button', class: 'btn btn-noir', onclick: ajouter }, 'Ajouter l’écran')] });
+  [nom, code].forEach(n => n.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ajouter(); } }));
+  nom.focus();
+}
+async function supprimerEcran(f) {
+  if (!(await demander('Supprimer l’écran ' + f.nom + ' ?', 'L’adresse ' + location.origin + '/?flux=' + f.code + ' ne fonctionnera plus : un écran encore réglé dessus affichera « flux inconnu ».', 'Supprimer l’écran', true))) return;
+  try { await ecrire(() => api('DELETE', '/api/admin/flux/' + f.code), 'Écran ' + f.nom + ' supprimé.'); } catch { return; }
+  if (surVue('flux')) vueFlux();
 }
 
 // Retire un contenu de la boucle d'un écran (ses programmations à venir sur cet écran) ; les autres écrans ne changent pas.
