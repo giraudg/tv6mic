@@ -4,7 +4,7 @@
   --noir: #000; --blanc: #fff; --brume: #f1f1f1; --brume2: #e4e4e4; --gris: #404040; --filet: #bababa;
   --violet: #8e63ff; --violet-f: #6a42e6; --magenta: #e744a8; --bleu: #2563eb; --vert: #047857; --rouge: #b91c1c; --orange: #b45309;
   --rose-clair: #fde4f2; --bleu-clair: #dde9fe; --violet-clair: #ece5ff;
-  --t-soiree: #c23d97; --t-lineup: #0e7490; --t-agenda: #2563eb; --t-serie: #b45309; --t-image: #047857; --t-video: #6a42e6;
+  --t-soiree: #c23d97; --t-lineup: #0e7490; --t-agenda: #2563eb; --t-serie: #b45309; --t-image: #047857; --t-video: #6a42e6; --t-web: #475569;
   --sans: "owners", "TV Archivo", "Helvetica Neue", Arial, sans-serif;
   --cond: "zuume-cut", "TV Anton", Impact, "Arial Narrow", sans-serif;
   color-scheme: light;
@@ -106,6 +106,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .t-lineup { background: var(--t-lineup); color: #fff; }
 .t-image { background: var(--t-image); color: #fff; }
 .t-video { background: var(--t-video); color: #fff; }
+.t-web { background: var(--t-web); color: #fff; }
 .prio { background: var(--rouge); color: #fff; }
 
 /* ---------- écrans (tableau de bord) ---------- */
@@ -162,6 +163,9 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .vignette-ag { position: absolute; inset: 0; display: grid; align-content: start; padding: 34px 12px 10px; background: #0b0a0d; }
 .vignette-ag b { font-family: var(--cond); text-transform: uppercase; font-size: 22px; line-height: .95; }
 .vignette-ag > span { font-size: 11px; color: #bdbdbd; margin-top: 4px; }
+.vignette-web { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 4px; padding: 30px 12px 12px; background: #1e293b; color: #fff; text-align: center; }
+.vignette-web b { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.vignette-web span { font-size: 11px; color: #cbd5e1; overflow-wrap: anywhere; }
 .vignette-soiree { position: absolute; left: 10px; right: 10px; bottom: 8px; font-family: var(--cond); text-transform: uppercase; font-size: 24px; line-height: .9; text-shadow: 0 0 12px rgba(0, 0, 0, .8); }
 .vignette-c { padding: 10px 12px 12px; display: grid; gap: 4px; }
 .vignette-c b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

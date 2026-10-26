@@ -8,7 +8,7 @@
 }(this, function () {
   'use strict';
 
-  var DUREES = { soiree: 10, lineup: 12, agenda: 15, serie: 12, image: 8, video: 0, veille: 60 };
+  var DUREES = { soiree: 10, lineup: 12, agenda: 15, serie: 12, image: 8, video: 0, web: 30, veille: 60 };
   var SERIE_MAX = 4;         // dates d'une série
   var PAR_PAGE = 6;          // dates par page d'agenda (au-delà de 6 lignes, la lecture à distance devient difficile)
   var BASCULE = 6 * 60;      // avant 6 h du matin, on est encore dans la soirée de la veille
@@ -92,6 +92,7 @@
     var d = c.donnees || {};
     if (c.type === 'soiree' || c.type === 'lineup') { return !(d.date && service > d.date); }
     if (c.type === 'agenda' || c.type === 'serie') { return datesAVenir(c, service).length > 0; }
+    if (c.type === 'web') { return !!d.url; }
     return !!d.src;
   }
   function duree(c) {

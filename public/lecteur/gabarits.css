@@ -282,3 +282,7 @@
 .g-ident-nom { margin: 24px 0; padding: 18px 48px 10px; background: var(--g-degrade); font-family: var(--g-cond); font-weight: 700; font-size: 220px; line-height: .95; text-transform: uppercase; }
 .g-ident-code { font-size: 40px; font-weight: 600; }
 
+
+/* 7. Page web : cadre plein écran, fond noir pendant le chargement */
+.g-web { background: #000; }
+.g-web-cadre { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; background: #000; pointer-events: none; }

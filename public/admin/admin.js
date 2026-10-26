@@ -30,7 +30,9 @@ const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 's
 const JC = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const MC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-const TYPES = { soiree: 'Soirée', lineup: 'Line-up', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo' };
+const TYPES = { soiree: 'Soirée', lineup: 'Line-up', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo', web: 'Page web' };
+// Domaine d'une page web (vignettes, titre proposé).
+const domaine = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const SEMAINE = [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'J'], [5, 'V'], [6, 'S'], [7, 'D']];
 // Listes de choix : celles des Réglages (éléments archivés exclus).
 const actifs = l => l.filter(x => !x.archive);
@@ -167,6 +169,7 @@ function apercu() {
       else if (etape.type === 'serie') g = G.serie(etape, s => s);
       else if (etape.type === 'lineup') g = G.lineup(etape, s => s);
       else if (etape.type === 'image') g = G.image(etape, s => s);
+      else if (etape.type === 'web') g = G.web(etape);
       else g = G.veille('');
       scene.append(g.noeud);
       if (g.ajuster) g.ajuster();
@@ -746,6 +749,7 @@ function alertes() {
   for (const c of E.contenus) {
     if (c.statut !== 'actif' || !diffsDe(c.id).some(d => d.fin >= t)) continue;
     if ((c.type === 'image' || c.type === 'video') && !c.donnees.src) l.push('« ' + c.titre + ' » est programmé mais n’a pas de fichier.');
+    if (c.type === 'web' && !c.donnees.url) l.push('« ' + c.titre + ' » est programmé mais n’a pas d’adresse.');
   }
   for (const f of E.flux) {
     const p = progFlux(f.code);
@@ -810,6 +814,7 @@ function vignette(c) {
       h('b', { class: 'vignette-ser-t', text: d.titre || c.titre }));
   }
   if (c.type === 'soiree') img.append(h('div', { class: 'vignette-soiree', text: d.nom || '' }));
+  if (c.type === 'web') img.append(h('div', { class: 'vignette-web' }, h('b', { text: domaine(d.url) || 'Sans adresse' }), h('span', { text: d.url ? new URL(d.url).pathname : '' })));
   if (c.type === 'lineup') {
     img.append(h('div', { class: 'vignette-soiree', text: d.titre || G.vedetteDe(d.passages) || 'Line-up' }));
   }
@@ -819,6 +824,7 @@ function vignette(c) {
   const sous = c.type === 'soiree' || c.type === 'lineup' ? (d.date ? dateLongue(d.date) + (d.date < t ? ' (passée)' : '') : 'Date à préciser') + (c.type === 'lineup' ? ' · ' + plur((d.passages || []).length, 'passage') : '')
     : c.type === 'agenda' || c.type === 'serie' ? plur((d.dates || []).filter(x => x.date >= t).length, 'date') + ' à venir'
       : c.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s' + (d.taille ? ' · ' + mo(d.taille) : '') : d.src ? 'Vidéo' : 'Sans fichier')
+        : c.type === 'web' ? (domaine(d.url) || 'Sans adresse')
         : (d.largeur ? d.largeur + ' × ' + d.hauteur + ' px' : d.src ? 'Image' : 'Sans fichier');
   return h('a', { class: 'vignette' + (c.statut === 'archive' ? ' archive' : ''), href: '#contenu/' + c.id }, img,
     h('div', { class: 'vignette-c' }, h('b', { text: c.titre }), h('span', { text: sous }),
@@ -945,7 +951,7 @@ function vueContenus() {
         Object.assign(filtre, FILTRE_VIDE, { type: 'soiree', soiree: 'avenir', prog: 'non', tri: 'date' }); synchro(); changer();
       } }, n > 1 ? 'Les afficher' : 'L’afficher'));
   };
-  const seg = h('div', { class: 'seg seg-types', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['lineup', 'Line-up'], ['agenda', 'Agendas'], ['serie', 'Séries'], ['image', 'Images'], ['video', 'Vidéos']].map(([k, tx]) =>
+  const seg = h('div', { class: 'seg seg-types', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['lineup', 'Line-up'], ['agenda', 'Agendas'], ['serie', 'Séries'], ['image', 'Images'], ['video', 'Vidéos'], ['web', 'Pages web']].map(([k, tx]) =>
     h('button', { type: 'button', 'data-v': k, onclick: () => { filtre.type = k; synchro(); changer(); } }, tx)));
   const recherche = h('input', { type: 'search', placeholder: 'Rechercher un nom…', value: filtre.texte, 'aria-label': 'Rechercher', oninput: e => { filtre.texte = e.target.value; changer(); } });
   const archives = h('input', { type: 'checkbox', checked: filtre.archives, onchange: e => { filtre.archives = e.target.checked; changer(); } });
@@ -978,6 +984,7 @@ function donneesVides(type) {
     { heure: '19:30', role: 'ouverture', libelle: '', nom: '' }, { heure: '20:30', role: 'premiere', libelle: '', nom: '' },
     { heure: '21:30', role: 'tete', libelle: '', nom: '' }, { heure: '00:00', role: 'fermeture', libelle: '', nom: '' }] };
   if (type === 'image') return { src: null, ajustement: 'remplir' };
+  if (type === 'web') return { url: '' };
   return { src: null, poster: null, son: false };
 }
 function titreAuto(ed) {
@@ -988,6 +995,7 @@ function titreAuto(ed) {
   if (ed.type === 'lineup') {
     return 'Line-up · ' + (d.titre || G.vedetteDe(d.passages) || 'soirée') + (d.date ? ' · ' + dateCourte(d.date) : '');
   }
+  if (ed.type === 'web') return 'Page web' + (domaine(d.url) ? ' · ' + domaine(d.url) : '');
   return d.fichier || TYPES[ed.type];
 }
 // Motif du design system posé sur la photo d'une soirée : sans réglage, le motif par défaut s'affiche.
@@ -1245,13 +1253,13 @@ function vueEditeur(id, typeNouveau) {
     const etapes = etapesApercu(ed);
     pageApercu = Math.min(pageApercu, etapes.length - 1);
     const e = etapes[pageApercu];
-    const vide = ed.type === 'image' && !d.src ? 'Importez une image pour la voir ici.' : null;
+    const vide = ed.type === 'image' && !d.src ? 'Importez une image pour la voir ici.' : ed.type === 'web' && !d.url ? 'Saisissez l’adresse de la page pour la voir ici.' : null;
     ap.rendre(e, vide);
     document.querySelectorAll('.editeur .media').forEach(m => m.majCadre && m.majCadre());
     const duree = ed.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s (durée de la vidéo)' : '—') : (ed.duree || R.DUREES[ed.type]) + ' s' + (ed.type === 'agenda' && etapes.length > 1 ? ' par page' : '');
     infoApercu.textContent = 'Durée à l’écran : ' + duree + (ed.type === 'soiree' && d.date && d.date < auj() ? ' · Date passée : cette soirée ne s’affiche plus.' : '');
     remplacer(pager, 
-      ed.type !== 'video' && h('button', { type: 'button', class: 'btn pt', onclick: majApercu }, '↻ Rejouer l’animation'),
+      ed.type !== 'video' && h('button', { type: 'button', class: 'btn pt', onclick: majApercu }, ed.type === 'web' ? '↻ Recharger la page' : '↻ Rejouer l’animation'),
       etapes.length > 1 && etapes.map((x, i) => h('button', { type: 'button', class: 'btn pt', 'aria-pressed': String(i === pageApercu), onclick: () => { pageApercu = i; majApercu(); } }, 'Page ' + (i + 1))));
   };
   let minuterieApercu = null;
@@ -1332,6 +1340,14 @@ function vueEditeur(id, typeNouveau) {
     const seg = h('div', { class: 'seg', role: 'group' }, [['remplir', 'Remplir l’écran (recadrer)'], ['ajuster', 'Image entière (bandes noires)']].map(([k, t]) =>
       h('button', { type: 'button', 'aria-pressed': String(d.ajustement === k), onclick: e => { d.ajustement = k; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer(); } }, t)));
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Cadrage' }), seg));
+  } else if (ed.type === 'web') {
+    // L'aperçu ne recharge la page qu'à la validation de l'adresse (pas à chaque lettre).
+    const ouvrir = h('a', { class: 'btn pt', style: { justifySelf: 'start' }, target: '_blank', rel: 'noopener', hidden: !d.url, href: d.url || '#' }, 'Ouvrir la page ↗');
+    champs.push(champ('Adresse de la page', h('input', { id: 'f-url', type: 'url', value: d.url || '', placeholder: 'https://roller.6mic-aix.fr/ecran', autocomplete: 'off', spellcheck: false,
+      oninput: e => { d.url = e.target.value.trim(); changer(false); },
+      onchange: e => { d.url = e.target.value.trim(); ouvrir.href = d.url || '#'; ouvrir.hidden = !d.url; changer(); } }),
+      'Affichée en plein écran dans un cadre de 1920 × 1080, rechargée à chaque passage. La page doit s’adapter à cette taille et fonctionner sur le navigateur des écrans : Chromium 56 sur les écrans de salle (sans grille CSS), Chromium 94 au bar. Certains sites refusent d’être affichés dans une autre page.'),
+      ouvrir);
   } else {
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Vidéo' }),
       champMedia({ genre: 'video', valeur: d.src ? d : null, change: v => { Object.assign(d, v || { src: null, poster: null }); changer(); } }),
@@ -1347,6 +1363,7 @@ function vueEditeur(id, typeNouveau) {
   const enregistrer = h('button', { type: 'button', class: 'btn btn-noir principal', disabled: !!ed.id, onclick: () => sauver() }, ed.id ? 'Enregistrer' : 'Créer le contenu');
   async function sauver(apres) {
     if ((ed.type === 'image' || ed.type === 'video') && !d.src) { annoncer('Importez d’abord le fichier.', true); return; }
+    if (ed.type === 'web' && !/^https:\/\/\S+$/i.test(d.url || '')) { annoncer('Indiquez l’adresse complète de la page (https://…).', true); $('#f-url').focus(); return; }
     if (ed.type === 'soiree' && !d.nom.trim()) { annoncer('Indiquez le nom du concert.', true); $('#f-nom').focus(); return; }
     if (ed.type === 'agenda' && d.dates.some(x => !x.date)) { annoncer('Chaque ligne de l’agenda doit avoir une date.', true); return; }
     if (ed.type === 'lineup' && !d.passages.length) { annoncer('Ajoutez au moins un passage au line-up.', true); return; }

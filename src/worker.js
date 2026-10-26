@@ -25,7 +25,7 @@ const CODE_VALIDE = /^[a-z0-9-]{1,40}$/;
 const ID_VALIDE = /^[a-z0-9-]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
-const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video'];
+const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video', 'web'];
 const NIVEAUX_LINEUP = ['vedette', 'forte', 'normale', 'discrete'];   // vide = selon le rôle
 const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
@@ -423,6 +423,17 @@ function nombre(v, min, max) {
   const n = Number(v);
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : null;
 }
+// Page web affichée par les écrans : adresse https complète (une page http serait bloquée dans le lecteur, servi en https),
+// jamais l'application des écrans elle-même (affichage en abyme). Vide : brouillon, ignoré par les écrans.
+function adresseWeb(v) {
+  const s = chaine(v, 500, 'adresse de la page');
+  if (!s) return '';
+  let u;
+  try { u = new URL(s); } catch { throw refus('Adresse de la page invalide : copiez-la depuis le navigateur (https://…).'); }
+  if (u.protocol !== 'https:') throw refus('L’adresse de la page doit commencer par https:// (les écrans refusent les pages http).');
+  if (u.hostname === 'tv.6mic-aix.fr') throw refus('Cette adresse est celle des écrans eux-mêmes.');
+  return u.href;
+}
 function lien(v) {
   const s = chaine(v, 300, 'lien de la billetterie');
   if (!s) return '';
@@ -488,6 +499,7 @@ function validerDonnees(type, d, reglages) {
     }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     return { accroche: chaine(d.accroche, 80, 'accroche'), titre: chaine(d.titre, 80, 'titre de la série'), fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'violet', dates };
   }
+  if (type === 'web') return { url: adresseWeb(d.url) };
   if (type === 'image') {
     return {
       src: source(d.src, 'image', false), ajustement: d.ajustement === 'ajuster' ? 'ajuster' : 'remplir', fichier: chaine(d.fichier, 120, 'nom du fichier'),

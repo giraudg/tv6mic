@@ -227,6 +227,29 @@
     } };
   }
 
+  /* 7. Page web : une adresse externe affichée en plein écran (cadre de 1920 × 1080), rechargée à chaque passage.
+     La page doit s'adapter elle-même à cette taille. sandbox : elle garde ses scripts et son origine (ses propres
+     appels réseau), mais ne peut ni quitter le cadre ni remplacer le lecteur. pret(suite) : appelle suite une fois la
+     page chargée (10 s au plus), pour ne jamais montrer un cadre vide. */
+  function web(etape) {
+    var d = (etape.contenu && etape.contenu.donnees) || {}, g = el('div', 'g g-web'), f = document.createElement('iframe');
+    var charge = false, attente = null;
+    f.className = 'g-web-cadre';
+    f.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    f.setAttribute('scrolling', 'no');
+    f.setAttribute('frameborder', '0');
+    f.setAttribute('tabindex', '-1');
+    f.onload = function () { charge = true; if (attente) { attente(); } };
+    f.src = d.url || 'about:blank';
+    g.appendChild(f);
+    return { noeud: g, cadre: f, pret: function (suite) {
+      var fait = false, garde = setTimeout(fin, 10000);
+      // une fois chargée, la page récupère souvent ses données : on lui laisse un instant avant de l'afficher
+      function fin() { if (fait) { return; } fait = true; clearTimeout(garde); setTimeout(suite, charge ? 800 : 0); }
+      if (charge) { fin(); } else { attente = fin; }
+    } };
+  }
+
   /* 4. Série : 2 à 4 dates mises en avant (promo thématique, même esthétique, artistes proches de la soirée).
      Aplat de couleur du design system avec la texture rayonnante, titre façon section du site (marqueur ■■■),
      affiches côte à côte, le texte sous la photo (jamais dessus), « Ce soir » et « Demain » mis en évidence. */
@@ -400,7 +423,7 @@
   }
 
   racine.Gabarits = {
-    soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, veille: veille, identification: identification,
+    soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, web: web, veille: veille, identification: identification,
     FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, NIVEAUX_LINEUP: NIVEAUX_LINEUP, niveauPassage: niveauPassage, niveauParDefaut: niveauParDefaut, vedetteDe: vedetteDe, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe,

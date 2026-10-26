@@ -41,6 +41,7 @@ Gabarits (`public/lecteur/gabarits.js` et `gabarits.css`, partagés avec l'aper�
 | `serie` | `accroche`, `titre`, `fond` (`violet`, `rose`, `degrade`, `noir`), `dates` : 1 à 4 `{ date, heure, nom, mention, photo.src }` ; dates passées masquées, « Ce soir » / « Demain » automatiques | 12 s |
 | `image` | `src`, `ajustement` (`remplir` ou `ajuster`) | 8 s |
 | `video` | `src`, `poster`, `duree` (s), `taille` (octets), `son` (booléen) | durée de la vidéo |
+| `web` | `url` : page externe en https (jamais tv.6mic-aix.fr), affichée dans un cadre 1920 × 1080 (`sandbox` : scripts et origine gardés, pas de navigation du lecteur), rechargée à chaque passage ; le lecteur attend son chargement (10 s au plus) avant de l'afficher | 30 s |
 
 Format vidéo lu sans conversion : MP4, H.264 profil High niveau 4.0, 1920 × 1080, 30 i/s constants, 4:2:0 8 bits,
 environ 5 Mbit/s, AAC ou sans son, option « fast start ».

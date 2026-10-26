@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.3.4';
+  var VERSION = '1.4.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -227,6 +227,7 @@
         else if (e.type === 'serie') { g = Gabarits.serie(e, url); }
         else if (e.type === 'lineup') { g = Gabarits.lineup(e, url); }
         else if (e.type === 'image') { g = Gabarits.image(e, url); }
+        else if (e.type === 'web') { g = Gabarits.web(e); }
         else { g = Gabarits.veille(!prog ? (horsLigne ? 'Connexion au serveur…' : 'Chargement…') : ''); }
       } catch (err) {
         noter('gabarit ' + e.cle + ' : ' + err.message);
@@ -242,11 +243,16 @@
           D.fonts.ready.then(function () { if (n === jeton) { try { g.ajuster(); } catch (x) { /* déjà noté */ } } });
         }
       }
-      void couches[i].offsetWidth;
-      g.noeud.className += ' joue';
-      montrer({ type: 'couche', index: i });
-      minuterie = setTimeout(function () { avancer(); }, Math.max(3, (e.duree || 10) - ecoule) * 1000);
-      setTimeout(function () { if (n === jeton) { preparerSuivante(liste, e); } }, 900);
+      // page web : on attend qu'elle soit chargée (l'étape précédente reste affichée en attendant)
+      if (g.pret) { g.pret(lancer); } else { lancer(); }
+      function lancer() {
+        if (n !== jeton) { return; }
+        void couches[i].offsetWidth;
+        g.noeud.className += ' joue';
+        montrer({ type: 'couche', index: i });
+        minuterie = setTimeout(function () { avancer(); }, Math.max(3, (e.duree || 10) - ecoule) * 1000);
+        setTimeout(function () { if (n === jeton) { preparerSuivante(liste, e); } }, 900);
+      }
     });
   }
 
