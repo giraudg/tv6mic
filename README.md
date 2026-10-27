@@ -24,7 +24,9 @@ Options du lecteur : `&debug=1` affiche le suivi technique en bas à droite, `&i
 - **Boucle** : les étapes actives du flux tournent avec un fondu de 0,6 s ; les règles (période, jours, jours de la semaine,
   plages horaires passant minuit, priorité, ordre, contenu par défaut) sont dans `public/lecteur/regles.js`.
 - **Vidéo** : deux lecteurs vidéo en alternance, la vidéo suivante préparée pendant que l'autre joue (4 ms d'écart mesurés
-  dans MagicINFO) ; repli automatique sur un seul lecteur si le second échoue.
+  dans MagicINFO) ; repli automatique sur un seul lecteur si le second échoue, ou si la vidéo en cours se fige pendant le
+  préchargement de la suivante. Dans le navigateur intégré des écrans Samsung (écrans du bar), un seul lecteur d'office :
+  il ne décode qu'une vidéo à la fois ; l'image fixe de la vidéo suivante couvre le passage.
 - **Mémoire** : les médias des 2 prochains jours sont gardés dans le stockage de l'écran (Cache API, 150 Mo au plus).
   Au-delà, ils sont lus depuis le réseau.
 - **Résistance** : reprise à l'étape suivante après un rechargement de la page par MagicINFO ; sans réseau, la dernière

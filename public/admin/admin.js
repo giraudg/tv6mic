@@ -785,7 +785,7 @@ function vueEcrans() {
           s.e && h('p', { class: 'meta' },
             h('span', { text: 'Lecteur ' + (s.e.lecteur || '?') }), h('span', { text: 'mémoire ' + mo(s.e.memoire || 0) }),
             h('span', { text: plur(s.e.chargements || 0, 'chargement') }), s.e.taille && h('span', { text: 'page ' + s.e.taille.replace('x', ' × ') }),
-            s.e.video === 'simple' && h('span', { class: 'attention', text: 'un seul lecteur vidéo' })),
+            (/SamsungBrowser/.test(s.e.agent || '') ? h('span', { text: 'navigateur intégré · un lecteur vidéo' }) : s.e.video === 'simple' && h('span', { class: 'attention', text: 'un seul lecteur vidéo' }))),
           s.e && s.e.erreur && h('p', { class: 'meta attention', text: 'Dernier incident : ' + s.e.erreur })),
         h('div', { class: 'carte-p' },
           h('button', { type: 'button', class: 'btn pt', onclick: () => identifier(f.code) }, 'Identifier'),

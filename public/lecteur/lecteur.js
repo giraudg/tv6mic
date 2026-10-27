@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.4.0';
+  var VERSION = '1.4.1';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -283,6 +283,13 @@
     if (preparee && preparee.index === i) { preparee = null; }
   }
   function codeErreur(v) { return v.error ? 'code ' + v.error.code : 'inconnue'; }
+  // Passe durablement à un seul lecteur vidéo (7 jours, ou jusqu'à la prochaine version du lecteur).
+  function passerEnSimple(raison) {
+    if (modeVideo === 'simple') { return; }
+    modeVideo = 'simple';
+    noter('passage à un seul lecteur vidéo (' + raison + ')');
+    ecrire(K.video, JSON.stringify({ echecs: 0, le: Date.now(), lecteur: VERSION, mode: 'simple' }));
+  }
   // Trois échecs de décodage en 24 h avec deux lecteurs chargés : on n'en garde plus qu'un.
   function echecVideo() {
     var s = lireJSON(K.video) || {}, t = Date.now();
@@ -350,8 +357,17 @@
         var c0 = v.currentTime, f0 = v.webkitDecodedFrameCount || 0;
         setTimeout(function () {
           if (n !== jeton) { return; }
-          tracer('après 3 s : temps ' + (v.currentTime - c0).toFixed(1) + ' s, images ' + ((v.webkitDecodedFrameCount || 0) - f0) + ' (perdues ' + (v.webkitDroppedFrameCount || 0) + '), ' +
+          var avance = v.currentTime - c0;
+          tracer('après 3 s : temps ' + avance.toFixed(1) + ' s, images ' + ((v.webkitDecodedFrameCount || 0) - f0) + ' (perdues ' + (v.webkitDroppedFrameCount || 0) + '), ' +
             v.videoWidth + '×' + v.videoHeight + ', visible ' + (v.classList.contains('visible') ? 'oui' : 'non'));
+          // Vidéo figée pendant que l'autre lecteur précharge la suivante : l'appareil ne décode qu'une vidéo à la fois.
+          // On passe à un seul lecteur et on rejoue cette vidéo depuis le début.
+          if (modeVideo === 'double' && avance < 1 && !v.paused && !v.ended && (v.duration || d.duree || 0) > 5 && videos[1 - i].getAttribute('src')) {
+            tracer('figée pendant le préchargement de la suivante : un seul lecteur désormais');
+            passerEnSimple('vidéo figée');
+            liberer(1 - i);
+            afficher(e, liste);
+          }
         }, 3000);
         garde = setTimeout(function () { if (n === jeton) { noter('vidéo trop longue : ' + e.cle); avancer(); } }, (reste + 15) * 1000);
         setTimeout(function () { if (n === jeton) { preparerSuivante(liste, e); } }, depuisCouche ? 900 : 300);
@@ -600,6 +616,9 @@
     decalage = parseInt(lire(K.decalage), 10) || 0;
     var mv = lireJSON(K.video);
     if (mv && mv.mode === 'simple' && mv.lecteur === VERSION && Date.now() - mv.le < 7 * 86400000) { modeVideo = 'simple'; }
+    // Navigateur intégré des écrans Samsung (QBC du bar, et QM55R hors MagicINFO) : une seule vidéo décodée à la fois.
+    // Précharger la suivante dans le second lecteur fige celle qui joue (journal de Bar 3 : « temps 0.4 s » puis noir).
+    if (/SamsungBrowser/i.test(navigator.userAgent || '')) { modeVideo = 'simple'; }
     if (SUIVI) { setInterval(majSuivi, 1000); }
     if (!CODE) { menu(); return; }
     memoire = lireJSON(K.medias) || {};
