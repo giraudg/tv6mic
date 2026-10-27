@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.4.1';
+  var VERSION = '1.4.2';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -395,13 +395,39 @@
     }
   }
 
+  // Un seul lecteur vidéo : la vidéo suivante ne peut pas se préparer dans le second lecteur. On télécharge son
+  // fichier en arrière-plan (3 s après le début de l'étape, pour ne pas gêner la vidéo qui démarre) : servi avec
+  // « immutable », il reste dans le cache du navigateur et la vidéo démarre ensuite sans attendre le réseau.
+  // Rien n'est gardé en mémoire ; une fois par heure au plus par fichier (inutile si le cache l'a gardé).
+  var telecharges = {};
+  function telechargerSuivante(s) {
+    var src = s.contenu && s.contenu.donnees && s.contenu.donnees.src, url;
+    if (!src || !W.fetch) { return; }
+    url = absolue(src);
+    if (telecharges[url] && Date.now() - telecharges[url] < 3600000) { return; }
+    telecharges[url] = Date.now();
+    setTimeout(function () {
+      var t0 = Date.now(), total = 0;
+      function fin() { tracer('fichier de ' + s.cle + ' téléchargé d\'avance : ' + (total / 1048576).toFixed(1) + ' Mo en ' + (Date.now() - t0) + ' ms'); }
+      W.fetch(url).then(function (r) {
+        if (!r.ok) { throw new Error('HTTP ' + r.status); }
+        if (!r.body || !r.body.getReader) { return r.arrayBuffer().then(function (b) { total = b.byteLength; fin(); }); }
+        var lecteur = r.body.getReader();
+        function lire() {
+          return lecteur.read().then(function (m) { if (m.done) { fin(); return; } total += m.value.length; return lire(); });
+        }
+        return lire();
+      })['catch'](function (err) { delete telecharges[url]; tracer('téléchargement d\'avance de ' + s.cle + ' : ' + (err && err.message)); });
+    }, 3000);
+  }
+
   // Prépare l'étape suivante pendant que la courante s'affiche.
   function preparerSuivante(liste, e) {
     var s = Regles.suivante(liste, e.cle), i;
     libererBlobs([e, s]);
     if (!s || s.cle === e.cle || quarantaine[s.cle] > Date.now()) { return; }
     if (s.type === 'video') {
-      if (modeVideo !== 'double') { return; }
+      if (modeVideo !== 'double') { telechargerSuivante(s); return; }
       i = videoPour(s, false);
       if (i < 0) { return; }
       resoudre(s, function (url) {
