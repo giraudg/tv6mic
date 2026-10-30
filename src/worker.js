@@ -34,35 +34,87 @@ const MEDIAS_MAX = 100 * 1024 * 1024;
 class ErreurHttp extends Error { constructor(status, message) { super(message); this.status = status; } }
 const refus = message => new ErreurHttp(400, message);
 
+/* ---- base de données : reprise des erreurs passagères ----
+   D1 renvoie parfois, pendant quelques secondes, des erreurs passagères (connexion perdue, base redémarrée,
+   surcharge). Les lectures, et les écritures qui peuvent se rejouer sans effet (INSERT … ON CONFLICT … DO UPDATE),
+   sont retentées deux fois (0,2 s puis 0,6 s plus tard). Les autres écritures ne le sont pas : on ne saurait pas
+   si la première a été enregistrée. Chaque reprise est notée (table erreurs, niveau « reprise »). */
+const PASSAGERE = /network connection lost|internal error|transient|reset|timed? ?out|overload|unavailable|try again|busy|durable object/i;
+const REJOUABLE = sql => /^\s*(SELECT|WITH)\b/i.test(sql) || /ON CONFLICT[\s\S]*DO UPDATE/i.test(sql);
+function fiable(db, noter) {
+  async function reprise(f, sql) {
+    for (let essai = 0; ; essai++) {
+      try {
+        const r = await f();
+        if (essai) noter('reprise', 'base de données : réussi au ' + (essai + 1) + 'e essai (' + sql.trim().split(/\s+/).slice(0, 4).join(' ') + '…)');
+        return r;
+      } catch (e) {
+        const m = String(e && e.message || e);
+        if (essai >= 2 || !REJOUABLE(sql) || !PASSAGERE.test(m)) throw e;
+        console.warn('D1 : erreur passagère, nouvel essai', m);
+        await new Promise(ok => setTimeout(ok, essai ? 600 : 200));
+      }
+    }
+  }
+  const enveloppe = (st, sql) => ({
+    brut: st,
+    bind: (...a) => enveloppe(st.bind(...a), sql),
+    first: col => reprise(() => col === undefined ? st.first() : st.first(col), sql),
+    all: () => reprise(() => st.all(), sql),
+    run: () => reprise(() => st.run(), sql)
+  });
+  return { prepare: sql => enveloppe(db.prepare(sql), sql), batch: l => db.batch(l.map(x => x && x.brut ? x.brut : x)) };
+}
+// Incidents notés dans la table erreurs (au mieux : si la base est indisponible, il reste les journaux Cloudflare).
+function noterIncidents(db, ctx, req, url, liste) {
+  if (!liste.length || !db) return;
+  ctx.waitUntil(db.batch([
+    ...liste.map(([niveau, message]) => db.prepare('INSERT INTO erreurs (niveau, methode, chemin, message) VALUES (?, ?, ?, ?)')
+      .bind(niveau, req.method, url.pathname.slice(0, 200), String(message).slice(0, 1000))),
+    db.prepare('DELETE FROM erreurs WHERE id <= (SELECT MAX(id) - 500 FROM erreurs)')
+  ]).catch(e => console.error('incident non noté', e)));
+}
+
 export default {
-  async fetch(req, env, ctx) {
+  async fetch(req, envBrut, ctx) {
     const url = new URL(req.url);
     const p = url.pathname;
+    const incidents = [];
+    const env = Object.create(envBrut);
+    if (envBrut.DB) env.DB = fiable(envBrut.DB, (niveau, message) => incidents.push([niveau, message]));
     try {
-      if (p.startsWith('/medias/')) return await media(req, env, ctx, p.slice(8));
-      if (p === '/api/sante') return json({ ok: true, maintenant: Date.now() });
-      if (p === '/api/flux') {
-        if (req.method !== 'GET') return json({ erreur: 'Méthode non permise' }, 405);
-        const { results } = await env.DB.prepare('SELECT code, nom FROM flux ORDER BY ordre, nom').all();
-        return json({ flux: results });
-      }
-      const m = p.match(/^\/api\/flux\/([^/]+)$/);
-      if (m) {
-        if (req.method !== 'GET' && req.method !== 'POST') return json({ erreur: 'Méthode non permise' }, 405);
-        const code = decodeURIComponent(m[1]).toLowerCase();
-        if (!CODE_VALIDE.test(code)) return json({ erreur: 'Flux inconnu', code }, 404);
-        return await programme(req, env, ctx, code);
-      }
-      if (p.startsWith('/api/admin/')) return await admin(req, env, url);
-      if (p.startsWith('/api/')) return json({ erreur: 'Adresse inconnue' }, 404);
-      return env.ASSETS.fetch(req);
+      const r = await traiter(req, env, ctx, url, p);
+      noterIncidents(envBrut.DB, ctx, req, url, incidents);
+      return r;
     } catch (e) {
-      if (e instanceof ErreurHttp) return json({ erreur: e.message }, e.status);
+      if (e instanceof ErreurHttp) { noterIncidents(envBrut.DB, ctx, req, url, incidents); return json({ erreur: e.message }, e.status); }
       console.error('erreur', p, e && e.stack || e);
-      return json({ erreur: 'Erreur interne du serveur.' }, 500);
+      incidents.push(['erreur', String(e && e.message || e)]);
+      noterIncidents(envBrut.DB, ctx, req, url, incidents);
+      return json({ erreur: 'Le serveur a rencontré une erreur. Réessayez dans un instant ; si elle revient, le détail est dans le Journal.' }, 500);
     }
   }
 };
+
+async function traiter(req, env, ctx, url, p) {
+  if (p.startsWith('/medias/')) return await media(req, env, ctx, p.slice(8));
+  if (p === '/api/sante') return json({ ok: true, maintenant: Date.now() });
+  if (p === '/api/flux') {
+    if (req.method !== 'GET') return json({ erreur: 'Méthode non permise' }, 405);
+    const { results } = await env.DB.prepare('SELECT code, nom FROM flux ORDER BY ordre, nom').all();
+    return json({ flux: results });
+  }
+  const m = p.match(/^\/api\/flux\/([^/]+)$/);
+  if (m) {
+    if (req.method !== 'GET' && req.method !== 'POST') return json({ erreur: 'Méthode non permise' }, 405);
+    const code = decodeURIComponent(m[1]).toLowerCase();
+    if (!CODE_VALIDE.test(code)) return json({ erreur: 'Flux inconnu', code }, 404);
+    return await programme(req, env, ctx, code);
+  }
+  if (p.startsWith('/api/admin/')) return await admin(req, env, url);
+  if (p.startsWith('/api/')) return json({ erreur: 'Adresse inconnue' }, 404);
+  return env.ASSETS.fetch(req);
+}
 
 function json(obj, status = 200, entetes = {}) {
   return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...entetes } });
@@ -381,7 +433,14 @@ async function journal(env, url) {
   const pages = Math.max(1, Math.ceil(total / par));
   const page = Math.min(pages, Math.max(1, parseInt(url.searchParams.get('page'), 10) || 1));
   const { results } = await env.DB.prepare('SELECT quand, qui, action, detail FROM journal ORDER BY id DESC LIMIT ? OFFSET ?').bind(par, (page - 1) * par).all();
-  return json({ lignes: results, total, page, pages });
+  // incidents du serveur des 7 derniers jours (table créée par la migration 0008 : absente, on n'en montre aucun)
+  let incidents = [];
+  if (page === 1) {
+    try {
+      incidents = (await env.DB.prepare("SELECT quand, niveau, methode, chemin, message FROM erreurs WHERE quand >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-7 days') ORDER BY id DESC LIMIT 50").all()).results;
+    } catch (e) { console.error('incidents', e); }
+  }
+  return json({ lignes: results, total, page, pages, incidents });
 }
 
 /* ---- écriture : chaque modification est journalisée et fait monter la version (les écrans rechargent) ---- */

@@ -98,6 +98,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .puce-ok { background: var(--vert); color: #fff; }
 .puce-ko { background: var(--rouge); color: #fff; }
 .puce-gris { background: var(--brume2); color: #000; }
+.puce-rouge { background: #dc2626; color: #fff; }
 .puce-noir { background: #000; color: #fff; }
 .puce-filet { box-shadow: inset 0 0 0 1px #000; }
 .t-soiree { background: var(--t-soiree); color: #fff; }
@@ -536,3 +537,9 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
   /* la notification passe au-dessus des barres collantes (enregistrement, sélection de jours) */
   body:has(.barre-ed, .reglages-pied:not([hidden]), .selection:not([hidden])) .toast { bottom: calc(128px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Journal : incidents du serveur */
+.incidents { margin: 0 0 20px; padding: 12px 14px; border: 1px solid #000; background: var(--brume); }
+.incidents summary { cursor: pointer; }
+.incidents .tableau { margin-top: 10px; background: #fff; }
+.incidents td.aide { overflow-wrap: anywhere; }

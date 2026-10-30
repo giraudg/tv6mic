@@ -103,6 +103,11 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
   (`version` de la programmation, à incrémenter à chaque modification pour que les écrans la rechargent ; `reglages`).
 - **Cloudflare R2** (compartiment `tv-6mic-medias`, liaison `MEDIAS`) : images et vidéos importées, clés `m/AAAA-MM/…`,
   servies sous `/medias/` avec cache Cloudflare. Les fichiers d'essai du lot 1 restent dans `public/test-medias/`.
+- **Erreurs passagères de D1** : les lectures (et l'enregistrement de l'état des écrans, rejouable) sont retentées deux
+  fois (0,2 s puis 0,6 s) quand la base répond « connexion perdue », « surchargée », etc. ; les autres écritures ne le
+  sont pas. Chaque reprise et chaque erreur 500 sont notées dans la table `erreurs` (500 dernières) et affichées en tête
+  du **Journal** du back-office (7 derniers jours). Les journaux complets restent dans Cloudflare (Workers → tv-6mic →
+  Observability).
 
 ## Mise en ligne (une seule fois)
 

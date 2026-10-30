@@ -2129,8 +2129,20 @@ async function vueJournal(page) {
   let j;
   try { j = await api('GET', '/api/admin/journal?page=' + page); } catch (e) { if (surVue('journal')) afficher(h('p', { class: 'erreur', text: e.message })); return; }
   if (!surVue('journal')) return;
+  // Incidents du serveur (7 derniers jours) : erreurs 500 et erreurs passagères de la base rattrapées au nouvel essai.
+  const inc = j.incidents || [], nbErreurs = inc.filter(x => x.niveau === 'erreur').length;
+  const incidents = inc.length ? h('details', { class: 'incidents', open: nbErreurs > 0 },
+    h('summary', null, h('b', { text: 'Incidents du serveur (7 derniers jours) : ' }),
+      [nbErreurs && plur(nbErreurs, 'erreur'), inc.length - nbErreurs && plur(inc.length - nbErreurs, 'reprise automatique', 'reprises automatiques')].filter(Boolean).join(', ')),
+    h('p', { class: 'aide', text: 'Une reprise automatique est une erreur passagère de la base de données, réussie au nouvel essai : rien n’a été perdu. Une erreur a fait échouer l’action ou l’interrogation de l’écran à ce moment-là.' }),
+    h('table', { class: 'tableau' },
+      h('thead', null, h('tr', null, h('th', { text: 'Quand' }), h('th', { text: 'Type' }), h('th', { text: 'Requête' }), h('th', { text: 'Détail' }))),
+      h('tbody', null, inc.map(x => h('tr', null, h('td', { text: heureIso(x.quand) }),
+        h('td', null, h('span', { class: 'puce ' + (x.niveau === 'erreur' ? 'puce-rouge' : 'puce-gris'), text: x.niveau === 'erreur' ? 'Erreur' : 'Reprise' })),
+        h('td', { text: (x.methode || '') + ' ' + (x.chemin || '') }), h('td', { class: 'aide', text: x.message || '' })))))) : null;
   afficher(
     h('div', { class: 'tete' }, h('div', null, h('p', { class: 'surtitre', text: plur(j.total, 'modification') }), h('h1', { class: 'titre', text: 'Journal' }))),
+    incidents,
     j.lignes.length ? h('table', { class: 'tableau' },
       h('thead', null, h('tr', null, h('th', { text: 'Quand' }), h('th', { text: 'Qui' }), h('th', { text: 'Quoi' }))),
       h('tbody', null, j.lignes.map(l => h('tr', null, h('td', { text: heureIso(l.quand) }), h('td', { text: l.qui || '' }),
