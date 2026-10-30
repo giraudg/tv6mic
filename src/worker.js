@@ -453,13 +453,22 @@ function motifValide(m) {
   }
   return r;
 }
+// Recadrage d'une photo dans son cadre : { x, y } en %, comme background-position (centré si absent).
+function cadrageValide(c) {
+  if (!c || typeof c !== 'object') return undefined;
+  const x = Number(c.x), y = Number(c.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
+  const b = n => Math.round(Math.max(0, Math.min(100, n)) * 10) / 10;
+  return b(x) === 50 && b(y) === 50 ? undefined : { x: b(x), y: b(y) };
+}
+const photoValide = (src, p) => src ? { src, largeur: nombre(p.largeur, 0, 20000), hauteur: nombre(p.hauteur, 0, 20000), cadrage: cadrageValide(p.cadrage) } : null;
 function validerDonnees(type, d, reglages) {
   if (!d || typeof d !== 'object') throw refus('Données manquantes.');
   if (type === 'soiree') {
     const photo = source(d.photo, 'photo', false);
     return {
       nom: chaine(d.nom, 120, 'nom du concert'), date: date(d.date, 'date du concert', false), heure: heure(d.heure, 'heure'),
-      photo: photo ? { src: photo, largeur: nombre(d.photo.largeur, 0, 20000), hauteur: nombre(d.photo.hauteur, 0, 20000) } : null,
+      photo: photoValide(photo, d.photo),
       infos: chaine(d.infos, 300, 'infos'), mention: chaine(d.mention, 40, 'mention'), billetterie: lien(d.billetterie),
       motif: motifValide(d.motif)
     };
@@ -470,7 +479,7 @@ function validerDonnees(type, d, reglages) {
       date: date(x && x.date, 'ligne ' + (i + 1), true), nom: chaine(x.nom, 120, 'nom, ligne ' + (i + 1)), mention: chaine(x.mention, 40, 'mention, ligne ' + (i + 1))
     })).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     const photo = source(d.photo, 'photo de fond', false);
-    return { titre: chaine(d.titre, 80, 'titre de l’agenda'), dates, photo: photo ? { src: photo } : null };
+    return { titre: chaine(d.titre, 80, 'titre de l’agenda'), dates, photo: photo ? { src: photo, cadrage: cadrageValide(d.photo.cadrage) } : null };
   }
   if (type === 'lineup') {
     // Programme d'une soirée : passages (heure, rôle, nom), 8 au plus ; l'ordre d'affichage suit l'heure.
@@ -485,7 +494,7 @@ function validerDonnees(type, d, reglages) {
     });
     const photo = source(d.photo, 'photo', false);
     return { titre: chaine(d.titre, 80, 'titre'), date: date(d.date, 'date de la soirée', false), lieu: chaine(d.lieu, 40, 'lieu'), passages,
-      photo: photo ? { src: photo, largeur: nombre(d.photo.largeur, 0, 20000), hauteur: nombre(d.photo.hauteur, 0, 20000) } : null };
+      photo: photoValide(photo, d.photo) };
   }
   if (type === 'serie') {
     // 2 à 4 dates mises en avant, chacune avec sa photo facultative ; triées par date.
@@ -495,7 +504,7 @@ function validerDonnees(type, d, reglages) {
       if (!x || typeof x !== 'object') throw refus('Date ' + (i + 1) + ' invalide.');
       const photo = source(x.photo, 'photo de la date ' + (i + 1), false);
       return { date: date(x.date, 'date ' + (i + 1), true), heure: heure(x.heure, 'heure, date ' + (i + 1)), nom: chaine(x.nom, 120, 'nom, date ' + (i + 1)),
-        mention: chaine(x.mention, 40, 'mention, date ' + (i + 1)), photo: photo ? { src: photo, largeur: nombre(x.photo.largeur, 0, 20000), hauteur: nombre(x.photo.hauteur, 0, 20000) } : null };
+        mention: chaine(x.mention, 40, 'mention, date ' + (i + 1)), photo: photoValide(photo, x.photo) };
     }).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     return { accroche: chaine(d.accroche, 80, 'accroche'), titre: chaine(d.titre, 80, 'titre de la série'), fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'violet', dates };
   }
@@ -503,6 +512,7 @@ function validerDonnees(type, d, reglages) {
   if (type === 'image') {
     return {
       src: source(d.src, 'image', false), ajustement: d.ajustement === 'ajuster' ? 'ajuster' : 'remplir', fichier: chaine(d.fichier, 120, 'nom du fichier'),
+      cadrage: d.ajustement === 'ajuster' ? undefined : cadrageValide(d.cadrage),
       taille: nombre(d.taille, 0, 1e10), largeur: nombre(d.largeur, 0, 20000), hauteur: nombre(d.hauteur, 0, 20000)
     };
   }

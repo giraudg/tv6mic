@@ -36,8 +36,10 @@
     i.src = LOGO; i.alt = '6MIC';
     return i;
   }
-  function fond(noeud, src, url) {
+  // cadrage { x, y } : position de la photo dans son cadre, en % (comme background-position) ; centrée sinon.
+  function fond(noeud, src, url, cadrage) {
     if (src) { noeud.style.backgroundImage = 'url("' + url(src).replace(/"/g, '%22') + '")'; }
+    if (src && cadrage && typeof cadrage.x === 'number' && typeof cadrage.y === 'number') { noeud.style.backgroundPosition = cadrage.x + '% ' + cadrage.y + '%'; }
   }
   // Réduit la taille du texte jusqu'à tenir dans sa boîte (largeur du bloc, nombre de lignes).
   function ajusterTexte(noeud, max, min, lignes) {
@@ -159,7 +161,9 @@
   function soiree(etape, url) {
     var c = etape.contenu, d = c.donnees || {}, g = el('div', 'g g-soiree');
     var photo = el('div', 'g-photo'), bloc = el('div', 'g-bloc'), nom, q, deco;
-    fond(photo, d.photo && d.photo.src, url);
+    fond(photo, d.photo && d.photo.src, url, d.photo && d.photo.cadrage);
+    // le zoom lent part du point gardé dans le cadre (même pourcentage que la position)
+    if (d.photo && d.photo.cadrage) { photo.style.webkitTransformOrigin = photo.style.transformOrigin = d.photo.cadrage.x + '% ' + d.photo.cadrage.y + '%'; }
     photo.style.webkitAnimationDuration = photo.style.animationDuration = Math.max(8, (etape.duree || 10) + 2) + 's';
     g.appendChild(photo);
     g.appendChild(el('div', 'g-voile'));
@@ -197,7 +201,7 @@
   function agenda(etape, url, ecoule) {
     var c = etape.contenu, d = c.donnees || {}, court = etape.dates.length <= 4, g = el('div', 'g g-agenda' + (court ? ' g-court' : ''));
     var tete = el('div', 'g-entete'), liste = el('div', 'g-liste'), titre, noms = [], i, x, p, ligne, quand, nom;
-    if (d.photo && d.photo.src) { var f = el('div', 'g-fond'); fond(f, d.photo.src, url); g.appendChild(f); }
+    if (d.photo && d.photo.src) { var f = el('div', 'g-fond'); fond(f, d.photo.src, url, d.photo.cadrage); g.appendChild(f); }
     tete.appendChild(el('div', 'g-motif'));
     titre = el('div', 'g-titre a a1', d.titre || c.titre);
     tete.appendChild(titre);
@@ -297,7 +301,7 @@
       carte.style.webkitAnimationDelay = carte.style.animationDelay = (0.45 + i * 0.16).toFixed(2) + 's';
       photo = el('div', 'g-s-photo' + (x.photo && x.photo.src ? '' : ' g-s-vide'));
       photo.style.height = hauteur + 'px';
-      if (x.photo && x.photo.src) { fond(photo, x.photo.src, url); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
+      if (x.photo && x.photo.src) { fond(photo, x.photo.src, url, x.photo.cadrage); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
       if (x.mention) { photo.appendChild(el('div', 'g-s-mention' + (mentionAlerte(x.mention) ? ' g-rouge' : ''), x.mention)); }
       carte.appendChild(photo);
       corps = el('div', 'g-s-corps');
@@ -354,7 +358,7 @@
     }
     // panneau de droite : photo, sinon aplat dégradé avec les faisceaux
     var panneau = el('div', 'g-l-panneau a a0' + (d.photo && d.photo.src ? '' : ' g-l-sansphoto'));
-    if (d.photo && d.photo.src) { fond(panneau, d.photo.src, url); } else { panneau.appendChild(el('div', 'g-l-motif')); }
+    if (d.photo && d.photo.src) { fond(panneau, d.photo.src, url, d.photo.cadrage); } else { panneau.appendChild(el('div', 'g-l-motif')); }
     g.appendChild(panneau);
     g.appendChild(el('div', 'g-l-fondu'));
     g.appendChild(logo('g-logo a a0'));
@@ -399,7 +403,7 @@
   /* 3. Image importée */
   function image(etape, url) {
     var d = etape.contenu.donnees || {}, g = el('div', 'g g-image' + (d.ajustement === 'ajuster' ? ' g-contenir' : ''));
-    fond(g, d.src, url);
+    fond(g, d.src, url, d.ajustement === 'ajuster' ? null : d.cadrage);
     return { noeud: g };
   }
 

@@ -41,9 +41,14 @@ Gabarits (`public/lecteur/gabarits.js` et `gabarits.css`, partagés avec l'aper�
 | `lineup` | `titre` (vide : tête d'affiche), `date`, `lieu`, `photo.src`, `passages` : 1 à 8 `{ heure, role (ouverture, premiere, tete, dj, fermeture, autre), libelle, nom }`, rangés par heure (après minuit en fin de soirée) ; le jour J, passage en cours et suivant signalés | 12 s |
 | `agenda` | `titre`, `dates` : liste de `{ date, nom, mention }`, `photo.src` facultative ; 6 dates au plus par page (pages équilibrées), barre de progression façon « story » | 15 s par page |
 | `serie` | `accroche`, `titre`, `fond` (`violet`, `rose`, `degrade`, `noir`), `dates` : 1 à 4 `{ date, heure, nom, mention, photo.src }` ; dates passées masquées, « Ce soir » / « Demain » automatiques | 12 s |
-| `image` | `src`, `ajustement` (`remplir` ou `ajuster`) | 8 s |
+| `image` | `src`, `ajustement` (`remplir` ou `ajuster`), `cadrage` (voir ci-dessous) | 8 s |
 | `video` | `src`, `poster`, `duree` (s), `taille` (octets), `son` (booléen) | durée de la vidéo |
 | `web` | `url` : page externe en https (jamais tv.6mic-aix.fr), affichée dans un cadre 1920 × 1080 (`sandbox` : scripts et origine gardés, pas de navigation du lecteur), rechargée à chaque passage ; le lecteur attend son chargement (10 s au plus) avant de l'afficher | 30 s |
+
+Recadrage : chaque photo (`photo` d'une soirée, d'un line-up, d'un agenda, d'une date de série, et l'image en mode
+`remplir`) peut porter `cadrage: { x, y }`, en pourcentages comme `background-position` (absent : centrée). Dans le
+back-office, on fait glisser l'image dans la vignette du champ (ou on la déplace aux flèches, Maj pour aller plus vite) ;
+« Recentrer » revient au centre. Sur une soirée, le zoom lent part du même point.
 
 Format vidéo lu sans conversion : MP4, H.264 profil High niveau 4.0, 1920 × 1080, 30 i/s constants, 4:2:0 8 bits,
 environ 5 Mbit/s, AAC ou sans son, option « fast start ».

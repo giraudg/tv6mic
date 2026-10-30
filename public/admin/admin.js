@@ -511,7 +511,8 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
   const video = genre === 'video';
   const racine = h('div', { class: 'media depot' });
   const vide = h('span', { class: 'media-vide' }, h('b'), h('small', { text: video ? 'Glisser une vidéo ici' : 'Glisser une image ici' }));
-  const vignette = h('div', { class: 'media-vignette', 'aria-hidden': 'true', onclick: () => { if (!bouton.disabled) entree.click(); } }, vide);
+  // Vignette vide : un clic ouvre le choix du fichier. Avec une image : on la fait glisser pour la recadrer.
+  const vignette = h('div', { class: 'media-vignette', 'aria-hidden': 'true', onclick: () => { if (!bouton.disabled && !(courant && courant.src)) entree.click(); } }, vide);
   const format = h('div', { class: 'format' });
   const info = h('div', { class: 'aide' });
   const barre = h('div', { class: 'barre', hidden: true }, h('i'));
@@ -525,8 +526,70 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
   const bouton = h('button', { type: 'button', class: 'btn', onclick: () => entree.click(), disabled: !E.r2 },
     video ? 'Choisir une vidéo…' : 'Choisir une image…');
   const retirer = facultatif ? h('button', { type: 'button', class: 'btn btn-danger pt', onclick: () => { change(null); montrer(null); } }, 'Retirer') : null;
+  const recentrer = h('button', { type: 'button', class: 'btn pt', hidden: true, onclick: () => recadrer(null) }, 'Recentrer');
   let courant = null, dims = null;
   const cadreActuel = () => typeof cadre === 'function' ? cadre() : cadre;
+
+  /* Recadrage : la vignette a le format de l'écran ; on y fait glisser l'image (ou on la déplace aux flèches)
+     pour choisir la partie visible. Gardé en pourcentages comme background-position : { x, y }, 50 % 50 % = centré. */
+  const posDe = v => v && v.cadrage ? v.cadrage : { x: 50, y: 50 };
+  const borne = n => Math.max(0, Math.min(100, Math.round(n * 10) / 10));
+  // Ce qui dépasse de la vignette sur chaque axe (px), ou null si l'image n'est pas recadrée (vidéo, image entière…).
+  function plages() {
+    const img = courant && !video && courant.src ? (courant.largeur ? courant : dims) : null, c = cadreActuel();
+    if (!img || !c || c.contenir) return null;
+    // taille affichée, ou celle que majCadre a fixée (le champ n'est pas encore dans la page au premier rendu)
+    const w = vignette.clientWidth || parseFloat(vignette.style.width) || 0, hh = vignette.clientHeight || parseFloat(vignette.style.height) || 0;
+    if (!w || !hh) return null;
+    const k = Math.max(w / img.largeur, hh / img.hauteur), p = { x: img.largeur * k - w, y: img.hauteur * k - hh };
+    return p.x >= 1 || p.y >= 1 ? p : null;
+  }
+  function majPosition() {
+    const p = posDe(courant), pl = plages();
+    vignette.style.backgroundPosition = p.x + '% ' + p.y + '%';
+    vignette.classList.toggle('recadrable', !!pl);
+    vignette.tabIndex = pl ? 0 : -1;
+    if (pl) { vignette.removeAttribute('aria-hidden'); vignette.setAttribute('aria-label', 'Recadrer l’image : faites-la glisser, ou utilisez les flèches du clavier'); }
+    else { vignette.setAttribute('aria-hidden', 'true'); vignette.removeAttribute('aria-label'); }
+    recentrer.hidden = !(pl && courant && courant.cadrage);
+  }
+  function recadrer(p) {
+    // null : centré (le champ est vidé, pour ne pas garder la position d'une image précédente)
+    const v = Object.assign({}, courant, { cadrage: p && (p.x !== 50 || p.y !== 50) ? { x: borne(p.x), y: borne(p.y) } : null });
+    courant = v; change(v); majPosition();
+  }
+  let glisse = null;
+  vignette.addEventListener('pointerdown', ev => {
+    const pl = plages();
+    if (!pl || occupe) return;
+    ev.preventDefault();
+    vignette.setPointerCapture(ev.pointerId);
+    glisse = { x0: ev.clientX, y0: ev.clientY, p: posDe(courant), pl, pos: null };
+    vignette.classList.add('glisse');
+  });
+  vignette.addEventListener('pointermove', ev => {
+    if (!glisse) return;
+    const g = glisse, dx = ev.clientX - g.x0, dy = ev.clientY - g.y0;
+    if (!g.pos && Math.abs(dx) + Math.abs(dy) < 3) return;
+    // glisser vers la droite montre la gauche de l'image : la position diminue
+    g.pos = { x: g.pl.x >= 1 ? borne(g.p.x - dx / g.pl.x * 100) : g.p.x, y: g.pl.y >= 1 ? borne(g.p.y - dy / g.pl.y * 100) : g.p.y };
+    vignette.style.backgroundPosition = g.pos.x + '% ' + g.pos.y + '%';
+  });
+  const finGlisse = () => {
+    if (!glisse) return;
+    const g = glisse; glisse = null;
+    vignette.classList.remove('glisse');
+    if (g.pos) recadrer(g.pos);
+  };
+  vignette.addEventListener('pointerup', finGlisse);
+  vignette.addEventListener('pointercancel', finGlisse);
+  vignette.addEventListener('keydown', ev => {
+    const pl = plages(), pas = ev.shiftKey ? 10 : 2, p = posDe(courant);
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
+    if (!pl || !d) return;
+    ev.preventDefault();
+    recadrer({ x: pl.x >= 1 ? borne(p.x + d[0] * pas) : p.x, y: pl.y >= 1 ? borne(p.y + d[1] * pas) : p.y });
+  });
   // Le format du cadre peut changer (nombre de dates d'une série, cadrage d'une image) : l'éditeur rappelle majCadre.
   function majCadre() {
     const c = cadreActuel();
@@ -539,6 +602,8 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
       h('p', {}, h('b', { text: 'À l’écran : ' + c.largeur + ' × ' + c.hauteur + ' px' }), ', ' + nomFormat(c.largeur, c.hauteur) + (c.conseil ? ' · ' + c.conseil : '')),
       img && h('ul', { class: 'controle' }, verdictCadre(img, c).map(([e, t]) => h('li', { class: e, text: t }))));
     format.hidden = false;
+    majPosition();
+    if (plages()) format.append(h('p', { class: 'astuce-cadrage', text: 'Faites glisser l’image dans la vignette pour choisir la partie visible à l’écran.' }));
   }
   racine.majCadre = majCadre;
   function montrer(v) {
@@ -571,7 +636,7 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
         const p = await preparerImage(f);
         info.textContent = 'Envoi…';
         const r = await televerser(p.blob, f.name, progresser);
-        const v = { src: r.src, largeur: p.largeur, hauteur: p.hauteur, taille: r.taille, fichier: nomSansExtension(f.name) };
+        const v = { src: r.src, largeur: p.largeur, hauteur: p.hauteur, taille: r.taille, fichier: nomSansExtension(f.name), cadrage: null };
         change(v); montrer(v);
         const c = cadreActuel(), flou = c && verdictCadre(v, c).find(([e, t]) => e === 'a' && /petite/.test(t));
         if (flou) annoncer(flou[1], true);
@@ -648,7 +713,7 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
     if (f) importer(f);
   });
   if (!E.r2) racine.classList.add('occupe');
-  racine.append(h('div', { class: 'media-ligne' }, vignette, h('div', { class: 'actions' }, bouton, retirer)), format, info, barre, annulerConv, choix, controle, encart, entree);
+  racine.append(h('div', { class: 'media-ligne' }, vignette, h('div', { class: 'actions' }, bouton, recentrer, retirer)), format, info, barre, annulerConv, choix, controle, encart, entree);
   montrer(valeur);
   if (!E.r2) racine.append(h('p', { class: 'erreur', text: 'Import impossible : le stockage Cloudflare R2 n’est pas encore activé.' }));
   return racine;
@@ -806,11 +871,13 @@ function vignette(c) {
   const d = c.donnees, img = h('div', { class: 'vignette-img' });
   const src = c.type === 'video' ? d.poster : c.type === 'image' ? d.src : d.photo && d.photo.src;
   if (src) img.style.backgroundImage = 'url("' + src + '")';
+  const cadrage = c.type === 'image' ? (d.ajustement === 'ajuster' ? null : d.cadrage) : d.photo && d.photo.cadrage;
+  if (src && cadrage) img.style.backgroundPosition = cadrage.x + '% ' + cadrage.y + '%';
   if (c.type === 'agenda') img.append(h('div', { class: 'vignette-ag' }, h('b', { text: d.titre || c.titre }), h('span', { text: plur((d.dates || []).length, 'date') })));
   if (c.type === 'serie') {
     // planche des affiches de la série, sur la couleur de fond choisie
     img.classList.add('vignette-serie', 'f-' + (d.fond || 'violet'));
-    img.append(h('div', { class: 'vignette-ser' }, (d.dates || []).slice(0, 4).map(x => h('i', { style: x.photo && x.photo.src ? { backgroundImage: 'url("' + x.photo.src + '")' } : null }))),
+    img.append(h('div', { class: 'vignette-ser' }, (d.dates || []).slice(0, 4).map(x => h('i', { style: x.photo && x.photo.src ? { backgroundImage: 'url("' + x.photo.src + '")', backgroundPosition: x.photo.cadrage ? x.photo.cadrage.x + '% ' + x.photo.cadrage.y + '%' : null } : null }))),
       h('b', { class: 'vignette-ser-t', text: d.titre || c.titre }));
   }
   if (c.type === 'soiree') img.append(h('div', { class: 'vignette-soiree', text: d.nom || '' }));

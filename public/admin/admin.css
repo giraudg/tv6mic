@@ -199,6 +199,10 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .media-vide small { font-size: 11px; color: rgba(255, 255, 255, .72); }
 @media (hover: none) { .media-vide small { display: none; } }
 .occupe .media-vignette { cursor: default; }
+.media-vignette.recadrable { cursor: grab; touch-action: none; }
+.media-vignette.recadrable.glisse { cursor: grabbing; }
+.media-vignette.recadrable:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
+.astuce-cadrage { font-style: italic; }
 /* glisser-déposer : la zone survolée */
 .depot.survol .media-vignette { outline: 3px dashed var(--violet-f); outline-offset: 3px; }
 .depot.survol .media-vignette::after { content: "Déposer ici"; position: absolute; inset: 0; display: grid; place-items: center;
