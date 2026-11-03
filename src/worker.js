@@ -89,6 +89,10 @@ export default {
     } catch (e) {
       if (e instanceof ErreurHttp) { noterIncidents(envBrut.DB, ctx, req, url, incidents); return json({ erreur: e.message }, e.status); }
       console.error('erreur', p, e && e.stack || e);
+      // Limite quotidienne de l'offre gratuite de D1 atteinte : aucune écriture possible jusqu'à minuit UTC.
+      if (/exceeded D1'?s free tier daily row (write|read) limit/i.test(String(e && e.message))) {
+        return json({ erreur: 'La base de données a atteint sa limite quotidienne d’écritures (offre gratuite Cloudflare) : aucune modification n’est possible jusqu’à ' + (decalageParisMinutes() === 60 ? '1 h' : '2 h') + ' du matin. Les écrans continuent d’afficher leur programmation.' }, 503);
+      }
       incidents.push(['erreur', String(e && e.message || e)]);
       noterIncidents(envBrut.DB, ctx, req, url, incidents);
       return json({ erreur: 'Le serveur a rencontré une erreur. Réessayez dans un instant ; si elle revient, le détail est dans le Journal.' }, 500);
@@ -118,6 +122,12 @@ async function traiter(req, env, ctx, url, p) {
 
 function json(obj, status = 200, entetes = {}) {
   return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...entetes } });
+}
+// Décalage de Paris sur UTC, en minutes (60 l'hiver, 120 l'été).
+function decalageParisMinutes() {
+  const d = new Date(), a = d.getUTCFullYear(), dim = (m) => { const x = new Date(Date.UTC(a, m + 1, 0)); return x.getUTCDate() - x.getUTCDay(); };
+  const ete = Date.UTC(a, 2, dim(2), 1), hiver = Date.UTC(a, 9, dim(9), 1);
+  return d.getTime() >= ete && d.getTime() < hiver ? 120 : 60;
 }
 // Date du jour à Paris (AAAA-MM-JJ).
 function dateParis(ms) {
@@ -195,7 +205,17 @@ function entier(v) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+/* État des écrans : chaque écran l'envoie toutes les 30 s (et à chaque rechargement de MagicINFO), soit plus de
+   30 000 envois par jour pour 9 écrans. Les écrire tous épuisait la limite d'écritures quotidienne de D1 (offre
+   gratuite : 100 000 lignes, pour tout le compte Cloudflare). On n'écrit plus que si quelque chose d'important a
+   changé (version du lecteur ou de la programmation, erreur, mode vidéo, premier envoi), sinon toutes les 5 minutes. */
+const SIGNAL_INTERVALLE = 5 * 60e3;
 async function enregistrerSignal(db, code, s, maintenant) {
+  const prec = await db.prepare('SELECT vu_le, lecteur, version, erreur, video, agent FROM ecrans WHERE flux_code = ?').bind(code).first();
+  // (le navigateur n'est envoyé qu'au premier signal de chaque chargement : MagicINFO recharge chaque minute, on ne le compare que s'il est là)
+  const important = !prec || prec.lecteur !== texte(s.lecteur, 20) || prec.version !== entier(s.version) || (prec.erreur || null) !== texte(s.erreur, 300)
+    || prec.video !== texte(s.video, 10) || (s.agent && prec.agent !== texte(s.agent, 300));
+  if (!important && maintenant - (prec.vu_le || 0) < SIGNAL_INTERVALLE) return;
   await db.prepare(
     `INSERT INTO ecrans (flux_code, vu_le, lecteur, version, contenu, memoire, video, erreur, demarre_le, chargements, taille, agent, trace)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)

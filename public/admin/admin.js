@@ -792,8 +792,10 @@ function etatEcran(code) {
   const e = E.ecrans.find(x => x.flux_code === code);
   if (!e) return { e: null, puce: h('span', { class: 'puce puce-gris', text: 'Jamais vu' }) };
   const age = (maintenant() - e.vu_le) / 1000;
-  const depuis = age < 90 ? 'en ligne' : age < 3600 ? 'vu il y a ' + Math.round(age / 60) + ' min' : age < 86400 ? 'vu il y a ' + Math.round(age / 3600) + ' h' : 'vu le ' + heureIso(new Date(e.vu_le).toISOString());
-  return { e, enLigne: age < 90, puce: h('span', { class: 'puce ' + (age < 90 ? 'puce-ok' : 'puce-ko') }, h('i'), depuis) };
+  // Les écrans ne sont notés que toutes les 5 minutes s'il ne se passe rien (voir enregistrerSignal) : en ligne jusqu'à 7 min.
+  const enLigne = age < 420;
+  const depuis = enLigne ? 'en ligne' : age < 3600 ? 'vu il y a ' + Math.round(age / 60) + ' min' : age < 86400 ? 'vu il y a ' + Math.round(age / 3600) + ' h' : 'vu le ' + heureIso(new Date(e.vu_le).toISOString());
+  return { e, enLigne, puce: h('span', { class: 'puce ' + (enLigne ? 'puce-ok' : 'puce-ko') }, h('i'), depuis) };
 }
 function titreEtape(et) {
   if (!et.contenu) return 'Logo 6MIC (rien de programmé)';
@@ -847,7 +849,7 @@ function vueEcrans() {
       return h('article', { class: 'carte' },
         h('div', { class: 'carte-t' }, h('h2', { text: f.nom }), s.puce),
         h('div', { class: 'carte-c' },
-          s.e && h('p', { class: 'ecran-maint' }, s.enLigne ? 'À l’écran en ce moment' : 'Dernier contenu affiché', h('b', { text: enCours })),
+          s.e && h('p', { class: 'ecran-maint' }, s.enLigne ? 'Dernier contenu signalé (il y a ' + Math.max(0, Math.round((maintenant() - s.e.vu_le) / 60000)) + ' min)' : 'Dernier contenu affiché', h('b', { text: enCours })),
           h('div', { class: 'lbl', text: b.prioritaire ? 'Boucle en ce moment : diffusion prioritaire' : 'Boucle en ce moment' }), b.liste,
           s.e && h('p', { class: 'meta' },
             h('span', { text: 'Lecteur ' + (s.e.lecteur || '?') }), h('span', { text: 'mémoire ' + mo(s.e.memoire || 0) }),
