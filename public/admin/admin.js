@@ -30,7 +30,7 @@ const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 's
 const JC = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const MC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-const TYPES = { soiree: 'Soirée', lineup: 'Line-up', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo', web: 'Page web' };
+const TYPES = { soiree: 'Soirée', lineup: 'Line-up', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo', web: 'Page web', carte: 'Carte', promo: 'Promo' };
 // Domaine d'une page web (vignettes, titre proposé).
 const domaine = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const SEMAINE = [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'J'], [5, 'V'], [6, 'S'], [7, 'D']];
@@ -170,6 +170,8 @@ function apercu() {
       else if (etape.type === 'lineup') g = G.lineup(etape, s => s);
       else if (etape.type === 'image') g = G.image(etape, s => s);
       else if (etape.type === 'web') g = G.web(etape);
+      else if (etape.type === 'carte') g = G.carte(etape, s => s);
+      else if (etape.type === 'promo') g = G.promo(etape, s => s);
       else g = G.veille('');
       scene.append(g.noeud);
       if (g.ajuster) g.ajuster();
@@ -882,6 +884,14 @@ function vignette(c) {
   }
   if (c.type === 'soiree') img.append(h('div', { class: 'vignette-soiree', text: d.nom || '' }));
   if (c.type === 'web') img.append(h('div', { class: 'vignette-web' }, h('b', { text: domaine(d.url) || 'Sans adresse' }), h('span', { text: d.url ? new URL(d.url).pathname : '' })));
+  const nbProduits = c.type === 'carte' ? (d.rubriques || []).reduce((n, r) => n + (r.produits || []).length, 0) : 0;
+  if (c.type === 'carte') img.append(h('div', { class: 'vignette-ag' }, h('b', { text: d.titre || c.titre }), h('span', { text: (d.rubriques || []).map(r => r.titre).filter(Boolean).join(' · ') })));
+  if (c.type === 'promo') {
+    const p0 = (d.produits || [])[0];
+    if (p0 && p0.photo && p0.photo.src) { img.style.backgroundImage = 'url("' + p0.photo.src + '")'; if (p0.photo.cadrage) img.style.backgroundPosition = p0.photo.cadrage.x + '% ' + p0.photo.cadrage.y + '%'; }
+    else img.classList.add('vignette-serie', 'f-' + (d.fond || 'rose'));
+    img.append(h('div', { class: 'vignette-soiree', text: (d.produits || []).map(x => x.nom).filter(Boolean).join(' + ') }));
+  }
   if (c.type === 'lineup') {
     img.append(h('div', { class: 'vignette-soiree', text: d.titre || G.vedetteDe(d.passages) || 'Line-up' }));
   }
@@ -892,6 +902,8 @@ function vignette(c) {
     : c.type === 'agenda' || c.type === 'serie' ? plur((d.dates || []).filter(x => x.date >= t).length, 'date') + ' à venir'
       : c.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s' + (d.taille ? ' · ' + mo(d.taille) : '') : d.src ? 'Vidéo' : 'Sans fichier')
         : c.type === 'web' ? (domaine(d.url) || 'Sans adresse')
+        : c.type === 'carte' ? plur(nbProduits, 'produit') + ' en ' + plur((d.rubriques || []).length, 'rubrique')
+        : c.type === 'promo' ? plur((d.produits || []).length, 'offre') + ((d.produits || []).some(x => x.prix) ? ' · ' + (d.produits || []).map(x => G.prixTexte(x.prix)).filter(Boolean).join(', ') : '')
         : (d.largeur ? d.largeur + ' × ' + d.hauteur + ' px' : d.src ? 'Image' : 'Sans fichier');
   return h('a', { class: 'vignette' + (c.statut === 'archive' ? ' archive' : ''), href: '#contenu/' + c.id }, img,
     h('div', { class: 'vignette-c' }, h('b', { text: c.titre }), h('span', { text: sous }),
@@ -1018,7 +1030,7 @@ function vueContenus() {
         Object.assign(filtre, FILTRE_VIDE, { type: 'soiree', soiree: 'avenir', prog: 'non', tri: 'date' }); synchro(); changer();
       } }, n > 1 ? 'Les afficher' : 'L’afficher'));
   };
-  const seg = h('div', { class: 'seg seg-types', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['lineup', 'Line-up'], ['agenda', 'Agendas'], ['serie', 'Séries'], ['image', 'Images'], ['video', 'Vidéos'], ['web', 'Pages web']].map(([k, tx]) =>
+  const seg = h('div', { class: 'seg seg-types', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['lineup', 'Line-up'], ['agenda', 'Agendas'], ['serie', 'Séries'], ['image', 'Images'], ['video', 'Vidéos'], ['web', 'Pages web'], ['carte', 'Cartes'], ['promo', 'Promos']].map(([k, tx]) =>
     h('button', { type: 'button', 'data-v': k, onclick: () => { filtre.type = k; synchro(); changer(); } }, tx)));
   const recherche = h('input', { type: 'search', placeholder: 'Rechercher un nom…', value: filtre.texte, 'aria-label': 'Rechercher', oninput: e => { filtre.texte = e.target.value; changer(); } });
   const archives = h('input', { type: 'checkbox', checked: filtre.archives, onchange: e => { filtre.archives = e.target.checked; changer(); } });
@@ -1052,6 +1064,8 @@ function donneesVides(type) {
     { heure: '21:30', role: 'tete', libelle: '', nom: '' }, { heure: '00:00', role: 'fermeture', libelle: '', nom: '' }] };
   if (type === 'image') return { src: null, ajustement: 'remplir' };
   if (type === 'web') return { url: '' };
+  if (type === 'carte') return { titre: 'Bar', colonnes: 0, mention: '', rubriques: [{ titre: '', note: '', formats: [], produits: [{ nom: '', format: '', detail: '', prix: [''] }] }] };
+  if (type === 'promo') return { accroche: 'Ce soir au bar', titre: '', fond: 'rose', mention: '', produits: [{ nom: '', detail: '', prix: '', ancien: '', photo: null }] };
   return { src: null, poster: null, son: false };
 }
 function titreAuto(ed) {
@@ -1063,6 +1077,8 @@ function titreAuto(ed) {
     return 'Line-up · ' + (d.titre || G.vedetteDe(d.passages) || 'soirée') + (d.date ? ' · ' + dateCourte(d.date) : '');
   }
   if (ed.type === 'web') return 'Page web' + (domaine(d.url) ? ' · ' + domaine(d.url) : '');
+  if (ed.type === 'carte') return 'Carte · ' + (d.titre || 'Bar');
+  if (ed.type === 'promo') return 'Promo · ' + ((d.produits || []).map(x => x.nom).filter(Boolean).join(' + ') || d.titre || 'bar');
   return d.fichier || TYPES[ed.type];
 }
 // Motif du design system posé sur la photo d'une soirée : sans réglage, le motif par défaut s'affiche.
@@ -1166,6 +1182,115 @@ async function couleurDansPhoto(src, boite, e) {
 }
 // Série : accroche, titre, couleur de fond, 1 à 4 dates (photo, jour, heure, nom, mention).
 // Les dates peuvent venir des soirées déjà enregistrées (avec leur photo).
+/* Carte du bar : titre, colonnes, mention ; rubriques (titre, précision, formats) et leurs produits (nom, format,
+   détail, un prix par format). Les champs modifient les données sans redessiner ; ajouter, retirer ou déplacer redessine. */
+function champsCarte(d, changer) {
+  d.rubriques = d.rubriques || [];
+  const zone = h('div', { class: 'rubriques-ed' });
+  const deplacer = (l, i, j) => { if (j < 0 || j >= l.length) return; const [x] = l.splice(i, 1); l.splice(j, 0, x); remplir(); changer(); };
+  const saisie = (valeur, attrs, maj) => h('input', Object.assign({ type: 'text', value: valeur || '', oninput: e => { maj(e.target.value); changer(); } }, attrs));
+  function remplir() {
+    remplacer(zone, ...d.rubriques.map((r, i) => {
+      r.formats = r.formats || []; r.produits = r.produits || [];
+      const nf = Math.max(1, r.formats.length > 1 ? r.formats.length : 1);
+      const formats = saisie(r.formats.join(', '), { maxLength: 60, placeholder: 'ex. 25 cl, 40 cl', 'aria-label': 'Formats (plusieurs prix)' }, v => {
+        r.formats = v.split(',').map(x => x.trim()).filter(Boolean).slice(0, 3);
+      });
+      // nombre de colonnes de prix changé : on redessine la rubrique à la sortie du champ
+      formats.addEventListener('change', () => { r.produits.forEach(x => { x.prix = (x.prix || []).slice(0, Math.max(1, r.formats.length > 1 ? r.formats.length : 1)); }); remplir(); changer(); });
+      const lignes = r.produits.map((x, j) => {
+        x.prix = Array.isArray(x.prix) ? x.prix : [x.prix || ''];
+        return h('div', { class: 'produit-ed' + (nf > 1 ? ' prix-' + nf : '') },
+          saisie(x.nom, { maxLength: 80, placeholder: 'Produit', 'aria-label': 'Nom du produit' }, v => { x.nom = v; }),
+          saisie(x.format, { maxLength: 20, placeholder: 'Format', 'aria-label': 'Format (ex. 50 cl)' }, v => { x.format = v; }),
+          saisie(x.detail, { maxLength: 120, placeholder: 'Détail (facultatif)', 'aria-label': 'Détail' }, v => { x.detail = v; }),
+          h('span', { class: 'prix-ed' }, Array.from({ length: nf }, (_, q) => saisie(x.prix[q], { maxLength: 16, inputMode: 'decimal', placeholder: nf > 1 ? r.formats[q] : 'Prix', 'aria-label': 'Prix' + (nf > 1 ? ' ' + r.formats[q] : '') }, v => { x.prix[q] = v; }))),
+          h('span', { class: 'fl' },
+            h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Monter', disabled: j === 0, onclick: () => deplacer(r.produits, j, j - 1) }, '↑'),
+            h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Descendre', disabled: j === r.produits.length - 1, onclick: () => deplacer(r.produits, j, j + 1) }, '↓'),
+            h('button', { type: 'button', class: 'btn carre pt btn-danger', 'aria-label': 'Retirer ce produit', onclick: () => { r.produits.splice(j, 1); remplir(); changer(); } }, '×')));
+      });
+      return h('div', { class: 'rubrique-ed' },
+        h('div', { class: 'rubrique-tete' },
+          saisie(r.titre, { maxLength: 40, placeholder: 'Rubrique (ex. Softs)', 'aria-label': 'Titre de la rubrique', class: 'rubrique-titre' }, v => { r.titre = v; }),
+          saisie(r.note, { maxLength: 60, placeholder: 'Précision (ex. verre 12 cl)', 'aria-label': 'Précision' }, v => { r.note = v; }),
+          formats,
+          h('span', { class: 'fl' },
+            h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Monter la rubrique', disabled: i === 0, onclick: () => deplacer(d.rubriques, i, i - 1) }, '↑'),
+            h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Descendre la rubrique', disabled: i === d.rubriques.length - 1, onclick: () => deplacer(d.rubriques, i, i + 1) }, '↓'),
+            h('button', { type: 'button', class: 'btn carre pt btn-danger', 'aria-label': 'Retirer la rubrique', onclick: () => { d.rubriques.splice(i, 1); remplir(); changer(); } }, '×'))),
+        lignes,
+        h('button', { type: 'button', class: 'btn pt', disabled: r.produits.length >= 20, onclick: () => {
+          r.produits.push({ nom: '', format: '', detail: '', prix: Array.from({ length: nf }, () => '') }); remplir(); changer();
+          zone.children[i].querySelectorAll('.produit-ed input')[(r.produits.length - 1) * (3 + nf)].focus();
+        } }, '+ Produit'));
+    }));
+  }
+  remplir();
+  const colSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Colonnes' }, [[0, 'Auto'], [1, '1'], [2, '2'], [3, '3']].map(([k, t]) =>
+    h('button', { type: 'button', 'aria-pressed': String((d.colonnes || 0) === k), onclick: e => {
+      d.colonnes = k; colSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
+    } }, t)));
+  const champ = (label, entree, aide) => h('div', { class: 'champ' }, h('label', { text: label, for: entree.id }), entree, aide && h('small', { text: aide }));
+  return [
+    champ('Titre', h('input', { id: 'f-titre-carte', type: 'text', value: d.titre || '', maxLength: 40, placeholder: 'Bar', oninput: e => { d.titre = e.target.value; changer(); } }), 'Dans le bandeau, en très grand (Bar, Snack, Cocktails…).'),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Colonnes' }), colSeg, h('small', { text: 'Auto : les rubriques se répartissent seules, la plus chargée seule dans sa colonne si besoin. Le texte se réduit pour tout faire tenir.' })),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Rubriques et produits' }), zone,
+      h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', disabled: d.rubriques.length >= 8, onclick: () => {
+        d.rubriques.push({ titre: '', note: '', formats: [], produits: [{ nom: '', format: '', detail: '', prix: [''] }] }); remplir(); changer();
+        zone.lastChild.querySelector('input').focus();
+      } }, '+ Rubrique')),
+      h('small', { text: 'Prix : « 3,5 » s’affiche « 3,50 € ». Plusieurs formats (ex. « 25 cl, 40 cl ») : une colonne de prix par format, titrée en haut de la rubrique.' })),
+    champ('Mention en bas de l’écran (facultative)', h('input', { id: 'f-mention-carte', type: 'text', value: d.mention || '', maxLength: 120, placeholder: 'Liste des allergènes disponible au bar.', oninput: e => { d.mention = e.target.value; changer(); } }))
+  ];
+}
+
+/* Promo : accroche, titre facultatif, couleur de fond, une ou deux offres (photo, nom, détail, prix, ancien prix), mention. */
+function champsPromo(d, changer) {
+  d.produits = d.produits || [];
+  const zone = h('div', { class: 'dates-serie' });
+  const cadre = () => Object.assign({ conseil: d.produits.length > 1 ? 'photo de la carte' : 'panneau de droite' }, d.produits.length > 1 ? G.CADRES.promo2 : G.CADRES.promo1);
+  const saisie = (valeur, attrs, maj) => h('input', Object.assign({ type: 'text', value: valeur || '', oninput: e => { maj(e.target.value); changer(); } }, attrs));
+  const ajouter = h('button', { type: 'button', class: 'btn', onclick: () => {
+    if (d.produits.length >= 2) return;
+    d.produits.push({ nom: '', detail: '', prix: '', ancien: '', photo: null }); remplir(); changer();
+  } }, '+ Seconde offre');
+  function remplir() {
+    remplacer(zone, ...d.produits.map((x, i) => {
+      const media = champMedia({ genre: 'image', valeur: x.photo, facultatif: true, change: v => { x.photo = v; changer(); }, cadre, boite: [168, 150] });
+      const carte = h('div', { class: 'date-serie depot' },
+        h('span', { class: 'num', text: String(i + 1) }),
+        h('div', { class: 'date-serie-photo' }, media),
+        h('div', { class: 'date-serie-champs' },
+          saisie(x.nom, { maxLength: 80, placeholder: 'Produit (ex. Moscow Mule)', 'aria-label': 'Produit' }, v => { x.nom = v; }),
+          saisie(x.detail, { maxLength: 120, placeholder: 'Détail (ex. vodka, ginger beer, citron vert)', 'aria-label': 'Détail' }, v => { x.detail = v; }),
+          h('div', { class: 'grille2' },
+            saisie(x.prix, { maxLength: 16, inputMode: 'decimal', placeholder: 'Prix (ex. 6)', 'aria-label': 'Prix' }, v => { x.prix = v; }),
+            saisie(x.ancien, { maxLength: 16, inputMode: 'decimal', placeholder: 'Ancien prix barré (facultatif)', 'aria-label': 'Ancien prix' }, v => { x.ancien = v; }))),
+        h('button', { type: 'button', class: 'btn carre btn-danger', 'aria-label': 'Retirer cette offre', disabled: d.produits.length <= 1, onclick: () => { d.produits.splice(i, 1); remplir(); changer(); } }, '×'));
+      carte._recevoir = f => media._recevoir(f);
+      return carte;
+    }));
+    ajouter.disabled = d.produits.length >= 2;
+    zone.querySelectorAll('.media').forEach(m => m.majCadre && m.majCadre());
+  }
+  remplir();
+  const fondSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Couleur de fond' }, Object.keys(G.FONDS_SERIE).map(k => [k, G.nomCouleur(k)]).map(([k, t]) =>
+    h('button', { type: 'button', 'aria-pressed': String((d.fond || 'rose') === k), onclick: e => {
+      d.fond = k; fondSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
+    } }, h('i', { class: 'pastille p-' + (k === 'noir' ? 'noir' : k) }), t)));
+  const champ = (label, entree, aide) => h('div', { class: 'champ' }, h('label', { text: label, for: entree.id }), entree, aide && h('small', { text: aide }));
+  const ligne = (cle, label, placeholder, aide, max) => champ(label, h('input', { id: 'f-' + cle + '-promo', type: 'text', value: d[cle] || '', maxLength: max || 80, placeholder, oninput: e => { d[cle] = e.target.value; changer(); } }), aide);
+  return [
+    ligne('accroche', 'Accroche', 'Ce soir au bar / Happy hour 19 h – 21 h', 'Petite ligne en haut de l’écran.'),
+    ligne('titre', 'Titre (facultatif)', 'Les bières de Provence', 'Utile surtout avec deux offres.'),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Couleur de fond' }), fondSeg),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Offre(s)' }), zone, h('div', { class: 'actions' }, ajouter),
+      h('small', { text: 'Une offre : photo à droite, nom et prix en très grand. Deux offres : deux cartes côte à côte. Prix « 6 » affiché « 6 € » ; l’ancien prix est barré.' })),
+    ligne('mention', 'Mention en bas de l’écran (facultative)', 'De 19 h à 21 h · dans la limite des stocks', null, 120)
+  ];
+}
+
 function champsSerie(d, changer) {
   d.dates = d.dates || [];
   const max = R.SERIE_MAX;
@@ -1397,6 +1522,10 @@ function vueEditeur(id, typeNouveau) {
           cadre: Object.assign({ conseil: 'en fond, très assombrie : une image simple suffit' }, G.CADRES.agenda) })));
   } else if (ed.type === 'serie') {
     champs.push(...champsSerie(d, changer));
+  } else if (ed.type === 'carte') {
+    champs.push(...champsCarte(d, changer));
+  } else if (ed.type === 'promo') {
+    champs.push(...champsPromo(d, changer));
   } else if (ed.type === 'lineup') {
     champs.push(champsLineup(d, changer));
   } else if (ed.type === 'image') {
@@ -1436,6 +1565,8 @@ function vueEditeur(id, typeNouveau) {
     if (ed.type === 'lineup' && !d.passages.length) { annoncer('Ajoutez au moins un passage au line-up.', true); return; }
     if (ed.type === 'lineup' && d.passages.some(x => !x.heure)) { annoncer('Chaque passage du line-up doit avoir une heure.', true); return; }
     if (ed.type === 'serie' && !d.dates.length) { annoncer('Ajoutez au moins une date à la série.', true); return; }
+    if (ed.type === 'carte' && !d.rubriques.some(r => r.produits.some(x => x.nom.trim()))) { annoncer('Ajoutez au moins un produit à la carte.', true); return; }
+    if (ed.type === 'promo' && !d.produits.some(x => x.nom.trim())) { annoncer('Indiquez le produit mis en avant.', true); return; }
     if (ed.type === 'serie' && d.dates.some(x => !x.date)) { annoncer('Chaque date de la série doit avoir un jour.', true); return; }
     enregistrer.disabled = true;
     const corps = { type: ed.type, titre: ed.titre || titreAuto(ed), donnees: d, duree: ed.duree, statut: apres === 'archiver' ? 'archive' : apres === 'restaurer' ? 'actif' : ed.statut };

@@ -254,6 +254,164 @@
     } };
   }
 
+  /* 8. Carte du bar : rubriques (Softs, Bières…) réparties en colonnes, chaque produit avec son prix,
+     un ou plusieurs formats (25 cl / 40 cl). Les colonnes s'équilibrent seules et la taille du texte se réduit
+     jusqu'à tout faire tenir. Prix saisis « 3,5 » ou « 3.50 » : affichés « 3,50 € » ; un texte libre reste tel quel. */
+  function prixTexte(p) {
+    var t = String(p === undefined || p === null ? '' : p).replace(/^\s+|\s+$/g, ''), d;
+    if (!t) { return ''; }
+    if (/^\d+([.,]\d{1,2})?$/.test(t)) {
+      t = t.replace('.', ',');
+      d = t.split(',')[1];
+      if (d !== undefined && d.length === 1) { t += '0'; }
+      return t + ' €';
+    }
+    return t;
+  }
+  function poidsRubrique(r) {
+    var p = 1.7, i, l = r.produits || [];
+    for (i = 0; i < l.length; i++) { p += 1 + (l[i].detail ? 0.6 : 0); }
+    return p;
+  }
+  // Répartit les rubriques (dans l'ordre) en n colonnes, en limitant la plus chargée.
+  function repartir(rubriques, n) {
+    var poids = [], i, meilleure = null, total = 0;
+    for (i = 0; i < rubriques.length; i++) { poids.push(poidsRubrique(rubriques[i])); total += poids[i]; }
+    n = Math.max(1, Math.min(n, rubriques.length));
+    function essayer(debut, reste, cols) {
+      var j, somme = 0;
+      if (reste === 1) {
+        for (j = debut; j < rubriques.length; j++) { somme += poids[j]; }
+        var c = cols.concat([[debut, rubriques.length]]), m = 0, k, s2;
+        for (k = 0; k < c.length; k++) { s2 = 0; for (j = c[k][0]; j < c[k][1]; j++) { s2 += poids[j]; } m = Math.max(m, s2); }
+        if (!meilleure || m < meilleure.m) { meilleure = { m: m, c: c }; }
+        return;
+      }
+      for (j = debut + 1; j <= rubriques.length - reste + 1; j++) { essayer(j, reste - 1, cols.concat([[debut, j]])); }
+    }
+    essayer(0, n, []);
+    return meilleure.c;
+  }
+  function carte(etape) {
+    var c = etape.contenu, d = c.donnees || {}, rubriques = [], i, j, k, r, x, ligne, nom, tete, col, cols, corps, n;
+    for (i = 0; i < (d.rubriques || []).length; i++) { if (d.rubriques[i] && (d.rubriques[i].produits || []).length) { rubriques.push(d.rubriques[i]); } }
+    var g = el('div', 'g g-carte'), entete = el('div', 'g-entete');
+    entete.appendChild(el('div', 'g-motif'));
+    var titre = el('div', 'g-titre a a1', d.titre || c.titre);
+    entete.appendChild(titre);
+    entete.appendChild(logo('g-logo'));
+    g.appendChild(entete);
+    corps = el('div', 'g-c-corps');
+    n = d.colonnes >= 1 && d.colonnes <= 3 ? d.colonnes : (rubriques.length <= 3 ? rubriques.length : (rubriques.length >= 6 ? 3 : 2));
+    cols = rubriques.length ? repartir(rubriques, n) : [];
+    for (k = 0; k < cols.length; k++) {
+      col = el('div', 'g-c-col');
+      for (i = cols[k][0]; i < cols[k][1]; i++) {
+        r = rubriques[i];
+        var bloc = el('div', 'g-c-rub a ' + (k === 0 ? 'a2' : (k === 1 ? 'a3' : 'a4'))), formats = r.formats || [];
+        tete = el('div', 'g-c-rtete');
+        tete.appendChild(el('span', 'g-c-rtitre', r.titre));
+        if (r.note) { tete.appendChild(el('span', 'g-c-rnote', r.note)); }
+        if (formats.length > 1) {
+          tete.appendChild(el('span', 'g-c-vide'));
+          for (j = 0; j < formats.length; j++) { tete.appendChild(el('span', 'g-c-fmt', formats[j])); }
+        }
+        bloc.appendChild(tete);
+        for (j = 0; j < r.produits.length; j++) {
+          x = r.produits[j];
+          ligne = el('div', 'g-c-ligne');
+          nom = el('div', 'g-c-pnom');
+          nom.appendChild(el('span', 'g-c-pn', x.nom));
+          if (x.format) { nom.appendChild(el('span', 'g-c-pf', ' ' + x.format)); }
+          if (x.detail) { nom.appendChild(el('span', 'g-c-pdet', x.detail)); }
+          ligne.appendChild(nom);
+          ligne.appendChild(el('span', 'g-c-points'));
+          var prix = x.prix && x.prix.length !== undefined && typeof x.prix !== 'string' ? x.prix : [x.prix];
+          for (var q = 0; q < Math.max(1, formats.length > 1 ? formats.length : 1); q++) {
+            ligne.appendChild(el('span', 'g-c-prix' + (formats.length > 1 ? ' g-c-prixf' : ''), prixTexte(prix[q])));
+          }
+          bloc.appendChild(ligne);
+        }
+        col.appendChild(bloc);
+      }
+      corps.appendChild(col);
+    }
+    if (cols.length) { corps.className += ' g-c-n' + cols.length; }
+    g.appendChild(corps);
+    if (d.mention) { g.appendChild(el('div', 'g-c-pied a a4', d.mention)); }
+    return { noeud: g, ajuster: function () {
+      ajusterTexte(titre, 128, 64, 1);
+      // texte le plus grand possible qui tient dans la hauteur disponible (et sans dépasser 46 px)
+      var taille = 46, haut = corps.clientHeight, m, z;
+      function trop() {
+        for (z = 0; z < corps.childNodes.length; z++) { if (corps.childNodes[z].offsetHeight > haut + 1) { return true; } }
+        return false;
+      }
+      corps.style.fontSize = taille + 'px';
+      for (m = 0; m < 30 && taille > 22 && trop(); m++) { taille -= 2; corps.style.fontSize = taille + 'px'; }
+    } };
+  }
+
+  /* 9. Promo : une ou deux offres d'une soirée (produit, prix, ancien prix barré, photo), sur l'aplat de couleur
+     des séries. Une offre : texte à gauche, photo à droite ; deux : deux cartes côte à côte. */
+  function promo(etape, url) {
+    var c = etape.contenu, d = c.donnees || {}, offres = (d.produits || []).slice(0, 2), n = Math.max(1, offres.length), i, x, carteP, photo, nomP, noms = [];
+    var g = el('div', 'g g-promo g-f-' + (FONDS_SERIE[d.fond] ? d.fond : 'rose') + ' g-p-' + n);
+    g.appendChild(el('div', 'g-s-rayons'));
+    g.appendChild(logo('g-logo a a0'));
+    var tete = el('div', 'g-p-tete');
+    if (d.accroche) { tete.appendChild(el('div', 'g-p-accroche a a1', d.accroche)); }
+    var titre = d.titre ? el('div', 'g-p-titre a a2', d.titre) : null;
+    if (titre) { tete.appendChild(titre); }
+    g.appendChild(tete);
+    function prixBloc(o, classe) {
+      var b = el('div', 'g-p-prix ' + classe);
+      if (o.ancien) { b.appendChild(el('span', 'g-p-ancien', prixTexte(o.ancien))); }
+      b.appendChild(el('span', 'g-p-montant', prixTexte(o.prix)));
+      return b;
+    }
+    if (n === 1) {
+      x = offres[0] || {};
+      if (x.photo && x.photo.src) {
+        photo = el('div', 'g-p-panneau a a0');
+        fond(photo, x.photo.src, url, x.photo.cadrage);
+        g.appendChild(photo);
+        g.className += ' g-p-photo';
+      }
+      var bloc = el('div', 'g-p-offre');
+      nomP = el('div', 'g-p-nom a a2', x.nom || '');
+      noms.push([nomP, 190, 96, 2]);
+      bloc.appendChild(nomP);
+      if (x.detail) { bloc.appendChild(el('div', 'g-p-detail a a3', x.detail)); }
+      if (x.prix) { bloc.appendChild(prixBloc(x, 'a a3')); }
+      g.appendChild(bloc);
+    } else {
+      var rang = el('div', 'g-p-cartes');
+      for (i = 0; i < offres.length; i++) {
+        x = offres[i];
+        carteP = el('div', 'g-p-carte');
+        carteP.style.webkitAnimationDelay = carteP.style.animationDelay = (0.4 + i * 0.15).toFixed(2) + 's';
+        photo = el('div', 'g-p-cphoto' + (x.photo && x.photo.src ? '' : ' g-s-vide'));
+        if (x.photo && x.photo.src) { fond(photo, x.photo.src, url, x.photo.cadrage); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
+        carteP.appendChild(photo);
+        var corpsC = el('div', 'g-p-ccorps');
+        nomP = el('div', 'g-p-cnom', x.nom || '');
+        noms.push([nomP, 84, 54, 1]);
+        corpsC.appendChild(nomP);
+        if (x.detail) { corpsC.appendChild(el('div', 'g-p-cdetail', x.detail)); }
+        carteP.appendChild(corpsC);
+        if (x.prix) { carteP.appendChild(prixBloc(x, 'g-p-cprix')); }
+        rang.appendChild(carteP);
+      }
+      g.appendChild(rang);
+    }
+    if (d.mention) { g.appendChild(el('div', 'g-p-mention a a4', d.mention)); }
+    return { noeud: g, ajuster: function () {
+      if (titre) { ajusterTexte(titre, n === 1 ? 96 : 120, 56, 1); }
+      for (var k2 = 0; k2 < noms.length; k2++) { ajusterTexte(noms[k2][0], noms[k2][1], noms[k2][2], noms[k2][3]); }
+    } };
+  }
+
   /* 4. Série : 2 à 4 dates mises en avant (promo thématique, même esthétique, artistes proches de la soirée).
      Aplat de couleur du design system avec la texture rayonnante, titre façon section du site (marqueur ■■■),
      affiches côte à côte, le texte sous la photo (jamais dessus), « Ce soir » et « Demain » mis en évidence. */
@@ -273,7 +431,9 @@
     soiree: { largeur: 1920, hauteur: 1080 },   // plein cadre (zoom lent de 8 %)
     agenda: { largeur: 1920, hauteur: 1080 },   // fond très assombri
     lineup: { largeur: 820, hauteur: 1080 },    // panneau de droite, bord gauche fondu au noir
-    image: { largeur: 1920, hauteur: 1080 }
+    image: { largeur: 1920, hauteur: 1080 },
+    promo1: { largeur: 860, hauteur: 1080 },    // une offre : panneau de droite
+    promo2: { largeur: 816, hauteur: 460 }      // deux offres : photo de chaque carte
   };
   // Série : 1680 px partagés entre les affiches (écart 48 px), 816 px au plus ; photo 3:4, 470 px de haut au plus.
   function cadreSerie(n) {
@@ -427,7 +587,7 @@
   }
 
   racine.Gabarits = {
-    soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, web: web, veille: veille, identification: identification,
+    soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, web: web, carte: carte, promo: promo, prixTexte: prixTexte, veille: veille, identification: identification,
     FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, NIVEAUX_LINEUP: NIVEAUX_LINEUP, niveauPassage: niveauPassage, niveauParDefaut: niveauParDefaut, vedetteDe: vedetteDe, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe,

@@ -4,7 +4,7 @@
   --noir: #000; --blanc: #fff; --brume: #f1f1f1; --brume2: #e4e4e4; --gris: #404040; --filet: #bababa;
   --violet: #8e63ff; --violet-f: #6a42e6; --magenta: #e744a8; --bleu: #2563eb; --vert: #047857; --rouge: #b91c1c; --orange: #b45309;
   --rose-clair: #fde4f2; --bleu-clair: #dde9fe; --violet-clair: #ece5ff;
-  --t-soiree: #c23d97; --t-lineup: #0e7490; --t-agenda: #2563eb; --t-serie: #b45309; --t-image: #047857; --t-video: #6a42e6; --t-web: #475569;
+  --t-soiree: #c23d97; --t-lineup: #0e7490; --t-agenda: #2563eb; --t-serie: #b45309; --t-image: #047857; --t-video: #6a42e6; --t-web: #475569; --t-carte: #9d174d; --t-promo: #c2410c;
   --sans: "owners", "TV Archivo", "Helvetica Neue", Arial, sans-serif;
   --cond: "zuume-cut", "TV Anton", Impact, "Arial Narrow", sans-serif;
   color-scheme: light;
@@ -108,6 +108,8 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .t-image { background: var(--t-image); color: #fff; }
 .t-video { background: var(--t-video); color: #fff; }
 .t-web { background: var(--t-web); color: #fff; }
+.t-carte { background: var(--t-carte); color: #fff; }
+.t-promo { background: var(--t-promo); color: #fff; }
 .prio { background: var(--rouge); color: #fff; }
 
 /* ---------- écrans (tableau de bord) ---------- */
@@ -543,3 +545,27 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .incidents summary { cursor: pointer; }
 .incidents .tableau { margin-top: 10px; background: #fff; }
 .incidents td.aide { overflow-wrap: anywhere; }
+
+/* Éditeur de carte : rubriques et produits */
+.rubriques-ed { display: grid; gap: 12px; }
+.rubrique-ed { display: grid; gap: 6px; padding: 12px; border: 1px solid #000; }
+.rubrique-tete { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-bottom: 4px; }
+.rubrique-tete .rubrique-titre { font-weight: 700; text-transform: uppercase; }
+.produit-ed { display: grid; grid-template-columns: 90px minmax(0, 1fr) 90px auto; gap: 6px; align-items: center;
+  grid-template-areas: "nom nom prix fl" "fmt det det det"; padding-bottom: 8px; border-bottom: 1px solid var(--brume2); }
+.produit-ed.prix-2 { grid-template-columns: 90px minmax(0, 1fr) 170px auto; }
+.produit-ed.prix-3 { grid-template-columns: 90px minmax(0, 1fr) 240px auto; }
+.produit-ed > input:nth-child(1) { grid-area: nom; font-weight: 600; }
+.produit-ed > input:nth-child(2) { grid-area: fmt; }
+.produit-ed > input:nth-child(3) { grid-area: det; }
+.produit-ed > .prix-ed { grid-area: prix; }
+.produit-ed > .fl { grid-area: fl; }
+.prix-ed { display: flex; gap: 6px; }
+.prix-ed input { min-width: 0; width: 100%; text-align: right; }
+.rubrique-ed .fl, .produit-ed .fl { display: flex; gap: 4px; }
+@media (max-width: 760px) {
+  .rubrique-tete { grid-template-columns: minmax(0, 1fr) auto; }
+  .rubrique-tete input:not(.rubrique-titre) { grid-column: 1 / -1; }
+  .produit-ed, .produit-ed.prix-2, .produit-ed.prix-3 { grid-template-columns: 90px minmax(0, 1fr); grid-template-areas: "nom nom" "fmt prix" "det det" "fl fl"; }
+  .produit-ed .fl { justify-content: flex-end; }
+}

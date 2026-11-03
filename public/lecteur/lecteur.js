@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.4.3';
+  var VERSION = '1.5.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -74,6 +74,9 @@
     if (d.photo && d.photo.src) { r.push(d.photo.src); }
     if (d.dates && d.dates.length) {           // photos d'une série
       for (var i = 0; i < d.dates.length; i++) { if (d.dates[i] && d.dates[i].photo && d.dates[i].photo.src) { r.push(d.dates[i].photo.src); } }
+    }
+    if (d.produits && d.produits.length) {        // photos d'une promo
+      for (var j = 0; j < d.produits.length; j++) { if (d.produits[j] && d.produits[j].photo && d.produits[j].photo.src) { r.push(d.produits[j].photo.src); } }
     }
     return r;
   }
@@ -228,6 +231,8 @@
         else if (e.type === 'lineup') { g = Gabarits.lineup(e, url); }
         else if (e.type === 'image') { g = Gabarits.image(e, url); }
         else if (e.type === 'web') { g = Gabarits.web(e); }
+        else if (e.type === 'carte') { g = Gabarits.carte(e, url); }
+        else if (e.type === 'promo') { g = Gabarits.promo(e, url); }
         else { g = Gabarits.veille(!prog ? (horsLigne ? 'Connexion au serveur…' : 'Chargement…') : ''); }
       } catch (err) {
         noter('gabarit ' + e.cle + ' : ' + err.message);

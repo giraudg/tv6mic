@@ -25,7 +25,7 @@ const CODE_VALIDE = /^[a-z0-9-]{1,40}$/;
 const ID_VALIDE = /^[a-z0-9-]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
-const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video', 'web'];
+const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video', 'web', 'carte', 'promo'];
 const NIVEAUX_LINEUP = ['vedette', 'forte', 'normale', 'discrete'];   // vide = selon le rôle
 const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
@@ -568,6 +568,40 @@ function validerDonnees(type, d, reglages) {
     return { accroche: chaine(d.accroche, 80, 'accroche'), titre: chaine(d.titre, 80, 'titre de la série'), fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'violet', dates };
   }
   if (type === 'web') return { url: adresseWeb(d.url) };
+  if (type === 'carte') {
+    // Carte du bar : rubriques (Softs, Bières…), chacune avec ses produits ; un prix par format (25 cl / 40 cl) ou un seul.
+    if (d.rubriques !== undefined && !Array.isArray(d.rubriques)) throw refus('Rubriques invalides.');
+    if ((d.rubriques || []).length > 8) throw refus('Une carte compte 8 rubriques au plus.');
+    const rubriques = (d.rubriques || []).map((r, i) => {
+      if (!r || typeof r !== 'object') throw refus('Rubrique ' + (i + 1) + ' invalide.');
+      const formats = (Array.isArray(r.formats) ? r.formats : []).slice(0, 3).map((f, k) => chaine(String(f == null ? '' : f), 16, 'format ' + (k + 1) + ', rubrique ' + (i + 1))).filter(Boolean);
+      if (r.produits !== undefined && !Array.isArray(r.produits)) throw refus('Produits invalides, rubrique ' + (i + 1) + '.');
+      if ((r.produits || []).length > 20) throw refus('Une rubrique compte 20 produits au plus.');
+      const produits = (r.produits || []).map((x, j) => {
+        x = x && typeof x === 'object' ? x : {};
+        const ou = ', produit ' + (j + 1) + ' de la rubrique ' + (i + 1);
+        const prix = (Array.isArray(x.prix) ? x.prix : [x.prix]).slice(0, Math.max(1, formats.length)).map(p => chaine(String(p == null ? '' : p), 16, 'prix' + ou));
+        return { nom: chaine(x.nom, 80, 'nom' + ou), format: chaine(x.format, 20, 'format' + ou), detail: chaine(x.detail, 120, 'détail' + ou), prix };
+      });
+      return { titre: chaine(r.titre, 40, 'titre de la rubrique ' + (i + 1)), note: chaine(r.note, 60, 'précision de la rubrique ' + (i + 1)), formats, produits };
+    });
+    return { titre: chaine(d.titre, 40, 'titre de la carte'), colonnes: [1, 2, 3].indexOf(Number(d.colonnes)) >= 0 ? Number(d.colonnes) : 0,
+      mention: chaine(d.mention, 120, 'mention'), rubriques };
+  }
+  if (type === 'promo') {
+    // Promo : une ou deux offres d'une soirée (produit, prix, ancien prix barré, photo facultative).
+    if (d.produits !== undefined && !Array.isArray(d.produits)) throw refus('Offres invalides.');
+    if ((d.produits || []).length > 2) throw refus('Une promo compte 2 offres au plus.');
+    const produits = (d.produits || []).map((x, i) => {
+      x = x && typeof x === 'object' ? x : {};
+      const photo = source(x.photo, 'photo de l’offre ' + (i + 1), false);
+      return { nom: chaine(x.nom, 80, 'nom de l’offre ' + (i + 1)), detail: chaine(x.detail, 120, 'détail de l’offre ' + (i + 1)),
+        prix: chaine(String(x.prix == null ? '' : x.prix), 16, 'prix de l’offre ' + (i + 1)), ancien: chaine(String(x.ancien == null ? '' : x.ancien), 16, 'ancien prix de l’offre ' + (i + 1)),
+        photo: photoValide(photo, x.photo || {}) };
+    });
+    return { accroche: chaine(d.accroche, 80, 'accroche'), titre: chaine(d.titre, 80, 'titre'), fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'rose',
+      mention: chaine(d.mention, 120, 'mention'), produits };
+  }
   if (type === 'image') {
     return {
       src: source(d.src, 'image', false), ajustement: d.ajustement === 'ajuster' ? 'ajuster' : 'remplir', fichier: chaine(d.fichier, 120, 'nom du fichier'),
@@ -785,6 +819,7 @@ function sources(d) {
   if (d.poster) r.push(d.poster);
   if (d.photo && d.photo.src) r.push(d.photo.src);
   if (Array.isArray(d.dates)) for (const x of d.dates) if (x && x.photo && x.photo.src) r.push(x.photo.src);   // photos d'une série
+  if (Array.isArray(d.produits)) for (const x of d.produits) if (x && x.photo && x.photo.src) r.push(x.photo.src);   // photos d'une promo
   return r;
 }
 // Supprime de R2 les fichiers qu'aucun contenu n'utilise plus.

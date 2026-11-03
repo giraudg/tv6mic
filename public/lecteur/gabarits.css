@@ -286,3 +286,70 @@
 /* 7. Page web : cadre plein écran, fond noir pendant le chargement */
 .g-web { background: #000; }
 .g-web-cadre { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; background: #000; pointer-events: none; }
+
+/* 8. Carte du bar : bandeau dégradé (comme l'agenda), rubriques en colonnes, prix alignés à droite.
+   Toutes les tailles sont en em : l'ajustement change la taille de .g-c-corps jusqu'à tout faire tenir. */
+.g-carte { background: var(--g-nuit); }
+.g-carte .g-entete { height: 200px; }
+.g-carte .g-titre { bottom: 34px; }
+.g-carte .g-entete .g-logo { bottom: 48px; }
+.g-c-corps { position: absolute; left: 120px; top: 246px; width: 1680px; height: 752px; display: -webkit-flex; display: flex;
+  -webkit-align-items: flex-start; align-items: flex-start; font-size: 46px; overflow: hidden; }
+.g-c-col { -webkit-flex: 1 1 0%; flex: 1 1 0%; min-width: 0; margin-left: 110px; }
+.g-c-col:first-child { margin-left: 0; }
+.g-c-rub { margin-bottom: .62em; }
+.g-c-rub:last-child { margin-bottom: 0; }
+.g-c-rtete { display: -webkit-flex; display: flex; -webkit-align-items: baseline; align-items: baseline; margin-bottom: .22em;
+  padding-bottom: .16em; border-bottom: 3px solid var(--g-primaire); }
+.g-c-rtitre { padding-top: .12em; font-family: var(--g-cond); font-weight: 700; font-size: 1.5em; line-height: .95; text-transform: uppercase;
+  color: var(--g-primaire); white-space: nowrap; }
+.g-c-rnote { margin-left: .6em; font-size: .52em; font-weight: 600; color: var(--g-gris); text-transform: uppercase; letter-spacing: .06em; }
+.g-c-vide { -webkit-flex: 1 1 auto; flex: 1 1 auto; }
+.g-c-fmt { -webkit-flex: none; flex: none; width: 5.9em; text-align: right; font-size: .55em; font-weight: 700; color: var(--g-gris);
+  text-transform: uppercase; letter-spacing: .04em; }
+.g-c-ligne { display: -webkit-flex; display: flex; -webkit-align-items: baseline; align-items: baseline; padding: .2em 0; }
+.g-c-pnom { -webkit-flex: 0 1 auto; flex: 0 1 auto; min-width: 0; }
+.g-c-pn { font-size: .82em; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; line-height: 1.12; }
+.g-c-pf { font-size: .62em; font-weight: 600; color: var(--g-gris); white-space: nowrap; }
+.g-c-pdet { display: block; margin-top: .1em; font-size: .6em; font-weight: 600; color: var(--g-gris); line-height: 1.2; }
+.g-c-points { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: .8em; height: 0; margin: 0 .35em; border-bottom: 3px dotted rgba(255, 255, 255, .28); }
+.g-c-prix { -webkit-flex: none; flex: none; font-family: var(--g-cond); font-weight: 700; font-size: 1.08em; line-height: 1; white-space: nowrap; }
+/* plusieurs formats : colonnes de prix de largeur fixe, alignées sur les formats de l'en-tête (3 em × 1,08 = 5,9 em × 0,55) */
+.g-c-prixf { width: 3em; text-align: right; }
+.g-c-pied { position: absolute; left: 120px; right: 120px; bottom: 30px; font-size: 26px; font-weight: 600; color: var(--g-gris); }
+
+/* 9. Promo : aplat de couleur + texture rayonnante (comme les séries) */
+.g-promo { background: var(--g-primaire); }
+.g-promo.g-f-violet { background: var(--g-secondaire); }
+.g-p-tete { position: absolute; left: 120px; top: 96px; width: 1300px; }
+.g-p-accroche { font-size: 40px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-p-titre { margin-top: 10px; padding-top: .16em; font-family: var(--g-cond); font-weight: 700; font-size: 120px; line-height: .92;
+  text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+.g-p-prix { display: inline-block; padding: 14px 30px 10px; background: #fff; color: #0b0a0d; white-space: nowrap; }
+.g-p-montant { font-family: var(--g-cond); font-weight: 700; font-size: 150px; line-height: 1; }
+.g-p-ancien { margin-right: 24px; font-family: var(--g-cond); font-weight: 700; font-size: 70px; line-height: 1; color: #6b6875;
+  text-decoration: line-through; vertical-align: 20%; }
+.g-p-mention { position: absolute; left: 120px; bottom: 48px; max-width: 1300px; font-size: 40px; font-weight: 700; line-height: 1.15; }
+/* une offre : texte à gauche, photo à droite (860 px) */
+.g-p-offre { position: absolute; left: 120px; top: 330px; width: 1680px; }
+.g-p-photo .g-p-offre, .g-p-photo .g-p-tete, .g-p-photo .g-p-mention { width: 820px; max-width: 820px; }
+.g-p-panneau { position: absolute; right: 0; top: 0; width: 860px; height: 1080px; background: #111 center / cover no-repeat; }
+.g-p-photo .g-logo { display: none; }
+.g-p-nom { padding-top: .14em; font-family: var(--g-cond); font-weight: 700; font-size: 190px; line-height: .9; text-transform: uppercase; overflow: hidden; }
+.g-p-detail { margin-top: 18px; font-size: 44px; font-weight: 600; line-height: 1.2; }
+.g-p-1 .g-p-prix { margin-top: 44px; }
+/* deux offres : cartes côte à côte */
+.g-p-cartes { position: absolute; left: 120px; bottom: 124px; width: 1680px; display: -webkit-flex; display: flex; -webkit-align-items: flex-end; align-items: flex-end; }
+.g-p-carte { position: relative; -webkit-flex: none; flex: none; width: 816px; margin-left: 48px; background: #0b0a0d; opacity: 0; }
+.g-p-carte:first-child { margin-left: 0; }
+.joue .g-p-carte { -webkit-animation: g-monte .9s cubic-bezier(.2, .7, .2, 1) both; animation: g-monte .9s cubic-bezier(.2, .7, .2, 1) both; }
+.g-p-cphoto { position: relative; height: 460px; overflow: hidden; background: #111 center / cover no-repeat; }
+.g-p-ccorps { height: 160px; padding: 28px 30px 20px; overflow: hidden; }
+.g-p-cnom { padding-top: .14em; font-family: var(--g-cond); font-weight: 700; font-size: 84px; line-height: .92; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; }
+.g-p-cdetail { margin-top: 8px; font-size: 30px; font-weight: 600; color: var(--g-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-p-cprix { position: absolute; right: 0; top: 380px; padding: 10px 22px 6px; }
+.g-p-cprix .g-p-montant { font-size: 96px; }
+.g-p-cprix .g-p-ancien { font-size: 48px; margin-right: 16px; }
+

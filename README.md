@@ -44,6 +44,8 @@ Gabarits (`public/lecteur/gabarits.js` et `gabarits.css`, partagés avec l'aper�
 | `image` | `src`, `ajustement` (`remplir` ou `ajuster`), `cadrage` (voir ci-dessous) | 8 s |
 | `video` | `src`, `poster`, `duree` (s), `taille` (octets), `son` (booléen) | durée de la vidéo |
 | `web` | `url` : page externe en https (jamais tv.6mic-aix.fr), affichée dans un cadre 1920 × 1080 (`sandbox` : scripts et origine gardés, pas de navigation du lecteur), rechargée à chaque passage ; le lecteur attend son chargement (10 s au plus) avant de l'afficher | 30 s |
+| `carte` | `titre` (bandeau), `colonnes` (0 = auto, 1 à 3), `mention`, `rubriques` : 8 au plus `{ titre, note, formats (0 à 3, ex. « 25 cl », « 40 cl »), produits : 20 au plus { nom, format, detail, prix: [un par format] } }` ; colonnes équilibrées, texte réduit jusqu'à tout faire tenir ; prix « 3,5 » affiché « 3,50 € » | 20 s |
+| `promo` | `accroche`, `titre`, `fond` (`rose`, `violet`, `degrade`, `noir`), `mention`, `produits` : 1 ou 2 `{ nom, detail, prix, ancien (barré), photo }` ; une offre : photo à droite ; deux : cartes côte à côte | 10 s |
 
 Recadrage : chaque photo (`photo` d'une soirée, d'un line-up, d'un agenda, d'une date de série, et l'image en mode
 `remplir`) peut porter `cadrage: { x, y }`, en pourcentages comme `background-position` (absent : centrée). Dans le
