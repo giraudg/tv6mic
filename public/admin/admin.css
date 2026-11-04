@@ -552,7 +552,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .rubrique-tete { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-bottom: 4px; }
 .rubrique-tete .rubrique-titre { font-weight: 700; text-transform: uppercase; }
 .produit-ed { display: grid; grid-template-columns: 90px minmax(0, 1fr) 90px auto; gap: 6px; align-items: center;
-  grid-template-areas: "nom nom prix fl" "fmt det det det"; padding-bottom: 8px; border-bottom: 1px solid var(--brume2); }
+  grid-template-areas: "nom nom prix fl" "fmt det st st"; padding-bottom: 8px; border-bottom: 1px solid var(--brume2); }
 .produit-ed.prix-2 { grid-template-columns: 90px minmax(0, 1fr) 170px auto; }
 .produit-ed.prix-3 { grid-template-columns: 90px minmax(0, 1fr) 240px auto; }
 .produit-ed > input:nth-child(1) { grid-area: nom; font-weight: 600; }
@@ -560,12 +560,17 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .produit-ed > input:nth-child(3) { grid-area: det; }
 .produit-ed > .prix-ed { grid-area: prix; }
 .produit-ed > .fl { grid-area: fl; }
+.produit-ed > .statut-ed { grid-area: st; min-width: 0; }
+/* non disponible / en rupture : nom barré, prix estompés, liste en couleur */
+.produit-ed.off > input:nth-child(1) { text-decoration: line-through; color: #6b6875; }
+.produit-ed.off .prix-ed input { color: #a9a6b3; }
+.produit-ed.off > .statut-ed { border-color: #e744a8; color: #b0207a; font-weight: 600; }
 .prix-ed { display: flex; gap: 6px; }
 .prix-ed input { min-width: 0; width: 100%; text-align: right; }
 .rubrique-ed .fl, .produit-ed .fl { display: flex; gap: 4px; }
 @media (max-width: 760px) {
   .rubrique-tete { grid-template-columns: minmax(0, 1fr) auto; }
   .rubrique-tete input:not(.rubrique-titre) { grid-column: 1 / -1; }
-  .produit-ed, .produit-ed.prix-2, .produit-ed.prix-3 { grid-template-columns: 90px minmax(0, 1fr); grid-template-areas: "nom nom" "fmt prix" "det det" "fl fl"; }
+  .produit-ed, .produit-ed.prix-2, .produit-ed.prix-3 { grid-template-columns: 90px minmax(0, 1fr) auto; grid-template-areas: "nom nom nom" "fmt prix prix" "det det det" "st st fl"; }
   .produit-ed .fl { justify-content: flex-end; }
 }

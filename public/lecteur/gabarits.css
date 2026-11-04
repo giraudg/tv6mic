@@ -316,11 +316,21 @@
 .g-c-prix { -webkit-flex: none; flex: none; font-family: var(--g-cond); font-weight: 700; font-size: 1.08em; line-height: 1; white-space: nowrap; }
 /* plusieurs formats : colonnes de prix de largeur fixe, alignées sur les formats de l'en-tête (3 em × 1,08 = 5,9 em × 0,55) */
 .g-c-prixf { width: 3em; text-align: right; }
+/* produit non disponible ou en rupture : grisé, une étiquette à la place du prix */
+.g-c-off .g-c-pn { color: #6b6875; }
+.g-c-off .g-c-pf, .g-c-off .g-c-pdet { color: #4f4b57; }
+.g-c-off .g-c-points { border-bottom-color: rgba(255, 255, 255, .1); }
+.g-c-etat { -webkit-flex: none; flex: none; -webkit-align-self: center; align-self: center; padding: .42em .7em .34em; border: 3px solid #6b6875;
+  font-size: .56em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; white-space: nowrap; color: #a9a6b3; }
+.g-c-rupture .g-c-etat { border-color: var(--g-primaire); background: var(--g-primaire); color: #fff; }
 .g-c-pied { position: absolute; left: 120px; right: 120px; bottom: 30px; font-size: 26px; font-weight: 600; color: var(--g-gris); }
 
 /* 9. Promo : aplat de couleur + texture rayonnante (comme les séries) */
 .g-promo { background: var(--g-primaire); }
 .g-promo.g-f-violet { background: var(--g-secondaire); }
+.g-promo.g-f-degrade { background: var(--g-degrade-v); }
+.g-promo.g-f-noir { background: #0b0a0d; }
+.g-promo.g-f-noir .g-p-carte { background: #1d1a22; }
 .g-p-tete { position: absolute; left: 120px; top: 96px; width: 1300px; }
 .g-p-accroche { font-size: 40px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1.1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -330,7 +340,8 @@
 .g-p-montant { font-family: var(--g-cond); font-weight: 700; font-size: 150px; line-height: 1; }
 .g-p-ancien { margin-right: 24px; font-family: var(--g-cond); font-weight: 700; font-size: 70px; line-height: 1; color: #6b6875;
   text-decoration: line-through; vertical-align: 20%; }
-.g-p-mention { position: absolute; left: 120px; bottom: 48px; max-width: 1300px; font-size: 40px; font-weight: 700; line-height: 1.15; }
+/* mention (ex. « L'abus d'alcool… ») : discrète, sur toute la largeur ; le gabarit écarte l'offre ou les cartes au-dessus */
+.g-p-mention { position: absolute; left: 120px; bottom: 44px; max-width: 1680px; font-size: 30px; font-weight: 600; line-height: 1.25; opacity: .92; }
 /* une offre : texte à gauche, photo à droite (860 px) */
 .g-p-offre { position: absolute; left: 120px; top: 330px; width: 1680px; }
 .g-p-photo .g-p-offre, .g-p-photo .g-p-tete, .g-p-photo .g-p-mention { width: 820px; max-width: 820px; }
@@ -349,7 +360,17 @@
 .g-p-cnom { padding-top: .14em; font-family: var(--g-cond); font-weight: 700; font-size: 84px; line-height: .92; text-transform: uppercase;
   white-space: nowrap; overflow: hidden; }
 .g-p-cdetail { margin-top: 8px; font-size: 30px; font-weight: 600; color: var(--g-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.g-p-cprix { position: absolute; right: 0; top: 380px; padding: 10px 22px 6px; }
+.g-p-cprix { position: absolute; right: 0; bottom: 128px; padding: 10px 22px 6px; }
 .g-p-cprix .g-p-montant { font-size: 96px; }
 .g-p-cprix .g-p-ancien { font-size: 48px; margin-right: 16px; }
+/* carte sans photo : le texte seul, plus grand, et le prix dessous */
+/* deux cartes sans photo : même hauteur */
+.g-p-texte { -webkit-align-items: stretch; align-items: stretch; }
+.g-p-sans .g-p-ccorps { height: auto; padding: 36px 36px 40px; }
+.g-p-sans .g-p-cnom { font-size: 110px; }
+.g-p-sans .g-p-cdetail { margin-top: 12px; font-size: 34px; }
+.g-p-sprix { display: block; float: left; margin-top: 30px; padding: 10px 24px 6px; }
+.g-p-sans .g-p-ccorps:after { content: ''; display: block; clear: both; }
+.g-p-sprix .g-p-montant { font-size: 104px; }
+.g-p-sprix .g-p-ancien { font-size: 52px; margin-right: 18px; }
 

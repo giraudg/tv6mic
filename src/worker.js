@@ -26,6 +26,7 @@ const ID_VALIDE = /^[a-z0-9-]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video', 'web', 'carte', 'promo'];
+const STATUTS_PRODUIT = ['indispo', 'rupture'];
 const NIVEAUX_LINEUP = ['vedette', 'forte', 'normale', 'discrete'];   // vide = selon le rôle
 const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
@@ -601,7 +602,10 @@ function validerDonnees(type, d, reglages) {
         x = x && typeof x === 'object' ? x : {};
         const ou = ', produit ' + (j + 1) + ' de la rubrique ' + (i + 1);
         const prix = (Array.isArray(x.prix) ? x.prix : [x.prix]).slice(0, Math.max(1, formats.length)).map(p => chaine(String(p == null ? '' : p), 16, 'prix' + ou));
-        return { nom: chaine(x.nom, 80, 'nom' + ou), format: chaine(x.format, 20, 'format' + ou), detail: chaine(x.detail, 120, 'détail' + ou), prix };
+        // statut : absent = disponible ; « indispo » (non disponible) ou « rupture » (en rupture) grisent le produit à l'écran
+        const statut = STATUTS_PRODUIT.indexOf(x.statut) >= 0 ? x.statut : null;
+        return Object.assign({ nom: chaine(x.nom, 80, 'nom' + ou), format: chaine(x.format, 20, 'format' + ou), detail: chaine(x.detail, 120, 'détail' + ou), prix },
+          statut ? { statut } : {});
       });
       return { titre: chaine(r.titre, 40, 'titre de la rubrique ' + (i + 1)), note: chaine(r.note, 60, 'précision de la rubrique ' + (i + 1)), formats, produits };
     });

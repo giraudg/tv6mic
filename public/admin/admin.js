@@ -1184,8 +1184,9 @@ async function couleurDansPhoto(src, boite, e) {
 }
 // Série : accroche, titre, couleur de fond, 1 à 4 dates (photo, jour, heure, nom, mention).
 // Les dates peuvent venir des soirées déjà enregistrées (avec leur photo).
+const STATUTS_PRODUIT = { '': 'Disponible', indispo: 'Non disponible', rupture: 'En rupture' };
 /* Carte du bar : titre, colonnes, mention ; rubriques (titre, précision, formats) et leurs produits (nom, format,
-   détail, un prix par format). Les champs modifient les données sans redessiner ; ajouter, retirer ou déplacer redessine. */
+   détail, un prix par format, disponibilité). Les champs modifient les données sans redessiner ; ajouter, retirer ou déplacer redessine. */
 function champsCarte(d, changer) {
   d.rubriques = d.rubriques || [];
   const zone = h('div', { class: 'rubriques-ed' });
@@ -1202,15 +1203,23 @@ function champsCarte(d, changer) {
       formats.addEventListener('change', () => { r.produits.forEach(x => { x.prix = (x.prix || []).slice(0, Math.max(1, r.formats.length > 1 ? r.formats.length : 1)); }); remplir(); changer(); });
       const lignes = r.produits.map((x, j) => {
         x.prix = Array.isArray(x.prix) ? x.prix : [x.prix || ''];
-        return h('div', { class: 'produit-ed' + (nf > 1 ? ' prix-' + nf : '') },
+        const boite = h('div', { class: 'produit-ed' + (nf > 1 ? ' prix-' + nf : '') + (x.statut ? ' off' : '') });
+        // Disponible / Non disponible / En rupture : à l'écran, le produit est grisé et l'étiquette remplace le prix
+        const statut = h('select', { class: 'statut-ed', 'aria-label': 'Disponibilité', onchange: e => {
+          if (e.target.value) x.statut = e.target.value; else delete x.statut;
+          boite.classList.toggle('off', !!x.statut); changer();
+        } }, Object.entries(STATUTS_PRODUIT).map(([k, t]) => h('option', { value: k, selected: (x.statut || '') === k }, t)));
+        remplacer(boite,
           saisie(x.nom, { maxLength: 80, placeholder: 'Produit', 'aria-label': 'Nom du produit' }, v => { x.nom = v; }),
           saisie(x.format, { maxLength: 20, placeholder: 'Format', 'aria-label': 'Format (ex. 50 cl)' }, v => { x.format = v; }),
           saisie(x.detail, { maxLength: 120, placeholder: 'Détail (facultatif)', 'aria-label': 'Détail' }, v => { x.detail = v; }),
           h('span', { class: 'prix-ed' }, Array.from({ length: nf }, (_, q) => saisie(x.prix[q], { maxLength: 16, inputMode: 'decimal', placeholder: nf > 1 ? r.formats[q] : 'Prix', 'aria-label': 'Prix' + (nf > 1 ? ' ' + r.formats[q] : '') }, v => { x.prix[q] = v; }))),
+          statut,
           h('span', { class: 'fl' },
             h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Monter', disabled: j === 0, onclick: () => deplacer(r.produits, j, j - 1) }, '↑'),
             h('button', { type: 'button', class: 'btn carre pt', 'aria-label': 'Descendre', disabled: j === r.produits.length - 1, onclick: () => deplacer(r.produits, j, j + 1) }, '↓'),
             h('button', { type: 'button', class: 'btn carre pt btn-danger', 'aria-label': 'Retirer ce produit', onclick: () => { r.produits.splice(j, 1); remplir(); changer(); } }, '×')));
+        return boite;
       });
       return h('div', { class: 'rubrique-ed' },
         h('div', { class: 'rubrique-tete' },
@@ -1242,7 +1251,7 @@ function champsCarte(d, changer) {
         d.rubriques.push({ titre: '', note: '', formats: [], produits: [{ nom: '', format: '', detail: '', prix: [''] }] }); remplir(); changer();
         zone.lastChild.querySelector('input').focus();
       } }, '+ Rubrique')),
-      h('small', { text: 'Prix : « 3,5 » s’affiche « 3,50 € ». Plusieurs formats (ex. « 25 cl, 40 cl ») : une colonne de prix par format, titrée en haut de la rubrique.' })),
+      h('small', { text: 'Prix : « 3,5 » s’affiche « 3,50 € ». Plusieurs formats (ex. « 25 cl, 40 cl ») : une colonne de prix par format, titrée en haut de la rubrique. Un produit « Non disponible » ou « En rupture » reste à l’écran, grisé, avec l’étiquette à la place du prix.' })),
     champ('Mention en bas de l’écran (facultative)', h('input', { id: 'f-mention-carte', type: 'text', value: d.mention || '', maxLength: 120, placeholder: 'Liste des allergènes disponible au bar.', oninput: e => { d.mention = e.target.value; changer(); } }))
   ];
 }

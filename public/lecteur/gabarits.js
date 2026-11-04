@@ -268,6 +268,7 @@
     }
     return t;
   }
+  var ETATS_PRODUIT = { indispo: 'Non disponible', rupture: 'En rupture' };
   function poidsRubrique(r) {
     var p = 1.7, i, l = r.produits || [];
     for (i = 0; i < l.length; i++) { p += 1 + (l[i].detail ? 0.6 : 0); }
@@ -319,16 +320,22 @@
         bloc.appendChild(tete);
         for (j = 0; j < r.produits.length; j++) {
           x = r.produits[j];
-          ligne = el('div', 'g-c-ligne');
+          // produit non disponible ou en rupture : grisé, l'étiquette remplace le prix
+          var etat = x.statut === 'indispo' || x.statut === 'rupture' ? x.statut : '';
+          ligne = el('div', 'g-c-ligne' + (etat ? ' g-c-off g-c-' + etat : ''));
           nom = el('div', 'g-c-pnom');
           nom.appendChild(el('span', 'g-c-pn', x.nom));
           if (x.format) { nom.appendChild(el('span', 'g-c-pf', ' ' + x.format)); }
           if (x.detail) { nom.appendChild(el('span', 'g-c-pdet', x.detail)); }
           ligne.appendChild(nom);
           ligne.appendChild(el('span', 'g-c-points'));
-          var prix = x.prix && x.prix.length !== undefined && typeof x.prix !== 'string' ? x.prix : [x.prix];
-          for (var q = 0; q < Math.max(1, formats.length > 1 ? formats.length : 1); q++) {
-            ligne.appendChild(el('span', 'g-c-prix' + (formats.length > 1 ? ' g-c-prixf' : ''), prixTexte(prix[q])));
+          if (etat) {
+            ligne.appendChild(el('span', 'g-c-etat', ETATS_PRODUIT[etat]));
+          } else {
+            var prix = x.prix && x.prix.length !== undefined && typeof x.prix !== 'string' ? x.prix : [x.prix];
+            for (var q = 0; q < Math.max(1, formats.length > 1 ? formats.length : 1); q++) {
+              ligne.appendChild(el('span', 'g-c-prix' + (formats.length > 1 ? ' g-c-prixf' : ''), prixTexte(prix[q])));
+            }
           }
           bloc.appendChild(ligne);
         }
@@ -355,7 +362,7 @@
   /* 9. Promo : une ou deux offres d'une soirée (produit, prix, ancien prix barré, photo), sur l'aplat de couleur
      des séries. Une offre : texte à gauche, photo à droite ; deux : deux cartes côte à côte. */
   function promo(etape, url) {
-    var c = etape.contenu, d = c.donnees || {}, offres = (d.produits || []).slice(0, 2), n = Math.max(1, offres.length), i, x, carteP, photo, nomP, noms = [];
+    var c = etape.contenu, d = c.donnees || {}, offres = (d.produits || []).slice(0, 2), n = Math.max(1, offres.length), i, x, carteP, photo, nomP, noms = [], photos = [];
     var g = el('div', 'g g-promo g-f-' + (FONDS_SERIE[d.fond] ? d.fond : 'rose') + ' g-p-' + n);
     g.appendChild(el('div', 'g-s-rayons'));
     g.appendChild(logo('g-logo a a0'));
@@ -386,29 +393,53 @@
       if (x.prix) { bloc.appendChild(prixBloc(x, 'a a3')); }
       g.appendChild(bloc);
     } else {
-      var rang = el('div', 'g-p-cartes');
+      var rang = el('div', 'g-p-cartes'), sansPhoto = true;
+      for (i = 0; i < offres.length; i++) { if (offres[i] && offres[i].photo && offres[i].photo.src) { sansPhoto = false; } }
+      if (sansPhoto) { rang.className += ' g-p-texte'; }
       for (i = 0; i < offres.length; i++) {
         x = offres[i];
-        carteP = el('div', 'g-p-carte');
+        // sans photo : pas de cadre vide, la carte se réduit au texte et le prix passe dessous
+        var aPhoto = !!(x.photo && x.photo.src);
+        carteP = el('div', 'g-p-carte' + (aPhoto ? '' : ' g-p-sans'));
         carteP.style.webkitAnimationDelay = carteP.style.animationDelay = (0.4 + i * 0.15).toFixed(2) + 's';
-        photo = el('div', 'g-p-cphoto' + (x.photo && x.photo.src ? '' : ' g-s-vide'));
-        if (x.photo && x.photo.src) { fond(photo, x.photo.src, url, x.photo.cadrage); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
-        carteP.appendChild(photo);
+        if (aPhoto) {
+          photo = el('div', 'g-p-cphoto');
+          fond(photo, x.photo.src, url, x.photo.cadrage);
+          carteP.appendChild(photo);
+          photos.push(photo);
+        }
         var corpsC = el('div', 'g-p-ccorps');
         nomP = el('div', 'g-p-cnom', x.nom || '');
-        noms.push([nomP, 84, 54, 1]);
+        noms.push(aPhoto ? [nomP, 84, 54, 1] : [nomP, 110, 60, 1]);
         corpsC.appendChild(nomP);
         if (x.detail) { corpsC.appendChild(el('div', 'g-p-cdetail', x.detail)); }
+        if (x.prix && !aPhoto) { corpsC.appendChild(prixBloc(x, 'g-p-sprix')); }
         carteP.appendChild(corpsC);
-        if (x.prix) { carteP.appendChild(prixBloc(x, 'g-p-cprix')); }
+        if (x.prix && aPhoto) { carteP.appendChild(prixBloc(x, 'g-p-cprix')); }
         rang.appendChild(carteP);
       }
       g.appendChild(rang);
     }
-    if (d.mention) { g.appendChild(el('div', 'g-p-mention a a4', d.mention)); }
+    var mention = d.mention ? el('div', 'g-p-mention a a4', d.mention) : null;
+    if (mention) { g.appendChild(mention); }
     return { noeud: g, ajuster: function () {
       if (titre) { ajusterTexte(titre, n === 1 ? 96 : 120, 56, 1); }
       for (var k2 = 0; k2 < noms.length; k2++) { ajusterTexte(noms[k2][0], noms[k2][1], noms[k2][2], noms[k2][3]); }
+      // la mention du bas ne doit rien chevaucher : 36 px d'écart au moins avec l'offre ou les cartes
+      var limite = mention ? mention.offsetTop - 36 : 1080 - 60, t, m;
+      if (n === 1 && bloc) {
+        t = parseFloat(nomP.style.fontSize) || 190;
+        for (m = 0; m < 20 && t > 84 && bloc.offsetTop + bloc.offsetHeight > limite; m++) { t -= 8; nomP.style.fontSize = t + 'px'; }
+      } else if (rang) {
+        // cartes au-dessus de la mention, et 40 px au moins sous le titre : au besoin, les photos raccourcissent
+        var bas = Math.max(124, mention ? 1080 - limite : 0), haut = tete.offsetTop + tete.offsetHeight + 40, trop;
+        for (m = 0; m < photos.length; m++) { photos[m].style.height = ''; }   // ajustement relancé : on repart des 460 px
+        rang.style.bottom = bas + 'px';
+        trop = haut - rang.offsetTop;
+        if (photos.length && trop > 0) { for (m = 0; m < photos.length; m++) { photos[m].style.height = Math.max(240, 460 - trop) + 'px'; } }
+        // sans aucune photo : les cartes se centrent dans la place libre entre le titre et le bas
+        if (!photos.length && trop < 0) { rang.style.bottom = Math.round(bas - trop / 2) + 'px'; }
+      }
     } };
   }
 

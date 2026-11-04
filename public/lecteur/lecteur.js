@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.5.0';
+  var VERSION = '1.5.1';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
