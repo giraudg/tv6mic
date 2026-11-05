@@ -443,6 +443,87 @@
     } };
   }
 
+  /* 10. Directionnel : l'écran sert de panneau. Une direction (flèche d'un côté, service de l'autre) ou deux
+     (écran partagé en deux moitiés). Chaque direction : une des 8 flèches, le service, une précision, et un
+     pictogramme : un émoji (dessins Twemoji livrés avec l'application, identiques sur tous les écrans) ou une image. */
+  var FLECHES = { droite: 0, 'bas-droite': 45, bas: 90, 'bas-gauche': 135, gauche: 180, 'haut-gauche': 225, haut: 270, 'haut-droite': 315 };
+  var FLECHE_SVG = '<svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true"><path d="M10 40H52V20L90 50L52 80V60H10Z" ' +
+    'fill="currentColor" stroke="currentColor" stroke-width="8" stroke-linejoin="round"/></svg>';
+  // Émoji → fichier Twemoji : points de code en hexadécimal, U+FE0F retiré hors séquences U+200D (règle de Twemoji).
+  function emojiSrc(texte) {
+    var s = String(texte || ''), r = [], c, p = 0, i = 0;
+    if (s.indexOf('‍') < 0) { s = s.replace(/️/g, ''); }
+    while (i < s.length) {
+      c = s.charCodeAt(i++);
+      if (p) { r.push((0x10000 + ((p - 0xd800) << 10) + (c - 0xdc00)).toString(16)); p = 0; }
+      else if (c >= 0xd800 && c <= 0xdbff) { p = c; }
+      else { r.push(c.toString(16)); }
+    }
+    return r.length ? '/emoji/' + r.join('-') + '.svg' : '';
+  }
+  function pictoDe(x) {
+    if (x.picto === 'image' && x.image && x.image.src) { return x.image.src; }
+    if (x.picto === 'emoji' && x.emoji) { return emojiSrc(x.emoji); }
+    return '';
+  }
+  // côté de la flèche : celui où elle pointe ; tout droit ou en bas : à gauche (au centre sur un écran partagé)
+  function coteFleche(f, n) {
+    if (f === 'droite' || f === 'haut-droite' || f === 'bas-droite') { return 'd'; }
+    if (f === 'gauche' || f === 'haut-gauche' || f === 'bas-gauche') { return 'g'; }
+    return n === 2 ? 'c' : 'g';
+  }
+  function direction(etape, url) {
+    var c = etape.contenu, d = c.donnees || {}, liste = (d.directions || []).slice(0, 2), n = Math.max(1, liste.length), i, x, moitie, f, rot, src, titres = [];
+    var g = el('div', 'g g-direction g-f-' + (FONDS_SERIE[d.fond] ? d.fond : 'noir') + ' g-d-' + n);
+    g.appendChild(el('div', 'g-s-rayons'));
+    for (i = 0; i < n; i++) {
+      x = liste[i] || {};
+      f = FLECHES.hasOwnProperty(x.fleche) ? x.fleche : 'droite';
+      rot = FLECHES[f];
+      moitie = el('div', 'g-d-moitie g-d-m' + (i + 1) + ' g-d-cote-' + coteFleche(f, n));
+      var fleche = el('div', 'g-d-fleche a a0');
+      fleche.style.webkitTransform = fleche.style.transform = 'rotate(' + rot + 'deg)';
+      var pousse = el('div', 'g-d-pousse');
+      pousse.innerHTML = FLECHE_SVG;
+      fleche.appendChild(pousse);
+      moitie.appendChild(fleche);
+      var infos = el('div', 'g-d-infos'), texte = el('div', 'g-d-texte');
+      src = pictoDe(x);
+      if (src) {
+        var picto = el('div', 'g-d-picto a a2'), dessin = el('i', '');
+        fond(dessin, src, url, null);
+        picto.appendChild(dessin);
+        infos.appendChild(picto);
+      }
+      var titre = el('div', 'g-d-titre a a2', x.titre || '');
+      titres.push(titre);
+      texte.appendChild(titre);
+      if (x.detail) { texte.appendChild(el('div', 'g-d-detail a a3', x.detail)); }
+      infos.appendChild(texte);
+      moitie.appendChild(infos);
+      g.appendChild(moitie);
+    }
+    g.appendChild(logo('g-logo g-d-logo a a4'));
+    return { noeud: g, ajuster: function () {
+      var k, t, m, bloc;
+      for (k = 0; k < titres.length; k++) {
+        ajusterTexte(titres[k], n === 1 ? 210 : 140, n === 1 ? 90 : 64, 2);
+        // le bloc (pictogramme, service, précision) doit tenir dans sa zone : 920 px de haut (une direction), 400 (deux)
+        bloc = titres[k].parentNode.parentNode;
+        t = parseFloat(titres[k].style.fontSize) || 100;
+        for (m = 0; m < 20 && t > 60 && hauteurBloc(bloc) > (n === 1 ? 920 : 400); m++) { t -= 8; titres[k].style.fontSize = t + 'px'; }
+      }
+    } };
+    function hauteurBloc(b) {
+      var h = 0, j, e;
+      for (j = 0; j < b.childNodes.length; j++) {
+        e = b.childNodes[j];
+        h = n === 1 ? h + e.offsetHeight + (parseFloat(window.getComputedStyle(e).marginBottom) || 0) : Math.max(h, e.offsetHeight);
+      }
+      return h;
+    }
+  }
+
   /* 4. Série : 2 à 4 dates mises en avant (promo thématique, même esthétique, artistes proches de la soirée).
      Aplat de couleur du design system avec la texture rayonnante, titre façon section du site (marqueur ■■■),
      affiches côte à côte, le texte sous la photo (jamais dessus), « Ce soir » et « Demain » mis en évidence. */
@@ -464,7 +545,8 @@
     lineup: { largeur: 820, hauteur: 1080 },    // panneau de droite, bord gauche fondu au noir
     image: { largeur: 1920, hauteur: 1080 },
     promo1: { largeur: 860, hauteur: 1080 },    // une offre : panneau de droite
-    promo2: { largeur: 816, hauteur: 460 }      // deux offres : photo de chaque carte
+    promo2: { largeur: 816, hauteur: 460 },     // deux offres : photo de chaque carte
+    direction: { largeur: 480, hauteur: 480 }   // pictogramme d'un panneau directionnel (affiché entier, sur fond blanc)
   };
   // Série : 1680 px partagés entre les affiches (écart 48 px), 816 px au plus ; photo 3:4, 470 px de haut au plus.
   function cadreSerie(n) {
@@ -618,7 +700,7 @@
   }
 
   racine.Gabarits = {
-    soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, web: web, carte: carte, promo: promo, prixTexte: prixTexte, veille: veille, identification: identification,
+    soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, web: web, carte: carte, promo: promo, direction: direction, prixTexte: prixTexte, emojiSrc: emojiSrc, FLECHES: FLECHES, FLECHE_SVG: FLECHE_SVG, veille: veille, identification: identification,
     FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, NIVEAUX_LINEUP: NIVEAUX_LINEUP, niveauPassage: niveauPassage, niveauParDefaut: niveauParDefaut, vedetteDe: vedetteDe, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe,

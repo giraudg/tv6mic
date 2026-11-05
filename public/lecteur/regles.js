@@ -8,7 +8,7 @@
 }(this, function () {
   'use strict';
 
-  var DUREES = { soiree: 10, lineup: 12, agenda: 15, serie: 12, image: 8, video: 0, web: 30, carte: 20, promo: 10, veille: 60 };
+  var DUREES = { soiree: 10, lineup: 12, agenda: 15, serie: 12, image: 8, video: 0, web: 30, carte: 20, promo: 10, direction: 15, veille: 60 };
   var SERIE_MAX = 4;         // dates d'une série
   var PAR_PAGE = 6;          // dates par page d'agenda (au-delà de 6 lignes, la lecture à distance devient difficile)
   var BASCULE = 6 * 60;      // avant 6 h du matin, on est encore dans la soirée de la veille
@@ -98,6 +98,7 @@
       return false;
     }
     if (c.type === 'promo') { return !!(d.produits && d.produits.length); }
+    if (c.type === 'direction') { return !!(d.directions && d.directions.length); }
     return !!d.src;
   }
   function duree(c) {

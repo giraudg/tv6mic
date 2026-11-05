@@ -374,3 +374,55 @@
 .g-p-sprix .g-p-montant { font-size: 104px; }
 .g-p-sprix .g-p-ancien { font-size: 52px; margin-right: 18px; }
 
+/* 10. Directionnel : panneau à une direction (flèche d'un côté, service de l'autre) ou deux (écran partagé).
+   Flèche blanche tournée par pas de 45°, qui pousse doucement dans sa direction ; pictogramme sur carré blanc. */
+.g-direction { background: #0b0a0d; }
+.g-direction.g-f-rose { background: var(--g-primaire); }
+.g-direction.g-f-violet { background: var(--g-secondaire); }
+.g-direction.g-f-degrade { background: var(--g-degrade-v); }
+.g-d-moitie { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; }
+.g-d-fleche { position: absolute; color: #fff; }
+.g-d-pousse { width: 100%; height: 100%; }
+.g-d-pousse svg { display: block; }
+@-webkit-keyframes g-pousse { from { -webkit-transform: translate3d(-3%, 0, 0); } to { -webkit-transform: translate3d(5%, 0, 0); } }
+@keyframes g-pousse { from { transform: translate3d(-3%, 0, 0); } to { transform: translate3d(5%, 0, 0); } }
+.joue .g-d-pousse { -webkit-animation: g-pousse 1.1s 1s ease-in-out infinite alternate both; animation: g-pousse 1.1s 1s ease-in-out infinite alternate both; }
+.g-d-infos { position: absolute; display: -webkit-flex; display: flex; }
+.g-d-texte { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; }
+.g-d-picto { position: relative; -webkit-flex: none; flex: none; background: #fff; }
+.g-d-picto i { position: absolute; left: 13%; top: 13%; width: 74%; height: 74%; background: center / contain no-repeat; }
+.g-d-titre { padding-top: .14em; font-family: var(--g-cond); font-weight: 700; line-height: .9; text-transform: uppercase; overflow: hidden; }
+.g-d-detail { font-weight: 600; line-height: 1.2; }
+.g-d-logo { top: auto; bottom: 64px; height: 64px; }
+
+/* une direction : flèche de 640 px du côté où elle pointe, service de l'autre côté */
+.g-d-1 .g-d-fleche { top: 220px; width: 640px; height: 640px; }
+.g-d-1 .g-d-cote-g .g-d-fleche { left: 110px; }
+.g-d-1 .g-d-cote-d .g-d-fleche { left: 1170px; }
+.g-d-1 .g-d-infos { top: 0; width: 900px; height: 1080px; -webkit-flex-direction: column; flex-direction: column; -webkit-justify-content: center; justify-content: center; }
+.g-d-1 .g-d-cote-g .g-d-infos { left: 870px; }
+.g-d-1 .g-d-cote-d .g-d-infos { left: 120px; }
+.g-d-1 .g-d-texte { -webkit-flex: none; flex: none; }
+.g-d-1 .g-d-picto { width: 280px; height: 280px; margin-bottom: 52px; }
+.g-d-1 .g-d-titre { font-size: 210px; }
+.g-d-1 .g-d-detail { margin-top: 28px; font-size: 56px; }
+/* logo sous la flèche, loin du texte */
+.g-d-1 .g-d-cote-g ~ .g-d-logo { right: auto; left: 110px; }
+.g-d-1 .g-d-cote-d ~ .g-d-logo { right: 110px; }
+
+/* deux directions : deux moitiés de 960 px, flèche en haut (du côté où elle pointe), pictogramme et service dessous */
+.g-d-2 .g-d-moitie { width: 960px; }
+.g-d-2 .g-d-m2 { left: 960px; }
+.g-d-2 .g-d-m2:before { content: ''; position: absolute; left: 0; top: 0; width: 960px; height: 1080px; background: rgba(0, 0, 0, .16); }
+.g-direction.g-f-noir.g-d-2 .g-d-m2:before { background: rgba(255, 255, 255, .05); }
+.g-d-2 .g-d-m1:after { content: ''; position: absolute; right: 0; top: 0; width: 4px; height: 1080px; background: rgba(255, 255, 255, .5); }
+.g-d-2 .g-d-fleche { top: 120px; width: 400px; height: 400px; }
+.g-d-2 .g-d-cote-g .g-d-fleche { left: 70px; }
+.g-d-2 .g-d-cote-d .g-d-fleche { left: 490px; }
+.g-d-2 .g-d-cote-c .g-d-fleche { left: 280px; }
+.g-d-2 .g-d-infos { left: 80px; top: 560px; width: 800px; height: 400px; -webkit-align-items: center; align-items: center; }
+.g-d-2 .g-d-picto { width: 220px; height: 220px; margin-right: 40px; }
+.g-d-2 .g-d-titre { font-size: 140px; }
+.g-d-2 .g-d-detail { margin-top: 16px; font-size: 40px; }
+.g-d-2 .g-d-logo { height: 52px; bottom: 44px; right: 60px; }
+

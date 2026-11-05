@@ -1,0 +1,8 @@
+Émojis Twemoji (https://github.com/jdecked/twemoji), version 15.0, fichiers SVG optimisés du paquet npm
+@twemoji/svg 15.0.0 (https://github.com/boywithkeyboard/twemoji_svg).
+
+Graphismes : Copyright 2019 Twitter, Inc and other contributors ; Copyright 2024 jdecked and other contributors.
+Licence CC-BY 4.0 : https://creativecommons.org/licenses/by/4.0/
+
+Nom des fichiers : points de code en hexadécimal séparés par « - » ; le sélecteur U+FE0F est retiré sauf dans
+les séquences avec U+200D (ex. 1f37a.svg pour 🍺, 1f3f3-fe0f-200d-1f308.svg pour 🏳️‍🌈).

@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.5.1';
+  var VERSION = '1.6.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -77,6 +77,13 @@
     }
     if (d.produits && d.produits.length) {        // photos d'une promo
       for (var j = 0; j < d.produits.length; j++) { if (d.produits[j] && d.produits[j].photo && d.produits[j].photo.src) { r.push(d.produits[j].photo.src); } }
+    }
+    if (c.type === 'direction' && d.directions) {  // pictogrammes d'un panneau directionnel (image importée ou émoji)
+      for (var k = 0; k < d.directions.length; k++) {
+        var x = d.directions[k] || {};
+        if (x.picto === 'image' && x.image && x.image.src) { r.push(x.image.src); }
+        else if (x.picto === 'emoji' && x.emoji) { r.push(Gabarits.emojiSrc(x.emoji)); }
+      }
     }
     return r;
   }
@@ -233,6 +240,7 @@
         else if (e.type === 'web') { g = Gabarits.web(e); }
         else if (e.type === 'carte') { g = Gabarits.carte(e, url); }
         else if (e.type === 'promo') { g = Gabarits.promo(e, url); }
+        else if (e.type === 'direction') { g = Gabarits.direction(e, url); }
         else { g = Gabarits.veille(!prog ? (horsLigne ? 'Connexion au serveur…' : 'Chargement…') : ''); }
       } catch (err) {
         noter('gabarit ' + e.cle + ' : ' + err.message);

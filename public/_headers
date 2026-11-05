@@ -16,3 +16,6 @@
 
 /vendor/mediabunny-*
   Cache-Control: public, max-age=31536000, immutable
+
+/emoji/*
+  Cache-Control: public, max-age=2592000

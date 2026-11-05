@@ -25,8 +25,9 @@ const CODE_VALIDE = /^[a-z0-9-]{1,40}$/;
 const ID_VALIDE = /^[a-z0-9-]{1,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
-const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video', 'web', 'carte', 'promo'];
+const TYPES = ['soiree', 'lineup', 'agenda', 'serie', 'image', 'video', 'web', 'carte', 'promo', 'direction'];
 const STATUTS_PRODUIT = ['indispo', 'rupture'];
+const FLECHES = ['droite', 'bas-droite', 'bas', 'bas-gauche', 'gauche', 'haut-gauche', 'haut', 'haut-droite'];
 const NIVEAUX_LINEUP = ['vedette', 'forte', 'normale', 'discrete'];   // vide = selon le rôle
 const FONDS_SERIE = ['violet', 'rose', 'degrade', 'noir'];
 const MEDIAS_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov' };
@@ -626,6 +627,21 @@ function validerDonnees(type, d, reglages) {
     return { accroche: chaine(d.accroche, 80, 'accroche'), titre: chaine(d.titre, 80, 'titre'), fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'rose',
       mention: chaine(d.mention, 120, 'mention'), produits };
   }
+  if (type === 'direction') {
+    // Panneau directionnel : une ou deux directions { fleche, titre (service), detail, picto: emoji | image | '' }.
+    // Seul le pictogramme choisi est gardé (l'autre est effacé à l'enregistrement).
+    if (!Array.isArray(d.directions) || d.directions.length < 1 || d.directions.length > 2) throw refus('Un panneau compte une ou deux directions.');
+    const directions = d.directions.map((x, i) => {
+      x = x && typeof x === 'object' ? x : {};
+      const ou = ' de la direction ' + (i + 1);
+      const picto = ['emoji', 'image'].indexOf(x.picto) >= 0 ? x.picto : '';
+      const image = picto === 'image' ? photoValide(source(x.image, 'image' + ou, false), x.image || {}) : null;
+      const emoji = picto === 'emoji' ? chaine(x.emoji, 32, 'émoji' + ou) : '';
+      return { fleche: FLECHES.indexOf(x.fleche) >= 0 ? x.fleche : 'droite', titre: chaine(x.titre, 40, 'service' + ou), detail: chaine(x.detail, 80, 'précision' + ou),
+        picto: image ? 'image' : emoji ? 'emoji' : '', emoji, image };
+    });
+    return { fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'noir', directions };
+  }
   if (type === 'image') {
     return {
       src: source(d.src, 'image', false), ajustement: d.ajustement === 'ajuster' ? 'ajuster' : 'remplir', fichier: chaine(d.fichier, 120, 'nom du fichier'),
@@ -844,6 +860,7 @@ function sources(d) {
   if (d.photo && d.photo.src) r.push(d.photo.src);
   if (Array.isArray(d.dates)) for (const x of d.dates) if (x && x.photo && x.photo.src) r.push(x.photo.src);   // photos d'une série
   if (Array.isArray(d.produits)) for (const x of d.produits) if (x && x.photo && x.photo.src) r.push(x.photo.src);   // photos d'une promo
+  if (Array.isArray(d.directions)) for (const x of d.directions) if (x && x.image && x.image.src) r.push(x.image.src);   // pictogrammes d'un panneau directionnel
   return r;
 }
 // Supprime de R2 les fichiers qu'aucun contenu n'utilise plus.

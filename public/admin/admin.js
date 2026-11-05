@@ -30,7 +30,7 @@ const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 's
 const JC = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const MC = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-const TYPES = { soiree: 'Soirée', lineup: 'Line-up', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo', web: 'Page web', carte: 'Carte', promo: 'Promo' };
+const TYPES = { soiree: 'Soirée', lineup: 'Line-up', agenda: 'Agenda', serie: 'Série', image: 'Image', video: 'Vidéo', web: 'Page web', carte: 'Carte', promo: 'Promo', direction: 'Directionnel' };
 // Domaine d'une page web (vignettes, titre proposé).
 const domaine = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const SEMAINE = [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'J'], [5, 'V'], [6, 'S'], [7, 'D']];
@@ -172,6 +172,7 @@ function apercu() {
       else if (etape.type === 'web') g = G.web(etape);
       else if (etape.type === 'carte') g = G.carte(etape, s => s);
       else if (etape.type === 'promo') g = G.promo(etape, s => s);
+      else if (etape.type === 'direction') g = G.direction(etape, s => s);
       else g = G.veille('');
       scene.append(g.noeud);
       if (g.ajuster) g.ajuster();
@@ -897,6 +898,10 @@ function vignette(c) {
   if (c.type === 'lineup') {
     img.append(h('div', { class: 'vignette-soiree', text: d.titre || G.vedetteDe(d.passages) || 'Line-up' }));
   }
+  if (c.type === 'direction') {
+    img.classList.add('vignette-serie', 'f-' + (d.fond || 'noir'));
+    img.append(h('div', { class: 'vignette-dir' }, (d.directions || []).map(x => h('span', null, h('b', { text: GLYPHES_FLECHE[x.fleche] || '→' }), ' ' + (x.titre || '')))));
+  }
   img.append(h('span', { class: 'puce t-' + c.type, text: TYPES[c.type] }));
   const t = auj(), actives = diffsDe(c.id).filter(x => x.fin >= t);
   const flux = [...new Set(actives.flatMap(x => x.flux))];
@@ -905,6 +910,7 @@ function vignette(c) {
       : c.type === 'video' ? (d.duree ? Math.round(d.duree) + ' s' + (d.taille ? ' · ' + mo(d.taille) : '') : d.src ? 'Vidéo' : 'Sans fichier')
         : c.type === 'web' ? (domaine(d.url) || 'Sans adresse')
         : c.type === 'carte' ? plur(nbProduits, 'produit') + ' en ' + plur((d.rubriques || []).length, 'rubrique')
+        : c.type === 'direction' ? plur((d.directions || []).length, 'direction') + ' · ' + (d.directions || []).map(x => GLYPHES_FLECHE[x.fleche] || '→').join(' ')
         : c.type === 'promo' ? plur((d.produits || []).length, 'offre') + ((d.produits || []).some(x => x.prix) ? ' · ' + (d.produits || []).map(x => G.prixTexte(x.prix)).filter(Boolean).join(', ') : '')
         : (d.largeur ? d.largeur + ' × ' + d.hauteur + ' px' : d.src ? 'Image' : 'Sans fichier');
   return h('a', { class: 'vignette' + (c.statut === 'archive' ? ' archive' : ''), href: '#contenu/' + c.id }, img,
@@ -1032,7 +1038,7 @@ function vueContenus() {
         Object.assign(filtre, FILTRE_VIDE, { type: 'soiree', soiree: 'avenir', prog: 'non', tri: 'date' }); synchro(); changer();
       } }, n > 1 ? 'Les afficher' : 'L’afficher'));
   };
-  const seg = h('div', { class: 'seg seg-types', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['lineup', 'Line-up'], ['agenda', 'Agendas'], ['serie', 'Séries'], ['image', 'Images'], ['video', 'Vidéos'], ['web', 'Pages web'], ['carte', 'Cartes'], ['promo', 'Promos']].map(([k, tx]) =>
+  const seg = h('div', { class: 'seg seg-types', role: 'group', 'aria-label': 'Type' }, [['tous', 'Tous'], ['soiree', 'Soirées'], ['lineup', 'Line-up'], ['agenda', 'Agendas'], ['serie', 'Séries'], ['image', 'Images'], ['video', 'Vidéos'], ['web', 'Pages web'], ['carte', 'Cartes'], ['promo', 'Promos'], ['direction', 'Directionnels']].map(([k, tx]) =>
     h('button', { type: 'button', 'data-v': k, onclick: () => { filtre.type = k; synchro(); changer(); } }, tx)));
   const recherche = h('input', { type: 'search', placeholder: 'Rechercher un nom…', value: filtre.texte, 'aria-label': 'Rechercher', oninput: e => { filtre.texte = e.target.value; changer(); } });
   const archives = h('input', { type: 'checkbox', checked: filtre.archives, onchange: e => { filtre.archives = e.target.checked; changer(); } });
@@ -1068,6 +1074,7 @@ function donneesVides(type) {
   if (type === 'web') return { url: '' };
   if (type === 'carte') return { titre: 'Bar', colonnes: 0, mention: '', rubriques: [{ titre: '', note: '', formats: [], produits: [{ nom: '', format: '', detail: '', prix: [''] }] }] };
   if (type === 'promo') return { accroche: 'Ce soir au bar', titre: '', fond: 'rose', mention: '', produits: [{ nom: '', detail: '', prix: '', ancien: '', photo: null }] };
+  if (type === 'direction') return { fond: 'noir', directions: [{ fleche: 'droite', titre: '', detail: '', picto: 'emoji', emoji: '', image: null }] };
   return { src: null, poster: null, son: false };
 }
 function titreAuto(ed) {
@@ -1080,6 +1087,7 @@ function titreAuto(ed) {
   }
   if (ed.type === 'web') return 'Page web' + (domaine(d.url) ? ' · ' + domaine(d.url) : '');
   if (ed.type === 'carte') return 'Carte · ' + (d.titre || 'Bar');
+  if (ed.type === 'direction') return 'Direction · ' + ((d.directions || []).map(x => x.titre).filter(Boolean).join(' / ') || 'panneau');
   if (ed.type === 'promo') return 'Promo · ' + ((d.produits || []).map(x => x.nom).filter(Boolean).join(' + ') || d.titre || 'bar');
   return d.fichier || TYPES[ed.type];
 }
@@ -1253,6 +1261,101 @@ function champsCarte(d, changer) {
       } }, '+ Rubrique')),
       h('small', { text: 'Prix : « 3,5 » s’affiche « 3,50 € ». Plusieurs formats (ex. « 25 cl, 40 cl ») : une colonne de prix par format, titrée en haut de la rubrique. Un produit « Non disponible » ou « En rupture » reste à l’écran, grisé, avec l’étiquette à la place du prix.' })),
     champ('Mention en bas de l’écran (facultative)', h('input', { id: 'f-mention-carte', type: 'text', value: d.mention || '', maxLength: 120, placeholder: 'Liste des allergènes disponible au bar.', oninput: e => { d.mention = e.target.value; changer(); } }))
+  ];
+}
+
+/* Directionnel : une ou deux directions (deux : l'écran est partagé, la 1re à gauche). Pour chacune : la flèche
+   (rose des vents à 8 directions), le service, une précision, et un pictogramme : émoji (suggestions ou collé,
+   dessiné à l'écran avec les émojis Twemoji livrés avec l'application), image importée, ou aucun. */
+const GLYPHES_FLECHE = { droite: '→', gauche: '←', haut: '↑', bas: '↓', 'haut-droite': '↗', 'haut-gauche': '↖', 'bas-droite': '↘', 'bas-gauche': '↙' };
+const NOMS_FLECHE = { droite: 'vers la droite', gauche: 'vers la gauche', haut: 'tout droit (vers le haut)', bas: 'vers le bas',
+  'haut-droite': 'en haut à droite', 'haut-gauche': 'en haut à gauche', 'bas-droite': 'en bas à droite', 'bas-gauche': 'en bas à gauche' };
+const ROSE = ['haut-gauche', 'haut', 'haut-droite', 'gauche', null, 'droite', 'bas-gauche', 'bas', 'bas-droite'];
+const EMOJIS_SIGNALETIQUE = [
+  ['🚻', 'Toilettes'], ['🚹', 'Hommes'], ['🚺', 'Femmes'], ['♿', 'Accès PMR'], ['🚼', 'Change bébé'], ['🛗', 'Ascenseur'], ['🚪', 'Sortie'], ['🏃', 'Sortie de secours'],
+  ['🍺', 'Bar'], ['🍸', 'Cocktails'], ['🍷', 'Vin'], ['🥤', 'Softs'], ['☕', 'Café'], ['🍔', 'Restauration'], ['🍕', 'Pizzas'], ['🍿', 'Snack'],
+  ['🎫', 'Billetterie'], ['🎟️', 'Billets'], ['🧥', 'Vestiaire'], ['🎒', 'Consigne'], ['🎤', 'Scène'], ['🎸', 'Concert'], ['🎧', 'DJ'], ['🪩', 'Club'],
+  ['🛼', 'Roller'], ['👕', 'Merch'], ['🛍️', 'Boutique'], ['🎭', 'Spectacle'], ['🎨', 'Expo'], ['📸', 'Photo'], ['ℹ️', 'Accueil, infos'], ['🏢', 'Bureaux'],
+  ['⛑️', 'Secours'], ['🩹', 'Premiers soins'], ['💧', 'Eau'], ['🚭', 'Non-fumeurs'], ['🚬', 'Fumeurs'], ['🏧', 'Distributeur'], ['💳', 'Carte bancaire'], ['🔒', 'Casiers'],
+  ['🅿️', 'Parking'], ['🚌', 'Navette'], ['🚕', 'Taxi'], ['🚲', 'Vélos'], ['🔌', 'Recharge'], ['🌳', 'Terrasse'], ['👶', 'Enfants'], ['🔞', 'Interdit aux moins de 18 ans']
+];
+function champsDirection(d, changer) {
+  d.directions = d.directions || [];
+  let reserve = null;   // seconde direction retirée : retrouvée si l'on repasse à deux
+  const zone = h('div', { class: 'directions-ed' });
+  const fleche = f => { const i = h('span', { class: 'fleche-ed' }); i.innerHTML = G.FLECHE_SVG; i.style.transform = 'rotate(' + G.FLECHES[f] + 'deg)'; return i; };
+  function bloc(x, i) {
+    x.picto = x.picto === undefined ? (x.image ? 'image' : 'emoji') : x.picto;
+    const rose = h('div', { class: 'rose', role: 'group', 'aria-label': 'Flèche' }, ROSE.map(f => f
+      ? h('button', { type: 'button', title: NOMS_FLECHE[f], 'aria-label': 'Flèche ' + NOMS_FLECHE[f], 'aria-pressed': String(x.fleche === f), onclick: e => {
+          x.fleche = f; rose.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
+        } }, fleche(f))
+      : h('span', { class: 'rose-centre', 'aria-hidden': 'true' })));
+    // émoji : suggestions, ou n'importe quel émoji collé (clavier : Windows + « . », Mac : Ctrl + Cmd + Espace)
+    const vu = h('img', { class: 'emoji-vu', alt: '', width: 40, height: 40 });
+    const alerte = h('small', { class: 'erreur', hidden: true, text: 'Émoji introuvable dans la collection : choisissez-en un autre.' });
+    const saisie = h('input', { type: 'text', class: 'emoji-saisie', value: x.emoji || '', maxLength: 32, placeholder: 'ou collez un émoji', 'aria-label': 'Émoji', autocomplete: 'off',
+      oninput: e => { x.emoji = e.target.value.trim(); majEmoji(); changer(); } });
+    const grille = h('div', { class: 'emojis', role: 'group', 'aria-label': 'Émojis proposés' }, EMOJIS_SIGNALETIQUE.map(([e, nom]) =>
+      h('button', { type: 'button', title: nom, 'aria-label': nom, 'data-emoji': e, onclick: () => { x.emoji = e; saisie.value = e; majEmoji(); changer(); } },
+        h('img', { src: G.emojiSrc(e), alt: '', width: 28, height: 28, loading: 'lazy' }))));
+    function majEmoji() {
+      const src = G.emojiSrc(x.emoji);
+      grille.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(G.emojiSrc(b.dataset.emoji) === src && !!src)));
+      alerte.hidden = true; vu.hidden = !src;
+      if (src) { vu.onerror = () => { vu.hidden = true; alerte.hidden = false; }; vu.src = src; }
+    }
+    majEmoji();
+    const panEmoji = h('div', { class: 'picto-emoji' }, grille, h('div', { class: 'emoji-ligne' }, saisie, vu), alerte,
+      h('small', { class: 'aide', text: 'Émojis Twemoji (CC-BY 4.0), identiques sur tous les écrans.' }));
+    const panImage = h('div', { class: 'picto-image' }, champMedia({ genre: 'image', valeur: x.image, facultatif: true, boite: [150, 150],
+      change: v => { x.image = v; changer(); },
+      cadre: Object.assign({ contenir: true, conseil: 'pictogramme ou logo, affiché entier sur un carré blanc' }, G.CADRES.direction) }));
+    const montrer = () => { panEmoji.hidden = x.picto !== 'emoji'; panImage.hidden = x.picto !== 'image'; };
+    const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Pictogramme' }, [['emoji', 'Émoji'], ['image', 'Image'], ['', 'Aucun']].map(([k, t]) =>
+      h('button', { type: 'button', 'aria-pressed': String(x.picto === k), onclick: e => {
+        x.picto = k; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); montrer(); changer();
+      } }, t)));
+    montrer();
+    const carte = h('div', { class: 'direction-ed depot' },
+      h('div', { class: 'direction-tete' },
+        h('b', { text: d.directions.length > 1 ? (i === 0 ? 'Moitié gauche' : 'Moitié droite') : 'Direction' }),
+        d.directions.length > 1 && i === 0 && h('button', { type: 'button', class: 'btn pt', onclick: () => { d.directions.reverse(); remplir(); changer(); } }, '⇄ Inverser les moitiés')),
+      h('div', { class: 'direction-corps' },
+        h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Flèche' }), rose),
+        h('div', { class: 'direction-champs' },
+          h('input', { type: 'text', value: x.titre || '', maxLength: 40, placeholder: 'Service (ex. Toilettes)', 'aria-label': 'Service', class: 'direction-titre',
+            oninput: e => { x.titre = e.target.value; changer(); } }),
+          h('input', { type: 'text', value: x.detail || '', maxLength: 80, placeholder: 'Précision facultative (ex. Au fond du couloir, 1er étage)', 'aria-label': 'Précision',
+            oninput: e => { x.detail = e.target.value; changer(); } }),
+          h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Pictogramme' }), seg, panEmoji, panImage))));
+    carte._recevoir = f => { if (x.picto !== 'image') { x.picto = 'image'; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.textContent === 'Image'))); montrer(); } const m = panImage.querySelector('.media'); if (m && m._recevoir) m._recevoir(f); };
+    return carte;
+  }
+  function remplir() {
+    remplacer(zone, d.directions.map(bloc));
+    nombre.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.n) === d.directions.length)));
+  }
+  const nombre = h('div', { class: 'seg', role: 'group', 'aria-label': 'Nombre de directions' }, [[1, 'Une direction'], [2, 'Deux directions (écran partagé)']].map(([n, t]) =>
+    h('button', { type: 'button', 'data-n': n, onclick: () => {
+      if (n === d.directions.length) return;
+      if (n === 2) {
+        const a = d.directions[0];
+        if (a.fleche === 'droite') a.fleche = 'gauche';
+        d.directions.push(reserve || { fleche: 'droite', titre: '', detail: '', picto: 'emoji', emoji: '', image: null });
+      } else reserve = d.directions.pop();
+      remplir(); changer();
+    } }, t)));
+  remplir();
+  const fondSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Couleur de fond' }, ['noir', 'rose', 'violet', 'degrade'].map(k =>
+    h('button', { type: 'button', 'aria-pressed': String((d.fond || 'noir') === k), onclick: e => {
+      d.fond = k; fondSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
+    } }, h('i', { class: 'pastille p-' + k }), G.nomCouleur(k))));
+  return [
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Panneau' }), nombre,
+      h('small', { text: 'Deux directions : l’écran est partagé en deux moitiés, chacune avec sa flèche et son service.' })),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Directions' }), zone),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Couleur de fond' }), fondSeg)
   ];
 }
 
@@ -1537,6 +1640,8 @@ function vueEditeur(id, typeNouveau) {
     champs.push(...champsCarte(d, changer));
   } else if (ed.type === 'promo') {
     champs.push(...champsPromo(d, changer));
+  } else if (ed.type === 'direction') {
+    champs.push(...champsDirection(d, changer));
   } else if (ed.type === 'lineup') {
     champs.push(champsLineup(d, changer));
   } else if (ed.type === 'image') {
@@ -1578,6 +1683,7 @@ function vueEditeur(id, typeNouveau) {
     if (ed.type === 'serie' && !d.dates.length) { annoncer('Ajoutez au moins une date à la série.', true); return; }
     if (ed.type === 'carte' && !d.rubriques.some(r => r.produits.some(x => x.nom.trim()))) { annoncer('Ajoutez au moins un produit à la carte.', true); return; }
     if (ed.type === 'promo' && !d.produits.some(x => x.nom.trim())) { annoncer('Indiquez le produit mis en avant.', true); return; }
+    if (ed.type === 'direction' && d.directions.some(x => !(x.titre || '').trim())) { annoncer('Indiquez le service de chaque direction (Toilettes, Bar…).', true); return; }
     if (ed.type === 'serie' && d.dates.some(x => !x.date)) { annoncer('Chaque date de la série doit avoir un jour.', true); return; }
     enregistrer.disabled = true;
     const corps = { type: ed.type, titre: ed.titre || titreAuto(ed), donnees: d, duree: ed.duree, statut: apres === 'archiver' ? 'archive' : apres === 'restaurer' ? 'actif' : ed.statut };

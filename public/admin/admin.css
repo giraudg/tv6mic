@@ -4,7 +4,7 @@
   --noir: #000; --blanc: #fff; --brume: #f1f1f1; --brume2: #e4e4e4; --gris: #404040; --filet: #bababa;
   --violet: #8e63ff; --violet-f: #6a42e6; --magenta: #e744a8; --bleu: #2563eb; --vert: #047857; --rouge: #b91c1c; --orange: #b45309;
   --rose-clair: #fde4f2; --bleu-clair: #dde9fe; --violet-clair: #ece5ff;
-  --t-soiree: #c23d97; --t-lineup: #0e7490; --t-agenda: #2563eb; --t-serie: #b45309; --t-image: #047857; --t-video: #6a42e6; --t-web: #475569; --t-carte: #9d174d; --t-promo: #c2410c;
+  --t-soiree: #c23d97; --t-lineup: #0e7490; --t-agenda: #2563eb; --t-serie: #b45309; --t-image: #047857; --t-video: #6a42e6; --t-web: #475569; --t-carte: #9d174d; --t-promo: #c2410c; --t-direction: #4d7c0f;
   --sans: "owners", "TV Archivo", "Helvetica Neue", Arial, sans-serif;
   --cond: "zuume-cut", "TV Anton", Impact, "Arial Narrow", sans-serif;
   color-scheme: light;
@@ -110,6 +110,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .t-web { background: var(--t-web); color: #fff; }
 .t-carte { background: var(--t-carte); color: #fff; }
 .t-promo { background: var(--t-promo); color: #fff; }
+.t-direction { background: var(--t-direction); color: #fff; }
 .prio { background: var(--rouge); color: #fff; }
 
 /* ---------- écrans (tableau de bord) ---------- */
@@ -574,3 +575,34 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
   .produit-ed, .produit-ed.prix-2, .produit-ed.prix-3 { grid-template-columns: 90px minmax(0, 1fr) auto; grid-template-areas: "nom nom nom" "fmt prix prix" "det det det" "st st fl"; }
   .produit-ed .fl { justify-content: flex-end; }
 }
+
+/* Éditeur du directionnel : rose des vents, émojis proposés */
+.directions-ed { display: grid; gap: 12px; }
+.direction-ed { display: grid; gap: 10px; padding: 12px; border: 1px solid #000; }
+.direction-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.direction-tete b { font-family: var(--cond); font-size: 22px; text-transform: uppercase; }
+.direction-corps { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
+.direction-champs { display: grid; gap: 8px; min-width: 0; }
+.direction-titre { font-weight: 700; text-transform: uppercase; }
+.rose { display: grid; grid-template-columns: repeat(3, 46px); gap: 4px; }
+.rose button { width: 46px; height: 46px; padding: 9px; border: 1px solid #000; background: #fff; color: #000; display: grid; place-items: center; }
+.rose button[aria-pressed="true"] { background: #000; color: #fff; }
+.rose-centre { width: 46px; height: 46px; display: grid; place-items: center; }
+.rose-centre::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #000; }
+.fleche-ed { display: block; width: 26px; height: 26px; }
+.fleche-ed svg { display: block; }
+.emojis { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px; }
+.emojis button { width: 42px; height: 42px; padding: 6px; border: 1px solid var(--brume2); background: #fff; display: grid; place-items: center; }
+.emojis button:hover { border-color: #000; }
+.emojis button[aria-pressed="true"] { border-color: #000; box-shadow: inset 0 0 0 2px #000; background: var(--violet-clair); }
+.emojis img { display: block; width: 28px; height: 28px; }
+.emoji-ligne { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.emoji-ligne .emoji-saisie { width: 240px; max-width: 100%; font-size: 22px; }
+.emoji-vu { width: 40px; height: 40px; }
+.picto-emoji, .picto-image { margin-top: 8px; }
+.vignette-dir { position: absolute; left: 10px; right: 10px; top: 50%; transform: translateY(-50%); display: grid; gap: 4px; font-family: var(--cond); text-transform: uppercase; font-size: 22px; line-height: 1; color: #fff; }
+.vignette-dir b { font-family: Arial, sans-serif; font-size: 26px; }
+@media (max-width: 760px) {
+  .direction-corps { grid-template-columns: minmax(0, 1fr); }
+}
+
