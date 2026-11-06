@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.6.1';
+  var VERSION = '1.6.2';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -334,12 +334,14 @@
       montrer({ type: 'couche', index: ic });
       depuisCouche = true;
     }
-    if (modeVideo === 'simple' && actif && actif.type === 'video') {
+    // Vidéo après vidéo : l'image fixe couvre le passage, et la précédente est libérée avant que la suivante charge
+    // (avec deux lecteurs aussi : les téléviseurs ne décodent qu'une vidéo à la fois, voir preparerSuivante).
+    if (actif && actif.type === 'video') {
       couvrirAvecPoster(d, function () { if (n === jeton) { jouerVideo(e, n, liste, ecoule); } });
       return;
     }
     i = videoPour(e, true);
-    if (modeVideo === 'simple' && !estActif({ type: 'video', index: 1 - i })) { liberer(1 - i); }
+    if (!estActif({ type: 'video', index: 1 - i })) { liberer(1 - i); }
     if (videos[i].__cle === e.cle && videos[i].getAttribute('src') && !videos[i].error) {
       lancer();
     } else {
@@ -440,7 +442,10 @@
     libererBlobs([e, s]);
     if (!s || s.cle === e.cle || quarantaine[s.cle] > Date.now()) { return; }
     if (s.type === 'video') {
-      if (modeVideo !== 'double') { telechargerSuivante(s); return; }
+      // Le second lecteur ne précharge la vidéo suivante que pendant une étape sans vidéo. Pendant une vidéo,
+      // on télécharge seulement son fichier. Régie, 6 nov. : Roller Disco, suivie de Maman Sort Danser, passait au noir
+      // quelques secondes après son début, au moment où l'autre lecteur chargeait la suivante.
+      if (modeVideo !== 'double' || e.type === 'video') { telechargerSuivante(s); return; }
       i = videoPour(s, false);
       if (i < 0) { return; }
       resoudre(s, function (url) {
@@ -672,6 +677,6 @@
     }
   }
 
-  W.TV6MIC = { version: VERSION, etat: function () { return { courante: courante, prog: prog, modeVideo: modeVideo, memoire: memoire, erreurs: erreurs, actif: actif }; } };
+  W.TV6MIC = { version: VERSION, etat: function () { return { courante: courante, prog: prog, modeVideo: modeVideo, memoire: memoire, erreurs: erreurs, actif: actif, trace: traceVideo }; } };
   init();
 }());
