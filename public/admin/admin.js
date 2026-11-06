@@ -2397,6 +2397,7 @@ async function vueJournal(page) {
   afficher(
     h('div', { class: 'tete' }, h('div', null, h('p', { class: 'surtitre', text: plur(j.total, 'modification') }), h('h1', { class: 'titre', text: 'Journal' }))),
     incidents,
+    blocConnexions(j.connexions || []),
     j.lignes.length ? h('table', { class: 'tableau' },
       h('thead', null, h('tr', null, h('th', { text: 'Quand' }), h('th', { text: 'Qui' }), h('th', { text: 'Quoi' }))),
       h('tbody', null, j.lignes.map(l => h('tr', null, h('td', { text: heureIso(l.quand) }), h('td', { text: l.qui || '' }),
@@ -2406,6 +2407,53 @@ async function vueJournal(page) {
       h('button', { type: 'button', class: 'btn', disabled: page <= 1, onclick: () => vueJournal(page - 1) }, '‹ Plus récentes'),
       h('span', { class: 'aide', text: 'Page ' + j.page + ' sur ' + j.pages }),
       h('button', { type: 'button', class: 'btn', disabled: page >= j.pages, onclick: () => vueJournal(page + 1) }, 'Plus anciennes ›')));
+}
+
+// Connexions des écrans (7 derniers jours) : retours de contact après un silence, et ce que l'écran a fait entre-temps.
+function dureeSilence(s) {
+  if (s < 90) return Math.round(s) + ' s';
+  if (s < 3600) return Math.round(s / 60) + ' min';
+  const m = Math.round(s / 60);
+  return Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+}
+const heureMs = ms => heureIso(new Date(ms).toISOString());
+const CAS_RETOUR = {
+  ouverte: ['page restée ouverte sans joindre le serveur', 'puce-rouge'],
+  rechargee: ['page rechargée sans joindre le serveur', 'puce-rouge'],
+  fermee: ['page fermée pendant ce temps : écran éteint, ou page non ouverte par MagicINFO', 'puce-gris'],
+  compteur: ['mémoire du navigateur effacée pendant ce temps', 'puce-gris']
+};
+function ligneConnexion(x) {
+  const d = x.detail || {}, nom = (E.fluxParCode.get(x.flux_code) || {}).nom || x.flux_code;
+  let puce, texte;
+  if (x.evenement === 'retour') {
+    const c = CAS_RETOUR[d.cas] || CAS_RETOUR.fermee;
+    puce = h('span', { class: 'puce ' + c[1], text: 'Retour' });
+    texte = 'Silence de ' + dureeSilence(d.silence || 0) + ' (depuis ' + (d.estime ? 'environ ' : '') + heureMs(x.depuis) + ') : ' + c[0]
+      + (d.cas === 'rechargee' && d.recharges > 1 ? ', ' + (d.recharges - 1) + ' fois' : '')
+      + (d.reseau ? ' · réseau ' + d.reseau : '') + (d.erreur ? ' · ' + d.erreur : '');
+  } else if (x.evenement === 'version') {
+    puce = h('span', { class: 'puce puce-gris', text: 'Version' }); texte = 'Lecteur ' + d.de + ' → ' + d.a;
+  } else if (x.evenement === 'mode') {
+    const nomMode = m => m === 'simple' ? 'un lecteur vidéo' : m === 'double' ? 'deux lecteurs vidéo' : m;
+    puce = h('span', { class: 'puce puce-gris', text: 'Vidéo' }); texte = nomMode(d.de) + ' → ' + nomMode(d.a);
+  } else if (x.evenement === 'reseau') {
+    puce = h('span', { class: 'puce puce-noir', text: 'Réseau' }); texte = 'Nouvelle adresse ' + d.a + (d.reseau ? ' (' + d.reseau + ')' : '') + ', au lieu de ' + d.de;
+  } else {
+    puce = h('span', { class: 'puce puce-filet', text: 'Erreur' }); texte = (d.nouvelles || []).join(' | ');
+  }
+  return h('tr', null, h('td', { text: heureMs(x.quand) }), h('td', { text: nom }), h('td', null, puce), h('td', { class: 'aide', text: texte }));
+}
+function blocConnexions(liste) {
+  if (!liste.length) return null;
+  const coupures = liste.filter(x => x.evenement === 'retour' && (x.detail.cas === 'ouverte' || x.detail.cas === 'rechargee')).length;
+  return h('details', { class: 'incidents' },
+    h('summary', null, h('b', { text: 'Connexions des écrans (7 derniers jours) : ' }),
+      [coupures && plur(coupures, 'coupure avec le serveur', 'coupures avec le serveur'), plur(liste.length, 'événement')].filter(Boolean).join(', ')),
+    h('p', { class: 'aide', text: 'Un « retour » est noté quand un écran reprend contact après plus de 3 minutes de silence, avec ce qu’il a fait entre-temps. En rouge : la page tournait mais ne joignait pas le serveur (réseau de l’écran, en général). En gris : la page était fermée, le plus souvent écran éteint.' }),
+    h('table', { class: 'tableau' },
+      h('thead', null, h('tr', null, h('th', { text: 'Quand' }), h('th', { text: 'Écran' }), h('th', { text: 'Événement' }), h('th', { text: 'Détail' }))),
+      h('tbody', null, liste.map(ligneConnexion))));
 }
 
 /* ================= connexion et démarrage ================= */

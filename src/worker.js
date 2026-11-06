@@ -157,7 +157,7 @@ async function programme(req, env, ctx, code) {
   let signal = null;
   if (req.method === 'POST') {
     signal = await req.json().catch(() => null);
-    if (signal && typeof signal === 'object') ctx.waitUntil(enregistrerSignal(db, code, signal, maintenant).catch(e => console.error('signal', e)));
+    if (signal && typeof signal === 'object') ctx.waitUntil(enregistrerSignal(db, code, signal, maintenant, req).catch(e => console.error('signal', e)));
   }
 
   const base = { flux: { code: flux.code, nom: flux.nom }, version, maintenant, identifier: flux.identifier_jusqua || 0 };
@@ -208,29 +208,77 @@ function entier(v) {
 }
 
 /* État des écrans : chaque écran l'envoie toutes les 30 s (et à chaque rechargement de MagicINFO), soit plus de
-   30 000 envois par jour pour 9 écrans. Les écrire tous épuisait la limite d'écritures quotidienne de D1 (offre
-   gratuite : 100 000 lignes, pour tout le compte Cloudflare). On n'écrit plus que si quelque chose d'important a
-   changé (version du lecteur ou de la programmation, erreur, mode vidéo, premier envoi), sinon toutes les 5 minutes. */
+   30 000 envois par jour pour 9 écrans. La ligne complète (trace comprise) n'est réécrite que si quelque chose
+   d'important a changé (version du lecteur ou de la programmation, erreur, mode vidéo, premier envoi), sinon toutes
+   les 5 minutes. Entre-temps, seuls l'heure du dernier contact, le compteur de chargements et le début de la page
+   sont mis à jour (offre payante de D1 : ces écritures sont largement couvertes).
+   Historique (table ecrans_historique, 90 jours) : retour de contact après plus de 3 minutes de silence, avec ce que
+   l'écran a fait pendant ce temps ; changement de version, de mode vidéo, de réseau ; nouvelles erreurs.
+   Tout se passe après la réponse à l'écran (waitUntil) : une erreur ici ne change rien à son affichage. */
 const SIGNAL_INTERVALLE = 5 * 60e3;
-async function enregistrerSignal(db, code, s, maintenant) {
-  const prec = await db.prepare('SELECT vu_le, lecteur, version, erreur, video, agent FROM ecrans WHERE flux_code = ?').bind(code).first();
+const SILENCE = 3 * 60e3;
+const HISTORIQUE_JOURS = 90;
+// Même réseau : même adresse IPv4, ou même préfixe /64 en IPv6 (la fin d'une adresse IPv6 change souvent d'elle-même).
+function prefixeReseau(ip) {
+  if (!ip) return null;
+  return ip.includes(':') ? ip.split(':').slice(0, 4).join(':') + '::/64' : ip;
+}
+function partiesErreur(t) { return t ? String(t).split(' | ').filter(Boolean) : []; }
+async function enregistrerSignal(db, code, s, maintenant, req) {
+  const prec = await db.prepare('SELECT vu_le, contact_le, lecteur, version, erreur, video, agent, chargements, demarre_le, ip FROM ecrans WHERE flux_code = ?').bind(code).first();
+  const lecteur = texte(s.lecteur, 20), video = texte(s.video, 10), erreur = texte(s.erreur, 300);
+  const chargements = entier(s.chargements), demarre = entier(s.demarre);
+  const ip = texte(req && req.headers.get('CF-Connecting-IP'), 64), reseau = texte(req && req.cf && req.cf.asOrganization, 80);
+  const evenements = [];
+  if (prec) {
+    // Dernier contact ; avant la migration 0009, seule l'heure de la dernière écriture est connue (5 min d'imprécision) :
+    // on ne s'en sert que pour un silence certain, pour ne pas inventer de coupures au déploiement.
+    const dernier = prec.contact_le || (maintenant - (prec.vu_le || maintenant) > SIGNAL_INTERVALLE + SILENCE ? prec.vu_le : 0);
+    if (dernier && maintenant - dernier > SILENCE) {
+      // Ce que la page a fait pendant le silence : restée ouverte (même début), rechargée sans joindre le serveur
+      // (MagicINFO la recharge chaque minute), ou fermée (écran éteint, page non ouverte).
+      // (début de page : horloge de l'écran, comparée à elle-même ; elle peut être décalée, Hall : 1 h d'avance)
+      const memePage = demarre !== null && demarre === prec.demarre_le;
+      const recharges = chargements !== null && prec.chargements !== null ? chargements - prec.chargements : null;
+      const cas = recharges !== null && recharges < 0 ? 'compteur'
+        : memePage ? 'ouverte' : recharges !== null && recharges > 1 ? 'rechargee' : 'fermee';
+      evenements.push(['retour', dernier, { silence: Math.round((maintenant - dernier) / 1000), cas, recharges,
+        estime: !prec.contact_le, page: demarre, lecteur, erreur, ip, reseau }]);
+    }
+    if (prec.lecteur && lecteur && prec.lecteur !== lecteur) evenements.push(['version', null, { de: prec.lecteur, a: lecteur }]);
+    if (prec.video && video && prec.video !== video) evenements.push(['mode', null, { de: prec.video, a: video }]);
+    const avant = partiesErreur(prec.erreur), nouvelles = partiesErreur(erreur).filter(x => !avant.includes(x));
+    if (nouvelles.length) evenements.push(['erreur', null, { nouvelles }]);
+    if (prec.ip && ip && prefixeReseau(prec.ip) !== prefixeReseau(ip)) evenements.push(['reseau', null, { de: prec.ip, a: ip, reseau }]);
+  }
   // (le navigateur n'est envoyé qu'au premier signal de chaque chargement : MagicINFO recharge chaque minute, on ne le compare que s'il est là)
-  const important = !prec || prec.lecteur !== texte(s.lecteur, 20) || prec.version !== entier(s.version) || (prec.erreur || null) !== texte(s.erreur, 300)
-    || prec.video !== texte(s.video, 10) || (s.agent && prec.agent !== texte(s.agent, 300));
-  if (!important && maintenant - (prec.vu_le || 0) < SIGNAL_INTERVALLE) return;
-  await db.prepare(
-    `INSERT INTO ecrans (flux_code, vu_le, lecteur, version, contenu, memoire, video, erreur, demarre_le, chargements, taille, agent, trace)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
-     ON CONFLICT (flux_code) DO UPDATE SET
-       vu_le = excluded.vu_le, lecteur = excluded.lecteur, version = excluded.version, contenu = excluded.contenu,
-       memoire = excluded.memoire, video = excluded.video, erreur = excluded.erreur, demarre_le = excluded.demarre_le,
-       chargements = excluded.chargements, taille = excluded.taille, agent = COALESCE(excluded.agent, ecrans.agent),
-       trace = COALESCE(excluded.trace, ecrans.trace)`
-  ).bind(
-    code, maintenant, texte(s.lecteur, 20), entier(s.version), texte(s.contenu, 120), entier(s.memoire),
-    texte(s.video, 10), texte(s.erreur, 300), entier(s.demarre), entier(s.chargements), texte(s.taille, 20), texte(s.agent, 300),
-    texte(s.trace, 2000)
-  ).run();
+  const important = !prec || prec.lecteur !== lecteur || prec.version !== entier(s.version) || (prec.erreur || null) !== erreur
+    || prec.video !== video || (s.agent && prec.agent !== texte(s.agent, 300)) || evenements.length > 0;
+  const ecritures = [];
+  if (important || maintenant - (prec.vu_le || 0) >= SIGNAL_INTERVALLE) {
+    ecritures.push(db.prepare(
+      `INSERT INTO ecrans (flux_code, vu_le, lecteur, version, contenu, memoire, video, erreur, demarre_le, chargements, taille, agent, trace, contact_le, ip, reseau)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?2, ?14, ?15)
+       ON CONFLICT (flux_code) DO UPDATE SET
+         vu_le = excluded.vu_le, lecteur = excluded.lecteur, version = excluded.version, contenu = excluded.contenu,
+         memoire = excluded.memoire, video = excluded.video, erreur = excluded.erreur, demarre_le = excluded.demarre_le,
+         chargements = excluded.chargements, taille = excluded.taille, agent = COALESCE(excluded.agent, ecrans.agent),
+         trace = COALESCE(excluded.trace, ecrans.trace), contact_le = excluded.contact_le,
+         ip = COALESCE(excluded.ip, ecrans.ip), reseau = COALESCE(excluded.reseau, ecrans.reseau)`
+    ).bind(
+      code, maintenant, lecteur, entier(s.version), texte(s.contenu, 120), entier(s.memoire),
+      video, erreur, demarre, chargements, texte(s.taille, 20), texte(s.agent, 300), texte(s.trace, 2000), ip, reseau
+    ));
+  } else {
+    ecritures.push(db.prepare('UPDATE ecrans SET contact_le = ?, chargements = COALESCE(?, chargements), demarre_le = COALESCE(?, demarre_le) WHERE flux_code = ?')
+      .bind(maintenant, chargements, demarre, code));
+  }
+  for (const [evenement, depuis, detail] of evenements) {
+    ecritures.push(db.prepare('INSERT INTO ecrans_historique (flux_code, quand, evenement, depuis, detail) VALUES (?, ?, ?, ?, ?)')
+      .bind(code, maintenant, evenement, depuis, JSON.stringify(detail)));
+  }
+  if (evenements.length) ecritures.push(db.prepare('DELETE FROM ecrans_historique WHERE quand < ?').bind(maintenant - HISTORIQUE_JOURS * 864e5));
+  await db.batch(ecritures);
 }
 
 /* Médias importés (R2). Les clés sont uniques : le navigateur et l'écran peuvent les garder longtemps. */
@@ -462,7 +510,15 @@ async function journal(env, url) {
       incidents = (await env.DB.prepare("SELECT quand, niveau, methode, chemin, message FROM erreurs WHERE quand >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-7 days') ORDER BY id DESC LIMIT 50").all()).results;
     } catch (e) { console.error('incidents', e); }
   }
-  return json({ lignes: results, total, page, pages, incidents });
+  // connexions des écrans des 7 derniers jours (table créée par la migration 0009)
+  let connexions = [];
+  if (page === 1) {
+    try {
+      connexions = (await env.DB.prepare('SELECT flux_code, quand, evenement, depuis, detail FROM ecrans_historique WHERE quand >= ? ORDER BY id DESC LIMIT 300')
+        .bind(Date.now() - 7 * 864e5).all()).results.map(x => ({ ...x, detail: lireJSON(x.detail, {}) }));
+    } catch (e) { console.error('connexions', e); }
+  }
+  return json({ lignes: results, total, page, pages, incidents, connexions });
 }
 
 /* ---- écriture : chaque modification est journalisée et fait monter la version (les écrans rechargent) ---- */
