@@ -611,7 +611,7 @@ function validerDonnees(type, d, reglages) {
       return { titre: chaine(r.titre, 40, 'titre de la rubrique ' + (i + 1)), note: chaine(r.note, 60, 'précision de la rubrique ' + (i + 1)), formats, produits };
     });
     return { titre: chaine(d.titre, 40, 'titre de la carte'), colonnes: [1, 2, 3].indexOf(Number(d.colonnes)) >= 0 ? Number(d.colonnes) : 0,
-      mention: chaine(d.mention, 120, 'mention'), rubriques };
+      fond: d.fond === 'blanc' ? 'blanc' : 'noir', mention: chaine(d.mention, 120, 'mention'), rubriques };
   }
   if (type === 'promo') {
     // Promo : une ou deux offres d'une soirée (produit, prix, ancien prix barré, photo facultative).

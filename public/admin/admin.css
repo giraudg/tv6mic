@@ -167,6 +167,7 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .vignette-ag { position: absolute; inset: 0; display: grid; align-content: start; padding: 34px 12px 10px; background: #0b0a0d; }
 .vignette-ag b { font-family: var(--cond); text-transform: uppercase; font-size: 22px; line-height: .95; }
 .vignette-ag > span { font-size: 11px; color: #bdbdbd; margin-top: 4px; }
+.vignette-ag.f-blanc { background: #fff; color: #0b0a0d; } .vignette-ag.f-blanc > span { color: #5f5b69; }
 .vignette-web { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 4px; padding: 30px 12px 12px; background: #1e293b; color: #fff; text-align: center; }
 .vignette-web b { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
 .vignette-web span { font-size: 11px; color: #cbd5e1; overflow-wrap: anywhere; }

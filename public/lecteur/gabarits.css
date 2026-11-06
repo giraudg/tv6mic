@@ -324,6 +324,16 @@
   font-size: .56em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; white-space: nowrap; color: #a9a6b3; }
 .g-c-rupture .g-c-etat { border-color: var(--g-primaire); background: var(--g-primaire); color: #fff; }
 .g-c-pied { position: absolute; left: 120px; right: 120px; bottom: 30px; font-size: 26px; font-weight: 600; color: var(--g-gris); }
+/* fond blanc : texte noir, gris foncés pour rester lisibles de loin ; le bandeau dégradé ne change pas */
+.g-carte.g-f-blanc { background: #fff; color: #0b0a0d; }
+.g-f-blanc .g-entete { color: #fff; }
+.g-f-blanc .g-c-rnote, .g-f-blanc .g-c-fmt, .g-f-blanc .g-c-pf, .g-f-blanc .g-c-pdet, .g-f-blanc .g-c-pied { color: #5f5b69; }
+.g-f-blanc .g-c-points { border-bottom-color: rgba(11, 10, 13, .3); }
+.g-f-blanc .g-c-off .g-c-pn { color: #a9a6b3; }
+.g-f-blanc .g-c-off .g-c-pf, .g-f-blanc .g-c-off .g-c-pdet { color: #c3c0ca; }
+.g-f-blanc .g-c-off .g-c-points { border-bottom-color: rgba(11, 10, 13, .1); }
+.g-f-blanc .g-c-etat { border-color: #b4b1bd; color: #858190; }
+.g-f-blanc .g-c-rupture .g-c-etat { border-color: var(--g-primaire); color: #fff; }
 
 /* 9. Promo : aplat de couleur + texture rayonnante (comme les séries) */
 .g-promo { background: var(--g-primaire); }

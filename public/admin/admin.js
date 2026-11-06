@@ -888,7 +888,7 @@ function vignette(c) {
   if (c.type === 'soiree') img.append(h('div', { class: 'vignette-soiree', text: d.nom || '' }));
   if (c.type === 'web') img.append(h('div', { class: 'vignette-web' }, h('b', { text: domaine(d.url) || 'Sans adresse' }), h('span', { text: d.url ? new URL(d.url).pathname : '' })));
   const nbProduits = c.type === 'carte' ? (d.rubriques || []).reduce((n, r) => n + (r.produits || []).length, 0) : 0;
-  if (c.type === 'carte') img.append(h('div', { class: 'vignette-ag' }, h('b', { text: d.titre || c.titre }), h('span', { text: (d.rubriques || []).map(r => r.titre).filter(Boolean).join(' · ') })));
+  if (c.type === 'carte') img.append(h('div', { class: 'vignette-ag' + (d.fond === 'blanc' ? ' f-blanc' : '') }, h('b', { text: d.titre || c.titre }), h('span', { text: (d.rubriques || []).map(r => r.titre).filter(Boolean).join(' · ') })));
   if (c.type === 'promo') {
     const p0 = (d.produits || [])[0];
     if (p0 && p0.photo && p0.photo.src) { img.style.backgroundImage = 'url("' + p0.photo.src + '")'; if (p0.photo.cadrage) img.style.backgroundPosition = p0.photo.cadrage.x + '% ' + p0.photo.cadrage.y + '%'; }
@@ -1072,7 +1072,7 @@ function donneesVides(type) {
     { heure: '21:30', role: 'tete', libelle: '', nom: '' }, { heure: '00:00', role: 'fermeture', libelle: '', nom: '' }] };
   if (type === 'image') return { src: null, ajustement: 'remplir' };
   if (type === 'web') return { url: '' };
-  if (type === 'carte') return { titre: 'Bar', colonnes: 0, mention: '', rubriques: [{ titre: '', note: '', formats: [], produits: [{ nom: '', format: '', detail: '', prix: [''] }] }] };
+  if (type === 'carte') return { titre: 'Bar', colonnes: 0, fond: 'noir', mention: '', rubriques: [{ titre: '', note: '', formats: [], produits: [{ nom: '', format: '', detail: '', prix: [''] }] }] };
   if (type === 'promo') return { accroche: 'Ce soir au bar', titre: '', fond: 'rose', mention: '', produits: [{ nom: '', detail: '', prix: '', ancien: '', photo: null }] };
   if (type === 'direction') return { fond: 'noir', directions: [{ fleche: 'droite', titre: '', detail: '', picto: 'emoji', emoji: '', image: null }] };
   return { src: null, poster: null, son: false };
@@ -1250,10 +1250,16 @@ function champsCarte(d, changer) {
     h('button', { type: 'button', 'aria-pressed': String((d.colonnes || 0) === k), onclick: e => {
       d.colonnes = k; colSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
     } }, t)));
+  const fondSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Couleur de fond' }, ['noir', 'blanc'].map(k =>
+    h('button', { type: 'button', 'aria-pressed': String((d.fond === 'blanc' ? 'blanc' : 'noir') === k), onclick: e => {
+      d.fond = k; fondSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
+    } }, h('i', { class: 'pastille p-' + k }), G.nomCouleur(k))));
   const champ = (label, entree, aide) => h('div', { class: 'champ' }, h('label', { text: label, for: entree.id }), entree, aide && h('small', { text: aide }));
   return [
     champ('Titre', h('input', { id: 'f-titre-carte', type: 'text', value: d.titre || '', maxLength: 40, placeholder: 'Bar', oninput: e => { d.titre = e.target.value; changer(); } }), 'Dans le bandeau, en très grand (Bar, Snack, Cocktails…).'),
     h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Colonnes' }), colSeg, h('small', { text: 'Auto : les rubriques se répartissent seules, la plus chargée seule dans sa colonne si besoin. Le texte se réduit pour tout faire tenir.' })),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Couleur de fond' }), fondSeg,
+      h('small', { text: 'Le bandeau du titre reste en dégradé ; sur fond blanc, le texte passe en noir.' })),
     h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Rubriques et produits' }), zone,
       h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', disabled: d.rubriques.length >= 8, onclick: () => {
         d.rubriques.push({ titre: '', note: '', formats: [], produits: [{ nom: '', format: '', detail: '', prix: [''] }] }); remplir(); changer();

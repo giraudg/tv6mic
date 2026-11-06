@@ -296,7 +296,8 @@
   function carte(etape) {
     var c = etape.contenu, d = c.donnees || {}, rubriques = [], i, j, k, r, x, ligne, nom, tete, col, cols, corps, n;
     for (i = 0; i < (d.rubriques || []).length; i++) { if (d.rubriques[i] && (d.rubriques[i].produits || []).length) { rubriques.push(d.rubriques[i]); } }
-    var g = el('div', 'g g-carte'), entete = el('div', 'g-entete');
+    // fond : noir (par défaut) ou blanc ; le bandeau dégradé reste le même
+    var g = el('div', 'g g-carte g-f-' + (d.fond === 'blanc' ? 'blanc' : 'noir')), entete = el('div', 'g-entete');
     entete.appendChild(el('div', 'g-motif'));
     var titre = el('div', 'g-titre a a1', d.titre || c.titre);
     entete.appendChild(titre);
