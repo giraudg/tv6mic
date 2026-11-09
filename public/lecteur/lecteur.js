@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.6.3';
+  var VERSION = '1.6.4';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -18,7 +18,7 @@
   var SUIVI = params.debug === '1';
   var K = {
     prog: 'tv6mic.prog.' + CODE, etat: 'tv6mic.etat.' + CODE, medias: 'tv6mic.medias',
-    decalage: 'tv6mic.decalage', chargements: 'tv6mic.chargements', video: 'tv6mic.video'
+    decalage: 'tv6mic.decalage', chargements: 'tv6mic.chargements', video: 'tv6mic.video', garde: 'tv6mic.garde'
   };
 
   var scene, couches, videos, identNoeud = null, suiviNoeud = null;
@@ -185,7 +185,7 @@
   }
 
   /* ---------- boucle ---------- */
-  var quarantaine = {}, minuterieVerif = null, inconnu = false;
+  var quarantaine = {}, minuterieVerif = null, inconnu = false, debutEtape = 0, relances = 0;
 
   function demarrer() {
     if (enRoute) { return; }
@@ -227,7 +227,7 @@
   function ecarter(cle) { quarantaine[cle] = Date.now() + 120000; }
   function afficher(e, liste, reprise) {
     var n = ++jeton, ecoule = reprise ? reprise.ecoule : 0;
-    courante = e;
+    courante = e; debutEtape = Date.now();
     ecrire(K.etat, JSON.stringify({ cle: e.cle, depuis: reprise ? reprise.depuis : Date.now(), reprises: reprise ? reprise.reprises : 0 }));
     if (e.type === 'video') { jouerVideo(e, n, liste, ecoule); return; }
     resoudre(e, function (url) {
@@ -265,6 +265,7 @@
         void couches[i].offsetWidth;
         g.noeud.className += ' joue';
         montrer({ type: 'couche', index: i });
+        relances = 0;
         minuterie = setTimeout(function () { avancer(); }, Math.max(3, (e.duree || 10) - ecoule) * 1000);
         setTimeout(function () { if (n === jeton) { preparerSuivante(liste, e); } }, 900);
       }
@@ -369,6 +370,7 @@
         parti = true;
         clearTimeout(garde);
         tracer('lecture en ' + (Date.now() - t0) + ' ms');
+        relances = 0;
         montrer({ type: 'video', index: i }, depuisCouche);
         // trois secondes plus tard : l'image avance-t-elle vraiment ? (une vidéo noire « qui joue » se voit ici)
         var c0 = v.currentTime, f0 = v.webkitDecodedFrameCount || 0;
@@ -461,7 +463,28 @@
   }
 
   // Toutes les 15 s : étape retirée, expirée, ou diffusion prioritaire qui commence ; nuit.
+  // Chien de garde (toutes les 15 s, indépendant de l'affichage) : une étape affichée bien au-delà de sa durée
+  // veut dire que la boucle s'est arrêtée sur une erreur imprévue. On passe à l'étape suivante ; après trois
+  // relances sans qu'aucune étape ne s'affiche, on recharge la page (au plus une fois toutes les 10 minutes).
+  function chienDeGarde() {
+    try {
+      if (!enRoute || !courante || !debutEtape) { return; }
+      var duree = Date.now() - debutEtape, limite = Math.max(30, courante.duree || 30) * 1000 + 60000;
+      if (duree < limite) { return; }
+      relances++;
+      noter('affichage bloqué sur ' + courante.cle + ' depuis ' + Math.round(duree / 1000) + ' s : relancé');
+      if (relances >= 3 && Date.now() - (parseInt(lire(K.garde), 10) || 0) > 600000) {
+        ecrire(K.garde, String(Date.now()));
+        W.location.reload();
+        return;
+      }
+      avancer();
+    } catch (e) { noter('chien de garde : ' + (e && e.message)); }
+  }
   function verifier() {
+    try { verifier2(); } catch (e) { noter('vérification : ' + (e && e.message)); }
+  }
+  function verifier2() {
     if (!enRoute || !courante) { return; }
     var h = Regles.heureParis(maintenant()), calc;
     if (h.minutes >= 300 && h.minutes < 310 && Date.now() - demarreLe > 3 * 3600000) { W.location.reload(); return; }
@@ -667,6 +690,7 @@
     // Navigateur intégré des écrans Samsung (QBC du bar, et QM55R hors MagicINFO) : une seule vidéo décodée à la fois.
     // Précharger la suivante dans le second lecteur fige celle qui joue (journal de Bar 3 : « temps 0.4 s » puis noir).
     if (/SamsungBrowser/i.test(navigator.userAgent || '')) { modeVideo = 'simple'; }
+    setInterval(chienDeGarde, 15000);
     if (SUIVI) { setInterval(majSuivi, 1000); }
     if (!CODE) { menu(); return; }
     memoire = lireJSON(K.medias) || {};

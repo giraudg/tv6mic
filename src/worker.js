@@ -17,6 +17,7 @@
    - GET  /api/admin/journal?page=N
    - PUT  /api/admin/reglages       couleurs du 6MIC et listes de choix (rôles du line-up, mentions, salles)
    Tout le reste est servi depuis public/ (lecteur, back-office, diagnostic, médias d'essai). */
+import { surveiller } from './surveillance.mjs';
 
 const COOKIE = 'tv6mic_admin';
 const SESSION_JOURS = 30;
@@ -99,6 +100,10 @@ export default {
       noterIncidents(envBrut.DB, ctx, req, url, incidents);
       return json({ erreur: 'Le serveur a rencontré une erreur. Réessayez dans un instant ; si elle revient, le détail est dans le Journal.' }, 500);
     }
+  },
+  // Toutes les 5 minutes (wrangler.jsonc, triggers) : surveillance des écrans et alertes par e-mail.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(surveiller(env).catch(e => console.error('surveillance', e && e.stack || e)));
   }
 };
 

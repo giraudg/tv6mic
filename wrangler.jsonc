@@ -29,7 +29,13 @@
     { "binding": "MEDIAS", "bucket_name": "tv-6mic-medias" }
   ],
   "observability": { "enabled": true },
+  // Avant chaque mise en ligne (wrangler deploy, donc Workers Builds) : tous les essais doivent passer, dont le
+  // démarrage du lecteur dans un navigateur simulé (test/lecteur.test.js). Sinon rien n'est déployé.
+  "build": { "command": "npm test", "watch_dir": "test" },
+  // Surveillance des écrans et alertes par e-mail, toutes les 5 minutes (src/surveillance.mjs).
+  "triggers": { "crons": ["*/5 * * * *"] },
   // Garde les variables saisies dans le tableau de bord lors des déploiements depuis GitHub.
   "keep_vars": true
-  // Secret à définir dans le tableau de bord (Settings > Variables and Secrets) : ADMIN_PASSWORD
+  // Secrets à définir dans le tableau de bord (Settings > Variables and Secrets) : ADMIN_PASSWORD ;
+  // pour les alertes, RESEND_API_KEY (clé d'envoi Resend) et ALERTES_A (adresses, séparées par des virgules).
 }

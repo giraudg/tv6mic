@@ -99,6 +99,15 @@ environ 5 Mbit/s, AAC ou sans son, option « fast start ».
   récents) ; sinon, l'encart HandBrake s'affiche.
 - Les médias qui ne servent plus à aucun contenu sont supprimés de R2 à l'enregistrement.
 
+## Fiabilité : essais, chien de garde, alertes (9 nov. 2026)
+
+Après le Hall resté noir du 6 au 9 novembre (lecteur 1.6.0 planté au démarrage sur un écran sans programmation) :
+
+- **Essais avant chaque mise en ligne** : `wrangler deploy` (donc Workers Builds) lance d'abord `npm test` (`build.command` dans `wrangler.jsonc`) ; un échec bloque le déploiement. `test/lecteur.test.js` démarre le lecteur dans un navigateur simulé (jsdom, horloge simulée) : écran sans programmation, chaque type de contenu, données manquantes, serveur injoignable, boucle arrêtée par une erreur.
+- **Lecteur** (1.6.3–1.6.4) : le contact avec le serveur passe avant l'affichage et n'en dépend plus ; un chien de garde relance l'affichage si une étape dépasse sa durée de plus d'une minute, et recharge la page après trois relances sans effet (au plus une fois toutes les 10 min). La copie locale (`sw.js`) ne laisse jamais une page en attente plus de 30 s.
+- **Historique des connexions** (`ecrans_historique`, 90 jours) et **alertes par e-mail** (`src/surveillance.mjs`, tâche planifiée toutes les 5 min, table `alertes`) : un e-mail quand un écran se tait plus de 15 min alors qu'au moins deux autres écrans de sa famille (hall ou bar) tournent depuis 15 min, un autre à son retour, et un en cas d'erreur grave du lecteur (une fois toutes les 6 h par écran). Envoi par Resend depuis `alertes@notifications.6mic-aix.fr` ; secrets `RESEND_API_KEY` et `ALERTES_A` (adresses séparées par des virgules). Sans eux, les alertes sont notées dans le Journal seulement.
+- **Dépannage d'un écran** : `/diagnostic/reparer.html` efface ce que le navigateur garde pour le site (copie locale, données) ; `/diagnostic/lecteur.html?flux=…` affiche le lecteur avec un journal à l'écran.
+
 ## Architecture
 
 - **Cloudflare Workers** avec ressources statiques : `public/` est servi tel quel, `src/worker.js` gère l'API.

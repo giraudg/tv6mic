@@ -11,7 +11,9 @@
     "test": "node --test test/*.test.js"
   },
   "devDependencies": {
+    "@sinonjs/fake-timers": "^14.0.0",
     "acorn": "8.19.0",
+    "jsdom": "^26.1.0",
     "wrangler": "4.149.0"
   }
 }
