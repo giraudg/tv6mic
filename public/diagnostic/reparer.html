@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réparation · écrans 6MIC</title>
+<!-- Efface tout ce que le navigateur d'un écran garde pour tv.6mic-aix.fr : service workers (copie locale
+     du lecteur), copies (Cache API) et données locales. Pour un écran resté noir alors que le réseau et le
+     diagnostic fonctionnent (Hall, 9 nov. 2026). Page placée sous /diagnostic/ : le service worker du lecteur
+     ne la gère pas, elle s'ouvre donc même quand celui-ci est bloqué. ES5, sans dépendance. -->
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0a0d; color: #fff; font-family: Arial, Helvetica, sans-serif; }
+  .boite { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); -webkit-transform: translateY(-50%); text-align: center; padding: 0 6%; }
+  h1 { font-size: 7vh; margin: 0 0 3vh; }
+  p { font-size: 3.6vh; line-height: 1.4; color: #c9c6d1; margin: 0 0 1.5vh; }
+  .ok h1 { color: #7ee2a0; }
+</style>
+</head>
+<body>
+<div class="boite" id="boite">
+  <h1 id="titre">Réparation de l’écran en cours…</h1>
+  <p id="detail">Effacement de la copie locale du lecteur.</p>
+</div>
+<script>
+(function () {
+  var etapes = [], termine = false;
+  function texte(id, t) { document.getElementById(id).appendChild(document.createTextNode(t)); }
+  function vider(id) { var n = document.getElementById(id); while (n.firstChild) { n.removeChild(n.firstChild); } }
+  // une promesse qui se résout au plus tard après ms, même si p ne répond jamais
+  function borne(p, ms) {
+    return new Promise(function (ok) { var f = false; function fin() { if (!f) { f = true; ok(); } } setTimeout(fin, ms); p.then(fin, fin); });
+  }
+  function fin() {
+    if (termine) { return; }
+    termine = true;
+    document.getElementById('boite').className = 'boite ok';
+    vider('titre'); texte('titre', 'Réparation terminée');
+    vider('detail'); texte('detail', etapes.join(' · ') || 'Rien à effacer.');
+    var p = document.createElement('p'); p.appendChild(document.createTextNode('Renvoyez maintenant le programme normal de l’écran depuis MagicINFO.'));
+    document.getElementById('boite').appendChild(p);
+  }
+  var travaux = [];
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      travaux.push(borne(navigator.serviceWorker.getRegistrations().then(function (rs) {
+        return Promise.all(rs.map(function (r) { return r.unregister()['catch'](function () {}); })).then(function () {
+          etapes.push(rs.length + ' copie(s) du lecteur désactivée(s)');
+        });
+      }), 8000));
+    }
+  } catch (e) {}
+  try {
+    if (window.caches) {
+      travaux.push(borne(caches.keys().then(function (ks) {
+        return Promise.all(ks.map(function (k) { return caches['delete'](k)['catch'](function () {}); })).then(function () {
+          etapes.push(ks.length + ' réserve(s) de fichiers effacée(s)');
+        });
+      }), 8000));
+    }
+  } catch (e) {}
+  try { var n = window.localStorage.length; window.localStorage.clear(); etapes.push(n + ' donnée(s) locale(s) effacée(s)'); } catch (e) {}
+  Promise.all(travaux).then(fin, fin);
+  setTimeout(fin, 10000);
+})();
+</script>
+</body>
+</html>
