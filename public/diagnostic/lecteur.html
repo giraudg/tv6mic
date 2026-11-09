@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecteur avec journal · écrans 6MIC</title>
+<meta name="robots" content="noindex">
+<!-- Le lecteur des écrans, avec un journal affiché par-dessus : chargement de chaque fichier, erreurs,
+     échanges avec le serveur, état du lecteur. Pour comprendre un écran qui reste noir (Hall, 9 nov. 2026).
+     Placée sous /diagnostic/ (hors du service worker du lecteur) ; fichiers du lecteur chargés à une
+     adresse neuve (?j=…) pour ne rien reprendre du cache du navigateur. Adresse : /diagnostic/lecteur.html?flux=hall -->
+<link rel="stylesheet" href="https://use.typekit.net/trm8rah.css" media="print" onload="this.media='all'">
+<style>
+  #journal { position: fixed; z-index: 99999; top: 1.5vh; right: 1.5vw; width: 46vw; max-height: 95vh; overflow: hidden;
+    background: rgba(0, 0, 0, .82); color: #e8e6ee; font: 1.35vw/1.35 Arial, Helvetica, sans-serif; padding: 1.2vh 1vw; border: 2px solid #ffd23f; }
+  #journal b { color: #ffd23f; }
+  #journal .ko { color: #ff6b6b; }
+  #journal .ok { color: #7ee2a0; }
+  #etat { border-bottom: 1px solid #555; padding-bottom: .8vh; margin-bottom: .8vh; }
+</style>
+</head>
+<body>
+<div id="scene">
+  <div class="couche" id="c0"></div>
+  <div class="couche" id="c1"></div>
+  <video class="video" id="v0" muted playsinline preload="auto"></video>
+  <video class="video" id="v1" muted playsinline preload="auto"></video>
+</div>
+<div id="journal"><div id="etat"><b>Lecteur avec journal</b></div><div id="lignes"></div></div>
+<script>
+(function () {
+  var t0 = Date.now(), lignes = [], j = String(t0);
+  function ms() { return ((Date.now() - t0) / 1000).toFixed(1) + ' s'; }
+  function ajouter(t, cls) {
+    lignes.push([ms() + ' · ' + t, cls || '']);
+    if (lignes.length > 26) { lignes.shift(); }
+    var z = document.getElementById('lignes'); if (!z) { return; }
+    while (z.firstChild) { z.removeChild(z.firstChild); }
+    for (var i = 0; i < lignes.length; i++) { var d = document.createElement('div'); d.className = lignes[i][1]; d.appendChild(document.createTextNode(lignes[i][0])); z.appendChild(d); }
+  }
+  window.__journal = ajouter;
+  ajouter('page ouverte · ' + window.innerWidth + '×' + window.innerHeight + ' · en ligne : ' + (navigator.onLine ? 'oui' : 'non'));
+  window.addEventListener('error', function (e) {
+    ajouter('ERREUR ' + (e.message || '?') + (e.filename ? ' (' + String(e.filename).split('/').pop().split('?')[0] + ':' + e.lineno + ')' : ''), 'ko');
+  }, true);
+  // échanges avec le serveur
+  var XO = XMLHttpRequest.prototype.open, XS = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (m, u) { this.__j = m + ' ' + String(u).replace(location.origin, ''); return XO.apply(this, arguments); };
+  XMLHttpRequest.prototype.send = function () {
+    var x = this, d = Date.now();
+    x.addEventListener('loadend', function () { ajouter(x.__j + ' → ' + (x.status || 'échec réseau') + ' en ' + (Date.now() - d) + ' ms', x.status >= 200 && x.status < 400 ? 'ok' : 'ko'); });
+    return XS.apply(this, arguments);
+  };
+  if (window.fetch) {
+    var F = window.fetch;
+    window.fetch = function (u) {
+      var d = Date.now(), n = String(u && u.url || u).replace(location.origin, '');
+      return F.apply(window, arguments).then(function (r) { ajouter('fetch ' + n + ' → ' + r.status + ' en ' + (Date.now() - d) + ' ms', r.ok ? 'ok' : 'ko'); return r; },
+        function (e) { ajouter('fetch ' + n + ' → échec : ' + (e && e.message), 'ko'); throw e; });
+    };
+  }
+  // feuilles de style et scripts du lecteur, à une adresse neuve, un par un
+  function css(h) { var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = h + '?j=' + j;
+    l.onload = function () { ajouter('style ' + h + ' chargé', 'ok'); }; l.onerror = function () { ajouter('style ' + h + ' : ÉCHEC', 'ko'); };
+    document.head.appendChild(l); }
+  css('/lecteur/gabarits.css'); css('/lecteur/lecteur.css');
+  var scripts = ['/vendor/qrcode.js', '/lecteur/regles.js', '/lecteur/gabarits.js', '/lecteur/lecteur.js'], i = 0;
+  function suivant() {
+    if (i >= scripts.length) { ajouter('tous les scripts chargés'); return; }
+    var s = document.createElement('script'), nom = scripts[i++], d = Date.now();
+    s.src = nom + '?j=' + j;
+    s.onload = function () { ajouter('script ' + nom.split('/').pop() + ' chargé en ' + (Date.now() - d) + ' ms', 'ok'); suivant(); };
+    s.onerror = function () { ajouter('script ' + nom.split('/').pop() + ' : ÉCHEC de chargement', 'ko'); suivant(); };
+    document.body.appendChild(s);
+  }
+  suivant();
+  // état du lecteur toutes les 3 s
+  setInterval(function () {
+    var e = document.getElementById('etat'), t = 'Lecteur avec journal · ' + ms() + ' · ';
+    try {
+      if (!window.TV6MIC) { t += 'lecteur pas encore démarré'; }
+      else {
+        var s = window.TV6MIC.etat();
+        t += 'lecteur ' + window.TV6MIC.version + ' · programmation ' + (s.prog ? 'reçue (' + (s.prog.diffusions || []).length + ' diffusions)' : 'absente')
+          + ' · à l’écran : ' + (s.courante ? (s.courante.cle || s.courante.type) : 'rien') + (s.erreurs && s.erreurs.length ? ' · dernière erreur : ' + s.erreurs[s.erreurs.length - 1] : '');
+      }
+    } catch (x) { t += 'état illisible : ' + x.message; }
+    while (e.firstChild) { e.removeChild(e.firstChild); }
+    var b = document.createElement('b'); b.appendChild(document.createTextNode(t)); e.appendChild(b);
+  }, 3000);
+})();
+</script>
+</body>
+</html>

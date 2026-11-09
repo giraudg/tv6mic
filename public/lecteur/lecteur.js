@@ -8,7 +8,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.6.2';
+  var VERSION = '1.6.3';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -68,7 +68,9 @@
     try { return new W.URL(src, W.location.href).pathname; } catch (e) { return String(src); }
   }
   function sourcesDe(c) {
-    var d = (c && c.donnees) || {}, r = [];
+    // c peut être null (veille, rien de programmé) : Hall, 6-9 nov. 2026, lecteur arrêté net au démarrage
+    if (!c) { return []; }
+    var d = c.donnees || {}, r = [];
     if (d.src) { r.push(d.src); }
     if (d.poster) { r.push(d.poster); }
     if (d.photo && d.photo.src) { r.push(d.photo.src); }
@@ -498,22 +500,24 @@
     if (premierSignal) { signal.agent = navigator.userAgent; }
     requete('POST', '/api/flux/' + CODE, signal, 15000, function (r) {
       var t1 = Date.now();
+      minuterieReseau = setTimeout(interroger, INTERVALLE);   // d'abord : rien de ce qui suit ne doit l'empêcher
       premierSignal = false; horsLigne = false; dernierContact = t1;
       if (typeof r.maintenant === 'number') {
         decalage = r.maintenant - Math.round((t0 + t1) / 2);
         ecrire(K.decalage, String(decalage));
       }
-      if (!r.inchange) { recevoir(r); }
-      else if (Date.now() - dernierTri > 600000) { gererMedias(); }
-      if (r.flux && prog) { prog.flux = r.flux; }
-      identifier(r.identifier || 0, r.flux && r.flux.nom);
-      minuterieReseau = setTimeout(interroger, INTERVALLE);
+      try {
+        if (!r.inchange) { recevoir(r); }
+        else if (Date.now() - dernierTri > 600000) { gererMedias(); }
+        if (r.flux && prog) { prog.flux = r.flux; }
+        identifier(r.identifier || 0, r.flux && r.flux.nom);
+      } catch (e) { noter('programmation reçue : ' + (e && e.message)); }
     }, function (statut) {
       if (statut === 404) { fluxInconnu(); minuterieReseau = setTimeout(interroger, 300000); return; }
       horsLigne = true;
-      noter('réseau : ' + (statut ? 'réponse ' + statut : 'serveur injoignable'));
-      if (!enRoute && !inconnu) { demarrer(); }
       minuterieReseau = setTimeout(interroger, prog ? INTERVALLE : 10000);
+      noter('réseau : ' + (statut ? 'réponse ' + statut : 'serveur injoignable'));
+      if (!enRoute && !inconnu) { try { demarrer(); } catch (e) { noter('démarrage : ' + (e && e.message)); } }
     });
   }
   function recevoir(r) {
@@ -668,9 +672,11 @@
     memoire = lireJSON(K.medias) || {};
     prog = lireJSON(K.prog);
     if (prog && prog.reglages) { try { Gabarits.appliquerReglages(prog.reglages); } catch (e) {} }
-    demarrer();                                   // tout de suite : programmation gardée, ou écran « Chargement… »
-    if (prog) { gererMedias(); }
+    // Le contact avec le serveur passe AVANT tout le reste et ne dépend de rien : un plantage de l'affichage
+    // ne doit jamais empêcher l'écran de recevoir une programmation corrigée (Hall, 6-9 nov. 2026).
     interroger();
+    try { demarrer(); } catch (e) { noter('démarrage : ' + (e && e.message)); }   // programmation gardée, ou écran « Chargement… »
+    if (prog) { try { gererMedias(); } catch (e) { noter('médias : ' + (e && e.message)); } }
     if (params.ident === '1') { setTimeout(function () { montrerIdentification(null, 20000); }, 1500); }
     if (navigator.serviceWorker && (W.location.protocol === 'https:' || W.location.hostname === 'localhost')) {
       try { navigator.serviceWorker.register('/sw.js').then(null, rien); } catch (e) {}
