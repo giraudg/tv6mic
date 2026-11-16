@@ -15,6 +15,9 @@ body { cursor: none; -webkit-font-smoothing: antialiased; }
 
 /* ---- kakémono LED vertical (320 × 900) : scène 1080 × 3038, même principe de réduction par zoom ---- */
 .format-kakemono #scene, .format-kakemono .couche, .format-kakemono .video { width: 1080px; height: 3038px; }
+/* position fixe : la scène ne compte pas dans la taille de la page, que le navigateur du boîtier épouse */
+.format-kakemono #scene { position: fixed; }
+.format-kakemono body { width: 100%; height: 100%; overflow: hidden; }
 
 /* Suivi technique (?debug=1) */
 #suivi { position: fixed; right: 8px; bottom: 8px; z-index: 100001; max-width: 46%; padding: 8px 12px; background: rgba(0, 0, 0, .78);

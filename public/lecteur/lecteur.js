@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.7.0';
+  var VERSION = '1.7.1';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -94,7 +94,10 @@
 
   /* ---------- scène : 1920 × 1080 (téléviseurs) ou 1080 × 3038 (kakémono vertical), réduite par zoom ---------- */
   function ajuster() {
-    var w = W.innerWidth || SW, h = W.innerHeight || SH, z = Math.min(w / SW, h / SH);
+    var w = W.innerWidth || SW, h = W.innerHeight || SH, z, s = W.screen || {};
+    // Navigateur du kakémono déjà agrandi à la taille de la scène : la taille de l'écran fait foi (si elle est verticale)
+    if (format !== 'paysage' && w >= SW && h >= SH * 0.98 && s.width && s.height > s.width && s.width < w) { w = s.width; h = s.height; }
+    z = Math.min(w / SW, h / SH);
     scene.style.zoom = z;
     scene.style.left = Math.round((w - SW * z) / 2 / z) + 'px';
     scene.style.top = Math.round((h - SH * z) / 2 / z) + 'px';

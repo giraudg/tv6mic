@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Écran TV · 6MIC</title>
 <meta name="robots" content="noindex">
+<script>
+/* Kakémono LED vertical (boîtier Novastar Taurus) : son navigateur prend la taille de ce qu'il affiche. Si la scène
+   horizontale (1920 × 1080) ou la scène verticale (1080 × 3038) dépassait de la page avant d'être réduite, il
+   s'agrandirait à sa taille et n'en montrerait qu'un coin (16 nov. 2026). Le format vertical est donc posé dès ici. */
+(function () {
+  var w = window.innerWidth || 0, h = window.innerHeight || 0;
+  if (w && h > w * 1.4) { document.documentElement.className += ' format-kakemono'; }
+})();
+</script>
 <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico?v=2" sizes="48x48">
 <!-- Polices du 6MIC (projet Adobe Fonts de Navettes), chargées sans bloquer : à défaut, Archivo et Anton intégrées -->
