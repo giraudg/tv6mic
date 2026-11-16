@@ -155,22 +155,24 @@ test('chien de garde : une boucle arrêtée par une erreur imprévue repart d\'e
   e.fermer();
 });
 
-test('kakémono vertical (320 × 900) : scène verticale, seuls les contenus plein écran passent', () => {
-  const e = ecran({ prog: programmation(['image', 'agenda', 'video', 'soiree', 'web'], null, 'kakemono'), taille: [320, 900] });
-  e.avancer(240);
+test('kakémono vertical (320 × 900) : scène verticale, gabarits verticaux et plein écran ; agenda, carte et promo écartés', () => {
+  const types = Object.keys(CONTENUS);
+  const e = ecran({ prog: programmation(types, null, 'kakemono'), taille: [320, 900] });
+  e.avancer(900);
   assert.deepStrictEqual(e.planteES, []);
   assert.deepStrictEqual(e.erreursPage, []);
   assert.ok(/format-kakemono/.test(e.W.document.documentElement.className), 'format appliqué à la page');
   const z = parseFloat(e.W.document.getElementById('scene').style.zoom);
   assert.ok(Math.abs(z - 320 / 1080) < 0.01, 'scène 1080 × 3038 réduite à 320 de large : zoom ' + z);
-  for (const t of ['image', 'video', 'web']) assert.ok(e.vues.has('c-' + t), 'étape affichée : ' + t);
-  for (const t of ['agenda', 'soiree']) assert.ok(!e.vues.has('c-' + t), 'gabarit paysage écarté : ' + t);
+  for (const t of ['image', 'video', 'web', 'soiree', 'serie', 'lineup', 'direction']) assert.ok(e.vues.has('c-' + t), 'étape affichée : ' + t);
+  for (const t of ['agenda', 'carte', 'promo']) assert.ok(!e.vues.has('c-' + t), 'gabarit réservé aux téléviseurs écarté : ' + t);
+  assert.strictEqual(e.W.Gabarits.vertical(), true, 'gabarits en mise en page verticale');
   assert.ok(!e.etat().erreurs.some(x => /JS |démarrage|chien de garde|gabarit/.test(x)), e.etat().erreurs.join(' | '));
   e.fermer();
 });
 
 test('kakémono sans rien d\'affichable : veille, sans plantage', () => {
-  const e = ecran({ prog: programmation(['agenda', 'soiree'], null, 'kakemono'), taille: [320, 900] });
+  const e = ecran({ prog: programmation(['agenda', 'carte'], null, 'kakemono'), taille: [320, 900] });
   e.avancer(90);
   assert.deepStrictEqual(e.planteES, []);
   assert.strictEqual(e.etat().courante.cle, 'veille');

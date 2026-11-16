@@ -194,6 +194,6 @@ test('formats : le kakémono ne garde que les contenus plein écran', () => {
   assert.deepStrictEqual(k.diffusions.map(d => d.contenu), ['a']);
   assert.strictEqual(k.defaut, null);
   assert.strictEqual(R.pourFormat(prog, 'paysage'), prog);
-  assert.ok(R.accepte('paysage', 'agenda') && R.accepte('kakemono', 'video') && !R.accepte('kakemono', 'carte'));
+  assert.ok(R.accepte('paysage', 'agenda') && R.accepte('kakemono', 'video') && R.accepte('kakemono', 'lineup') && !R.accepte('kakemono', 'carte') && !R.accepte('kakemono', 'agenda'));
   assert.strictEqual(R.format('inconnu').largeur, 1920);
 });

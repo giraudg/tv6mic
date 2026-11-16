@@ -186,11 +186,12 @@
 
   /* ---- formats d'écran ----
      paysage : téléviseurs 16:9 (scène 1920 × 1080), tous les types de contenus.
-     kakemono : écran LED vertical 320 × 900 (Novastar Taurus, nov. 2026), scène 1080 × 3038 ; seuls les contenus
-     plein écran y passent (images, vidéos, pages web), en attendant des gabarits dessinés pour ce format. */
+     kakemono : écran LED vertical 320 × 900 (Novastar Taurus, nov. 2026), scène 1080 × 3038 ; y passent les contenus
+     plein écran (images, vidéos, pages web) et les gabarits qui ont une mise en page verticale (soirée, série,
+     line-up, directionnel) ; agenda, carte et promo restent réservés aux téléviseurs. */
   var FORMATS = {
     paysage: { largeur: 1920, hauteur: 1080, types: null },
-    kakemono: { largeur: 1080, hauteur: 3038, types: { image: 1, video: 1, web: 1 } }
+    kakemono: { largeur: 1080, hauteur: 3038, types: { image: 1, video: 1, web: 1, soiree: 1, serie: 1, lineup: 1, direction: 1 } }
   };
   function format(code) { return FORMATS.hasOwnProperty(code) ? FORMATS[code] : FORMATS.paysage; }
   function accepte(codeFormat, type) { var t = format(codeFormat).types; return !t || t.hasOwnProperty(type); }

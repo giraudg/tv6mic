@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.7.1';
+  var VERSION = '1.8.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -108,6 +108,7 @@
     if (code === format && D.documentElement.className.indexOf('format-') >= 0) { return; }
     var f = Regles.format(code);
     format = code; SW = f.largeur; SH = f.hauteur;
+    Gabarits.utiliserFormat(code);
     D.documentElement.className = (D.documentElement.className.replace(/\s*format-[a-z]+/g, '') + ' format-' + code).replace(/^\s+/, '');
     if (scene) { ajuster(); }
   }

@@ -10,6 +10,11 @@
   var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   var MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
   var LOGO = '/logo/6mic-logo-blanc-tv.png';
+  // Format de l'écran (Regles.FORMATS) : « kakemono » = écran LED vertical, scène 1080 × 3038 (affichée en 320 × 900).
+  // Soirée, série, line-up et directionnel y ont une mise en page verticale (gabarits.css, .format-kakemono).
+  var FORMAT = 'paysage';
+  function utiliserFormat(f) { FORMAT = f === 'kakemono' ? 'kakemono' : 'paysage'; }
+  function vertical() { return FORMAT === 'kakemono'; }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function el(tag, classe, texte) {
@@ -171,13 +176,13 @@
     if (deco) { g.appendChild(deco); }
     g.appendChild(logo('g-logo a a0'));
     if (d.mention) { g.appendChild(el('div', 'g-mention a a0' + (mentionAlerte(d.mention) ? ' g-rouge' : ''), d.mention)); }
-    if (d.date) { bloc.appendChild(el('div', 'g-date a a1', dateLongue(d.date) + (d.heure ? ' · ' + heureTexte(d.heure) : ''))); }
+    if (d.date) { bloc.appendChild(el('div', 'g-date a a1', dateLongue(d.date) + (d.heure ? (vertical() ? '\n' : ' · ') + heureTexte(d.heure) : ''))); }
     nom = el('div', 'g-nom a a2', d.nom || c.titre);
     bloc.appendChild(nom);
     if (d.infos) { bloc.appendChild(el('div', 'g-infos a a3', d.infos)); }
     g.appendChild(bloc);
     if (d.billetterie) { q = qr(d.billetterie, 'Billetterie'); if (q) { g.appendChild(q); g.className += ' g-avec-qr'; } }
-    return { noeud: g, ajuster: function () { ajusterTexte(nom, 190, 90, 2); } };
+    return { noeud: g, ajuster: function () { if (vertical()) { ajusterTexte(nom, 300, 120, 3); } else { ajusterTexte(nom, 190, 90, 2); } } };
   }
 
   /* 2. Agenda : titre, puis une ligne par date (6 au plus par page), le nom de l'artiste en avant.
@@ -507,19 +512,22 @@
     g.appendChild(logo('g-logo g-d-logo a a4'));
     return { noeud: g, ajuster: function () {
       var k, t, m, bloc;
+      // kakémono : une direction, zone de 1440 px sous la flèche ; deux, une moitié de 1519 px chacune (zone de 700 px)
+      var v = vertical(), max = v ? (n === 1 ? 260 : 180) : (n === 1 ? 210 : 140), min = v ? (n === 1 ? 110 : 84) : (n === 1 ? 90 : 64);
+      var zone = v ? (n === 1 ? 1440 : 700) : (n === 1 ? 920 : 400);
       for (k = 0; k < titres.length; k++) {
-        ajusterTexte(titres[k], n === 1 ? 210 : 140, n === 1 ? 90 : 64, 2);
+        ajusterTexte(titres[k], max, min, v && n === 1 ? 3 : 2);
         // le bloc (pictogramme, service, précision) doit tenir dans sa zone : 920 px de haut (une direction), 400 (deux)
         bloc = titres[k].parentNode.parentNode;
         t = parseFloat(titres[k].style.fontSize) || 100;
-        for (m = 0; m < 20 && t > 60 && hauteurBloc(bloc) > (n === 1 ? 920 : 400); m++) { t -= 8; titres[k].style.fontSize = t + 'px'; }
+        for (m = 0; m < 20 && t > (v ? min * 0.7 : 60) && hauteurBloc(bloc) > zone; m++) { t -= 8; titres[k].style.fontSize = t + 'px'; }
       }
     } };
     function hauteurBloc(b) {
       var h = 0, j, e;
       for (j = 0; j < b.childNodes.length; j++) {
         e = b.childNodes[j];
-        h = n === 1 ? h + e.offsetHeight + (parseFloat(window.getComputedStyle(e).marginBottom) || 0) : Math.max(h, e.offsetHeight);
+        h = n === 1 || vertical() ? h + e.offsetHeight + (parseFloat(window.getComputedStyle(e).marginBottom) || 0) : Math.max(h, e.offsetHeight);
       }
       return h;
     }
@@ -561,6 +569,14 @@
     var tete = el('div', 'g-s-tete'), rang = el('div', 'g-s-cartes'), titre, noms = [], i, x, carte, photo, corps, q, nom;
     var cadre = cadreSerie(n), largeur = cadre.largeur, hauteur = cadre.hauteur;
     var tailleNom = n <= 2 ? 72 : (n === 3 ? 66 : 64);
+    // Kakémono : affiches empilées (zone de 1958 px de haut) ; photo à gauche du texte à partir de 3 dates, au-dessus sinon.
+    var hCarte = 0, lPhoto = 0;
+    if (vertical()) {
+      hCarte = Math.floor((1958 - (n - 1) * 40) / n);
+      if (n >= 3) { lPhoto = Math.min(440, Math.round(hCarte * 0.75)); largeur = lPhoto; hauteur = hCarte; tailleNom = n === 3 ? 124 : 108; }
+      else { largeur = 936; hauteur = hCarte - 480; tailleNom = 150; }
+      g.className += ' g-s-' + (n >= 3 ? 'ligne' : 'pile');
+    }
     g.appendChild(el('div', 'g-s-rayons'));
     g.appendChild(logo('g-logo a a0'));
     if (d.accroche) { tete.appendChild(el('div', 'g-s-accroche a a0', d.accroche)); }
@@ -571,15 +587,17 @@
     for (i = 0; i < dates.length; i++) {
       x = dates[i]; q = quandSerie(x, etape.service);
       carte = el('div', 'g-s-carte');
-      carte.style.width = largeur + 'px';
+      carte.style.width = (vertical() ? 936 : largeur) + 'px';
+      if (vertical()) { carte.style.height = hCarte + 'px'; }
       carte.style.webkitAnimationDelay = carte.style.animationDelay = (0.45 + i * 0.16).toFixed(2) + 's';
       photo = el('div', 'g-s-photo' + (x.photo && x.photo.src ? '' : ' g-s-vide'));
       photo.style.height = hauteur + 'px';
+      if (vertical()) { photo.style.width = largeur + 'px'; }
       if (x.photo && x.photo.src) { fond(photo, x.photo.src, url, x.photo.cadrage); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
       if (x.mention) { photo.appendChild(el('div', 'g-s-mention' + (mentionAlerte(x.mention) ? ' g-rouge' : ''), x.mention)); }
       carte.appendChild(photo);
       corps = el('div', 'g-s-corps');
-      corps.appendChild(el('div', 'g-s-quand' + (q.proche ? ' g-s-proche' : ''), q.texte));
+      corps.appendChild(el('div', 'g-s-quand' + (q.proche ? ' g-s-proche' : ''), vertical() ? q.texte.replace(' · ', '\n') : q.texte));
       nom = el('div', 'g-s-nom', x.nom || '');
       noms.push(nom);
       corps.appendChild(nom);
@@ -588,8 +606,15 @@
     }
     g.appendChild(rang);
     return { noeud: g, ajuster: function () {
-      ajusterTexte(titre, 136, 72, 1);
-      for (var k = 0; k < noms.length; k++) { ajusterTexte(noms[k], tailleNom, 34, 2); }
+      ajusterTexte(titre, vertical() ? 200 : 136, vertical() ? 96 : 72, vertical() ? 2 : 1);
+      for (var k = 0; k < noms.length; k++) {
+        ajusterTexte(noms[k], tailleNom, vertical() ? 56 : 34, vertical() && n >= 3 ? 3 : 2);
+        // kakémono : le texte (date sur deux lignes + nom) doit tenir dans la hauteur de l'affiche
+        if (vertical()) {
+          var corpsK = noms[k].parentNode, t = parseFloat(noms[k].style.fontSize) || tailleNom, lim = n >= 3 ? hCarte : 480, e = 0;
+          while (e < 24 && t > 50 && corpsK.scrollHeight > lim) { t -= 6; e++; noms[k].style.fontSize = t + 'px'; }
+        }
+      }
     } };
   }
 
@@ -600,6 +625,7 @@
   // Mise en valeur d'un passage, choisie librement ; sans choix, elle suit le rôle (la tête d'affiche en vedette).
   var NIVEAUX_LINEUP = { vedette: 'Vedette', forte: 'Forte', normale: 'Normale', discrete: 'Discrète' };
   var TAILLES_NIVEAU = { vedette: [96, 72], forte: [82, 64], normale: [68, 56], discrete: [48, 40] };
+  var TAILLES_NIVEAU_V = { vedette: [150, 124], forte: [126, 106], normale: [104, 90], discrete: [76, 66] };   // kakémono
   function niveauParDefaut(role) { var r = roleReglage(role); return r && NIVEAUX_LINEUP[r.niveau] ? r.niveau : (role === 'tete' ? 'vedette' : 'normale'); }
   function niveauPassage(p) { return p && NIVEAUX_LINEUP[p.niveau] ? p.niveau : niveauParDefaut(p && p.role); }
   // Nom mis en avant (titre par défaut) : le premier passage en vedette, sinon la première tête d'affiche.
@@ -642,7 +668,8 @@
     entete.appendChild(titre);
     g.appendChild(entete);
     // frise : hauteur des lignes selon leur nombre (670 px disponibles)
-    var liste = el('div', 'g-l-liste g-l-' + Math.max(1, Math.min(n, 8))), hauteurLigne = Math.min(176, Math.floor(670 / Math.max(n, 1)));
+    var liste = el('div', 'g-l-liste g-l-' + Math.max(1, Math.min(n, 8)));
+    var hauteurLigne = vertical() ? Math.min(250, Math.floor(1380 / Math.max(n, 1))) : Math.min(176, Math.floor(670 / Math.max(n, 1)));
     liste.appendChild(el('div', 'g-l-trait'));
     for (i = 0; i < n; i++) {
       p = passages[i];
@@ -654,13 +681,15 @@
       ligne.appendChild(el('div', 'g-l-heure', p.heure));
       ligne.appendChild(el('div', 'g-l-point'));
       texte = el('div', 'g-l-texte');
-      role = el('div', 'g-l-role', p.libelle || libelleRole(p.role) || '');
+      // kakémono : le badge « En ce moment » / « À suivre » remplace l'intitulé (la ligne ne déborde pas)
+      var badge = i === courant || (maintenant !== null && i === courant + 1);
+      role = el('div', 'g-l-role', vertical() && badge ? '' : (p.libelle || libelleRole(p.role) || ''));
       if (i === courant) { role.appendChild(el('span', 'g-l-badge', 'En ce moment')); }
       else if (maintenant !== null && i === courant + 1) { role.appendChild(el('span', 'g-l-badge g-l-badge-suivant', 'À suivre')); }
       texte.appendChild(role);
       if (p.nom) {
         nom = el('div', 'g-l-nom', p.nom);
-        noms.push([nom, TAILLES_NIVEAU[niveau]]);
+        noms.push([nom, (vertical() ? TAILLES_NIVEAU_V : TAILLES_NIVEAU)[niveau]]);
         texte.appendChild(nom);
       }
       ligne.appendChild(texte);
@@ -668,9 +697,9 @@
     }
     g.appendChild(liste);
     return { noeud: g, ajuster: function () {
-      var grand = hauteurLigne >= 150, k;
-      ajusterTexte(titre, 120, 64, 1);
-      for (k = 0; k < noms.length; k++) { ajusterTexte(noms[k][0], noms[k][1][grand ? 0 : 1], 28, 1); }
+      var grand = hauteurLigne >= (vertical() ? 220 : 150), k;
+      if (vertical()) { ajusterTexte(titre, 190, 90, 2); } else { ajusterTexte(titre, 120, 64, 1); }
+      for (k = 0; k < noms.length; k++) { ajusterTexte(noms[k][0], noms[k][1][grand ? 0 : 1], vertical() ? 56 : 28, 1); }
     } };
   }
 
@@ -703,7 +732,7 @@
   racine.Gabarits = {
     soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, web: web, carte: carte, promo: promo, direction: direction, prixTexte: prixTexte, emojiSrc: emojiSrc, FLECHES: FLECHES, FLECHE_SVG: FLECHE_SVG, veille: veille, identification: identification,
     FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, NIVEAUX_LINEUP: NIVEAUX_LINEUP, niveauPassage: niveauPassage, niveauParDefaut: niveauParDefaut, vedetteDe: vedetteDe, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
-    dateLongue: dateLongue, heureTexte: heureTexte, el: el,
+    dateLongue: dateLongue, heureTexte: heureTexte, el: el, utiliserFormat: utiliserFormat, vertical: vertical,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe,
     appliquerReglages: appliquerReglages, utiliserReglages: utiliserReglages, variablesCouleurs: variablesCouleurs, libelleRole: libelleRole,
     mentionAlerte: mentionAlerte, nomCouleur: nomCouleur, teinteDe: teinteDe, melanger: melanger, contraste: contraste

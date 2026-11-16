@@ -159,11 +159,18 @@ function demander(titre, message, bouton, danger) {
 /* ================= aperçu (gabarits du lecteur) ================= */
 function apercu() {
   const boite = h('div', { class: 'apercu' }), scene = h('div', { class: 'apercu-scene' });
+  let format = 'paysage';   // ou « kakemono » : écran LED vertical, scène 1080 × 3038 (gabarits.css, .format-kakemono)
   boite.append(scene);
-  const ajuster = () => { scene.style.transform = 'scale(' + (boite.clientWidth / 1920) + ')'; };
+  const ajuster = () => { scene.style.transform = 'scale(' + (boite.clientWidth / (format === 'kakemono' ? 1080 : 1920)) + ')'; };
   new ResizeObserver(ajuster).observe(boite);
   return {
     noeud: boite,
+    format(f) {
+      format = f === 'kakemono' ? 'kakemono' : 'paysage';
+      boite.classList.toggle('apercu-k', format === 'kakemono');
+      boite.classList.toggle('format-kakemono', format === 'kakemono');
+      ajuster();
+    },
     rendre(etape, message) {
       boite.querySelectorAll('video, .apercu-msg').forEach(n => n.remove());
       remplacer(scene);
@@ -176,6 +183,8 @@ function apercu() {
         return;
       }
       let g;
+      G.utiliserFormat(format);   // les gabarits lisent le format en se construisant et en ajustant leurs textes
+      try {
       if (etape.type === 'soiree') g = G.soiree(etape, s => s);
       else if (etape.type === 'agenda') g = G.agenda(etape, s => s);
       else if (etape.type === 'serie') g = G.serie(etape, s => s);
@@ -188,6 +197,7 @@ function apercu() {
       else g = G.veille('');
       scene.append(g.noeud);
       if (g.ajuster) g.ajuster();
+      } finally { G.utiliserFormat('paysage'); }
       void g.noeud.offsetWidth;
       g.noeud.classList.add('joue');
     }
@@ -1583,6 +1593,11 @@ function vueEditeur(id, typeNouveau) {
   const d = ed.donnees;
   const ap = apercu();
   let pageApercu = 0;
+  // Aperçu au format du kakémono, pour les types qui y passent (s'il existe un écran de ce format)
+  const avecKakemono = E.flux.some(f => formatDe(f) === 'kakemono') && R.accepte('kakemono', ed.type);
+  const boutonsFormat = [['paysage', 'Téléviseur'], ['kakemono', 'Kakémono']].map(([k, t]) => h('button', { type: 'button', 'aria-pressed': String(k === 'paysage'),
+    onclick: () => { boutonsFormat.forEach(b => b.setAttribute('aria-pressed', String(b === boutonsFormat[k === 'paysage' ? 0 : 1]))); ap.format(k); majApercu(); } }, t));
+  const choixFormat = avecKakemono ? h('div', { class: 'seg', role: 'group', 'aria-label': 'Format de l’aperçu' }, boutonsFormat) : null;
   const infoApercu = h('p', { class: 'aide' });
   const pager = h('div', { class: 'actions' });
   const majApercu = () => {
@@ -1780,7 +1795,7 @@ function vueEditeur(id, typeNouveau) {
   const refleter = () => { enregistrerBas.disabled = enregistrer.disabled; enregistrerBas.textContent = enregistrer.textContent; };
   new MutationObserver(refleter).observe(enregistrer, { attributes: true, attributeFilter: ['disabled'], childList: true, subtree: true, characterData: true });
   refleter();
-  const colle = h('div', { class: 'colle ed-apercu' }, h('p', { class: 'lbl', text: 'Aperçu à l’écran' }), ap.noeud, pager, infoApercu);
+  const colle = h('div', { class: 'colle ed-apercu' }, h('p', { class: 'lbl', text: 'Aperçu à l’écran' }), choixFormat, ap.noeud, pager, infoApercu);
   afficher(
     h('div', { class: 'tete' },
       h('div', null, h('p', { class: 'surtitre' }, h('a', { href: '#contenus', text: '← Contenus' }), ' · ', TYPES[ed.type], ed.statut === 'archive' ? ' · archivé' : ''),
@@ -1845,7 +1860,7 @@ function dialogueDiffusion({ diffusion, contenu, jours, jour }) {
           E.flux.map(f => h('label', { class: 'coche' }, h('input', { type: 'checkbox', checked: x.flux.includes(f.code), onchange: e => { x.flux = e.target.checked ? [...x.flux, f.code] : x.flux.filter(k => k !== f.code); rendre(); } }), f.nom))),
         (() => {
           const hors = c ? E.flux.filter(f => x.flux.includes(f.code) && !R.accepte(formatDe(f), c.type)) : [];
-          return hors.length ? h('p', { class: 'aide', text: hors.map(f => f.nom).join(', ') + ' : ce gabarit n’existe pas encore au format vertical, il n’y sera pas affiché. Sur le kakémono passent les images, vidéos et pages web.' }) : null;
+          return hors.length ? h('p', { class: 'aide', text: hors.map(f => f.nom).join(', ') + ' : ce gabarit n’existe pas au format vertical, il n’y sera pas affiché. Sur le kakémono passent les soirées, séries, line-ups, directionnels, images, vidéos et pages web.' }) : null;
         })()),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Jours' }),
         h('div', { class: 'seg', role: 'group' },
@@ -2143,7 +2158,7 @@ function carteFlux(f, ms) {
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Quand rien n’est programmé' }), defaut),
       h('label', { class: 'coche propose' }, propose, 'Coché d’office quand on programme un contenu'),
       h('div', { class: 'lbl', text: 'Boucle le ' + dateMoy(simu.date) + ' à ' + simu.heure }), liste,
-      ecartes.length ? h('p', { class: 'aide', text: 'Programmés mais non affichés sur ce kakémono (gabarits paysage) : ' + ecartes.map(c => '« ' + c.titre + ' »').join(', ') + '.' }) : null),
+      ecartes.length ? h('p', { class: 'aide', text: 'Programmés mais non affichés sur ce kakémono (agenda, carte et promo restent réservés aux téléviseurs) : ' + ecartes.map(c => '« ' + c.titre + ' »').join(', ') + '.' }) : null),
     h('div', { class: 'carte-p' },
       h('button', { type: 'button', class: 'btn pt', onclick: () => identifier(f.code) }, 'Identifier'),
       h('a', { class: 'btn pt', href: '/?flux=' + f.code + '&debug=1', target: '_blank', rel: 'noopener' }, 'Voir le flux ↗'),

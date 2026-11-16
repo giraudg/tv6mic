@@ -192,6 +192,9 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 .colle { position: sticky; top: 12px; display: grid; gap: 12px; }
 .apercu { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; overflow: hidden; border: 1px solid #000; }
 .apercu-scene { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+/* aperçu au format du kakémono (écran LED vertical 320 × 900, scène 1080 × 3038) */
+.apercu.apercu-k { aspect-ratio: 1080 / 3038; width: 46%; max-width: 260px; margin: 0 auto; }
+.apercu-k .apercu-scene { width: 1080px; height: 3038px; }
 .apercu video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
 .apercu-msg { position: absolute; inset: 0; display: grid; place-items: center; color: #bdbdbd; font-size: 14px; padding: 20px; text-align: center; }
 .media { display: grid; gap: 8px; }

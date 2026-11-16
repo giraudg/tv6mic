@@ -446,3 +446,94 @@
 .g-d-2 .g-d-detail { margin-top: 16px; font-size: 40px; }
 .g-d-2 .g-d-logo { height: 52px; bottom: 44px; right: 60px; }
 
+
+/* ===== Kakémono vertical : soirée, série, line-up, directionnel =====
+   Scène 1080 × 3038 affichée en 320 × 900 (tout est 3,4 fois plus petit à l'écran) : corps de 54 px au moins
+   (16 px réels), marges de 72 px. Même contenu que sur les téléviseurs, mise en page empilée. */
+.format-kakemono .g-logo { left: 72px; right: auto; top: 96px; height: 120px; }
+.format-kakemono .g-deco { display: none; }
+
+/* Soirée : photo en haut (1080 × 2000) fondue dans le noir, date, nom et infos en bas, QR de billetterie dessous */
+.format-kakemono .g-soiree { background: #0b0a0d; }
+.format-kakemono .g-soiree .g-photo { width: 1080px; height: 2000px; }
+.format-kakemono .g-soiree .g-voile { width: 1080px; height: 2000px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .5) 0%, rgba(0, 0, 0, 0) 14%, rgba(11, 10, 13, 0) 50%, rgba(11, 10, 13, .88) 82%, #0b0a0d 100%); }
+.format-kakemono .g-mention { left: auto; right: 72px; top: 112px; padding: 22px 32px 18px; font-size: 52px; }
+.format-kakemono .g-bloc { left: 72px; bottom: 150px; width: 936px; }
+.format-kakemono .g-avec-qr .g-bloc { width: 936px; bottom: 690px; }
+.format-kakemono .g-date { padding: 24px 34px 18px; font-size: 84px; line-height: 1.02; white-space: pre-line; }
+.format-kakemono .g-nom { margin-top: 40px; font-size: 300px; }
+.format-kakemono .g-infos { margin-top: 40px; font-size: 62px; max-height: 322px; }
+.format-kakemono .g-qr { left: 72px; right: auto; bottom: 150px; width: 400px; padding: 28px 28px 22px; }
+.format-kakemono .g-qr svg { width: 400px; height: 400px; }
+.format-kakemono .g-qr span { margin-top: 18px; font-size: 44px; }
+
+/* Série : titre en haut, affiches empilées (photo à gauche dès 3 dates, au-dessus pour 1 ou 2) */
+.format-kakemono .g-s-rayons { left: -760px; width: 2600px; height: 1563px; }
+.format-kakemono .g-s-tete { left: 72px; top: 300px; width: 936px; }
+.format-kakemono .g-s-accroche { margin-bottom: 18px; font-size: 60px; white-space: normal; }
+.format-kakemono .g-s-titre { font-size: 200px; white-space: normal; }
+.format-kakemono .g-s-marque { margin-top: 30px; width: 126px; height: 30px;
+  background: linear-gradient(90deg, #fff 0, #fff 30px, transparent 30px, transparent 48px, #fff 48px, #fff 78px, transparent 78px, transparent 96px, #fff 96px, #fff 126px); }
+.format-kakemono .g-s-cartes { left: 72px; top: 980px; bottom: auto; width: 936px; display: block; }
+.format-kakemono .g-s-carte, .format-kakemono .g-s-carte:first-child { margin: 0 0 40px 0; overflow: hidden; }
+.format-kakemono .g-s-ligne .g-s-carte { display: -webkit-flex; display: flex; }
+.format-kakemono .g-s-ligne .g-s-photo { -webkit-flex: none; flex: none; }
+.format-kakemono .g-s-ligne .g-s-corps { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; height: auto; padding: 36px 36px 30px; }
+.format-kakemono .g-s-pile .g-s-corps { height: 424px; padding: 30px 36px 26px; }
+.format-kakemono .g-s-quand { font-size: 54px; white-space: pre-line; }
+.format-kakemono .g-s-pile .g-s-quand { font-size: 64px; }
+.format-kakemono .g-s-nom { margin-top: 14px; font-size: 108px; }
+.format-kakemono .g-s-mention { top: 30px; padding: 16px 24px 12px; font-size: 44px; }
+
+/* Line-up : photo en haut, titre, puis la frise horaire sur toute la largeur */
+.format-kakemono .g-l-panneau { left: 0; right: auto; width: 1080px; height: 1250px; }
+.format-kakemono .g-l-panneau:after { height: 420px; }
+.format-kakemono .g-l-motif { width: 1080px; height: 1440px; }
+.format-kakemono .g-l-fondu { left: 0; top: 500px; width: 1080px; height: 762px;
+  background: linear-gradient(180deg, rgba(11, 10, 13, 0) 0%, rgba(11, 10, 13, .85) 65%, #0b0a0d 100%); }
+.format-kakemono .g-l-tete { left: 72px; top: 1060px; width: 936px; }
+.format-kakemono .g-l-quand { padding: 18px 28px 14px; font-size: 50px; }
+.format-kakemono .g-l-titre { margin-top: 18px; font-size: 190px; white-space: normal; }
+.format-kakemono .g-l-liste { left: 72px; top: 1580px; width: 936px; }
+.format-kakemono .g-l-trait { left: 257px; width: 6px; }
+.format-kakemono .g-l-heure { width: 200px; font-size: 88px; }
+.format-kakemono .g-l-point { width: 36px; height: 36px; margin: 0 40px 0 42px; box-shadow: inset 0 0 0 7px #a9a6b3; }
+.format-kakemono .g-l-v-vedette .g-l-point { width: 48px; height: 48px; margin: 0 34px 0 36px; box-shadow: none; }
+.format-kakemono .g-l-v-forte .g-l-point { width: 42px; height: 42px; margin: 0 37px 0 39px; box-shadow: none; }
+.format-kakemono .g-l-v-discrete .g-l-point { width: 26px; height: 26px; margin: 0 45px 0 47px; box-shadow: inset 0 0 0 5px #3d3946; }
+.format-kakemono .g-l-encours .g-l-point { box-shadow: 0 0 0 16px var(--g-primaire-halo); }
+.format-kakemono .g-l-role { font-size: 44px; white-space: normal; }
+.format-kakemono .g-l-nom { font-size: 104px; }
+.format-kakemono .g-l-seul .g-l-role { font-size: 64px; }
+.format-kakemono .g-l-v-vedette .g-l-nom { font-size: 150px; }
+.format-kakemono .g-l-v-vedette.g-l-seul .g-l-role { font-size: 76px; }
+.format-kakemono .g-l-v-forte .g-l-nom { font-size: 126px; }
+.format-kakemono .g-l-v-forte.g-l-seul .g-l-role { font-size: 70px; }
+.format-kakemono .g-l-v-discrete .g-l-heure { font-size: 66px; }
+.format-kakemono .g-l-v-discrete .g-l-role { font-size: 40px; }
+.format-kakemono .g-l-v-discrete .g-l-nom { font-size: 76px; }
+.format-kakemono .g-l-v-discrete.g-l-seul .g-l-role { font-size: 48px; }
+.format-kakemono .g-l-badge { margin: 0; padding: 10px 18px 8px; font-size: 40px; vertical-align: 0; }
+.format-kakemono .g-l-6 .g-l-heure, .format-kakemono .g-l-7 .g-l-heure, .format-kakemono .g-l-8 .g-l-heure { font-size: 76px; }
+.format-kakemono .g-l-7 .g-l-role, .format-kakemono .g-l-8 .g-l-role { font-size: 40px; }
+
+/* Directionnel : flèche en haut, pictogramme et service dessous ; deux directions : moitié haute et moitié basse */
+.format-kakemono .g-d-moitie { width: 1080px; height: 3038px; }
+.format-kakemono .g-d-1 .g-d-fleche { top: 600px; left: 190px; width: 700px; height: 700px; }
+.format-kakemono .g-d-1 .g-d-infos { left: 72px; top: 1440px; width: 936px; height: 1440px; -webkit-justify-content: flex-start; justify-content: flex-start; }
+.format-kakemono .g-d-1 .g-d-picto { width: 360px; height: 360px; margin-bottom: 64px; }
+.format-kakemono .g-d-1 .g-d-titre { font-size: 260px; }
+.format-kakemono .g-d-1 .g-d-detail { margin-top: 36px; font-size: 76px; }
+.format-kakemono .g-d-2 .g-d-moitie { width: 1080px; height: 1519px; }
+.format-kakemono .g-d-2 .g-d-m2 { left: 0; top: 1519px; }
+.format-kakemono .g-d-2 .g-d-m2:before { width: 1080px; height: 1519px; }
+.format-kakemono .g-d-2 .g-d-m1:after { right: auto; left: 0; top: auto; bottom: 0; width: 1080px; height: 6px; }
+.format-kakemono .g-d-2 .g-d-fleche { top: 110px; left: 260px; width: 560px; height: 560px; }
+.format-kakemono .g-d-2 .g-d-infos { left: 72px; top: 740px; width: 936px; height: 700px; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-align-items: flex-start; align-items: flex-start; }
+.format-kakemono .g-d-2 .g-d-texte { -webkit-flex: none; flex: none; width: 936px; }
+.format-kakemono .g-d-2 .g-d-picto { width: 220px; height: 220px; margin: 0 0 36px; }
+.format-kakemono .g-d-2 .g-d-titre { font-size: 180px; }
+.format-kakemono .g-d-2 .g-d-detail { margin-top: 24px; font-size: 60px; }
+.format-kakemono .g-d-logo, .format-kakemono .g-d-1 .g-d-moitie ~ .g-d-logo, .format-kakemono .g-d-2 .g-d-logo { left: auto; right: 72px; top: auto; bottom: 80px; height: 90px; }
