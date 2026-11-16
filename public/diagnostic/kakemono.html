@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test kakémono · écrans 6MIC</title>
+<!-- Page de test pour un écran inconnu (kakémono LED Novastar Taurus, nov. 2026) : taille de la page,
+     moteur du navigateur, JavaScript, réseau, couleurs et fluidité, en très gros caractères pour rester
+     lisible sur un écran LED de faible résolution, vertical ou non. ES5, sans dépendance. -->
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
+  #page { position: absolute; left: 0; top: 0; right: 0; bottom: 0; padding: 3vmin 4vmin; }
+  h1 { margin: 0 0 2vmin; font-size: 7vmin; color: #ff5cc0; }
+  .l { font-size: 6.2vmin; line-height: 1.25; margin: 0 0 1.4vmin; }
+  .l b { color: #ffd34d; }
+  .ok { color: #6dff9e; } .ko { color: #ff6b6b; }
+  #ua { font-size: 2.6vmin; color: #aaa; margin-top: 2vmin; word-break: break-all; }
+  #barres { position: absolute; left: 0; right: 0; bottom: 6vmin; height: 7vmin; }
+  #barres div { float: left; width: 12.5%; height: 100%; }
+  #balle { position: absolute; bottom: 0; left: 0; width: 6vmin; height: 6vmin; background: #fff; }
+  #cadre { position: absolute; left: 0; top: 0; right: 0; bottom: 0; border: 2px solid #ff5cc0; box-sizing: border-box; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="page">
+  <h1>Test kakémono 6MIC</h1>
+  <div class="l">Page : <b id="taille">?</b></div>
+  <div class="l">Densité : <b id="dpr">?</b></div>
+  <div class="l">Moteur : <b id="moteur">?</b></div>
+  <div class="l">Heure : <b id="heure">?</b></div>
+  <div class="l">Serveur : <b id="reseau">test…</b></div>
+  <div class="l">Fluidité : <b id="ips">…</b></div>
+  <div id="ua"></div>
+</div>
+<div id="barres"><div style="background:#fff"></div><div style="background:#ff0"></div><div style="background:#0ff"></div><div style="background:#0f0"></div><div style="background:#f0f"></div><div style="background:#f00"></div><div style="background:#00f"></div><div style="background:#8e63ff"></div></div>
+<div id="balle"></div>
+<div id="cadre"></div>
+<script>
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function ecrire(id, t, cls) { var n = $(id); n.innerHTML = ''; n.appendChild(document.createTextNode(t)); if (cls) { n.className = cls; } }
+  function deux(n) { return (n < 10 ? '0' : '') + n; }
+  function taille() {
+    var w = window.innerWidth || document.documentElement.clientWidth, h = window.innerHeight || document.documentElement.clientHeight;
+    ecrire('taille', w + ' × ' + h + (h > w ? ' (vertical)' : ' (horizontal)'));
+    ecrire('dpr', String(Math.round((window.devicePixelRatio || 1) * 100) / 100));
+  }
+  var ua = navigator.userAgent || '';
+  var m = ua.match(/Chrome\/(\d+)/), a = ua.match(/Android (\d+(\.\d+)?)/);
+  ecrire('moteur', (m ? 'Chrome ' + m[1] : (/AppleWebKit/.test(ua) ? 'WebKit' : 'inconnu')) + (a ? ' · Android ' + a[1] : ''));
+  ecrire('ua', ua);
+  taille();
+  window.onresize = taille;
+  setInterval(function () { var d = new Date(); ecrire('heure', deux(d.getHours()) + ':' + deux(d.getMinutes()) + ':' + deux(d.getSeconds())); }, 500);
+
+  // réseau : un petit fichier du serveur, sans cache, avec le temps de réponse
+  function sonder() {
+    var x = new XMLHttpRequest(), t0 = new Date().getTime(), fini = false;
+    x.open('GET', '/logo/motif-6mic.svg?k=' + t0, true);
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4 || fini) { return; }
+      fini = true;
+      if (x.status >= 200 && x.status < 400) { ecrire('reseau', 'OK · ' + (new Date().getTime() - t0) + ' ms', 'ok'); }
+      else { ecrire('reseau', 'injoignable (' + x.status + ')', 'ko'); }
+    };
+    setTimeout(function () { if (!fini) { fini = true; try { x.abort(); } catch (e) {} ecrire('reseau', 'pas de réponse en 10 s', 'ko'); } }, 10000);
+    x.send();
+  }
+  sonder();
+  setInterval(sonder, 15000);
+
+  // fluidité : un carré qui traverse l'écran, et le nombre d'images par seconde
+  var raf = window.requestAnimationFrame || window.webkitRequestAnimationFrame || function (f) { return setTimeout(function () { f(new Date().getTime()); }, 16); };
+  var balle = $('balle'), images = 0, debut = new Date().getTime();
+  function boucle() {
+    var t = new Date().getTime(), w = (window.innerWidth || 300) - balle.offsetWidth;
+    var x = Math.round(((t / 3000) % 2 < 1 ? (t / 3000) % 1 : 1 - (t / 3000) % 1) * w);
+    balle.style.left = x + 'px';
+    images++;
+    if (t - debut >= 2000) { ecrire('ips', Math.round(images * 1000 / (t - debut)) + ' images/s'); images = 0; debut = t; }
+    raf(boucle);
+  }
+  raf(boucle);
+})();
+</script>
+</body>
+</html>
