@@ -13,6 +13,9 @@ body { cursor: none; -webkit-font-smoothing: antialiased; }
 .video { visibility: hidden; background: #000; object-fit: contain; }
 .video.visible { visibility: visible; }
 
+/* ---- kakémono LED vertical (320 × 900) : scène 1080 × 3038, même principe de réduction par zoom ---- */
+.format-kakemono #scene, .format-kakemono .couche, .format-kakemono .video { width: 1080px; height: 3038px; }
+
 /* Suivi technique (?debug=1) */
 #suivi { position: fixed; right: 8px; bottom: 8px; z-index: 100001; max-width: 46%; padding: 8px 12px; background: rgba(0, 0, 0, .78);
   color: #fde68a; font: 14px/1.35 monospace; white-space: pre-wrap; pointer-events: none; }

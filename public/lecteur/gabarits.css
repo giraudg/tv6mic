@@ -282,6 +282,16 @@
 .g-ident-nom { margin: 24px 0; padding: 18px 48px 10px; background: var(--g-degrade); font-family: var(--g-cond); font-weight: 700; font-size: 220px; line-height: .95; text-transform: uppercase; }
 .g-ident-code { font-size: 40px; font-weight: 600; }
 
+/* Kakémono LED vertical (scène 1080 × 3038, affichée en 320 × 900 : tout est 3,4 fois plus petit qu'à l'écran) :
+   contenus plein cadre, veille et identification recentrées. Les gabarits paysage n'y passent pas (Regles.FORMATS). */
+.format-kakemono .g, .format-kakemono .g-fond, .format-kakemono .g-web-cadre, .format-kakemono .g-ident { width: 1080px; height: 3038px; }
+.format-kakemono .g-veille-logo { left: 170px; top: 1290px; width: 740px; }
+.format-kakemono .g-veille-texte { width: 1080px; top: 1720px; font-size: 64px; }
+.format-kakemono .g-ident-l { font-size: 84px; padding: 0 60px; }
+.format-kakemono .g-ident-nom { font-size: 190px; padding: 24px 40px 12px; }
+.format-kakemono .g-ident-code { font-size: 62px; padding: 0 40px; word-wrap: break-word; }
+.format-kakemono .g-menu { left: 80px; top: 200px; width: 920px; }
+
 
 /* 7. Page web : cadre plein écran, fond noir pendant le chargement */
 .g-web { background: #000; }

@@ -108,6 +108,15 @@ Après le Hall resté noir du 6 au 9 novembre (lecteur 1.6.0 planté au démarra
 - **Historique des connexions** (`ecrans_historique`, 90 jours) et **alertes par e-mail** (`src/surveillance.mjs`, tâche planifiée toutes les 5 min, table `alertes`) : un e-mail quand un écran se tait plus de 15 min alors qu'au moins deux autres écrans de sa famille (hall ou bar) tournent depuis 15 min, un autre à son retour, et un en cas d'erreur grave du lecteur (une fois toutes les 6 h par écran). Envoi par Resend depuis `alertes@notifications.6mic-aix.fr` ; secrets `RESEND_API_KEY` et `ALERTES_A` (adresses séparées par des virgules). Sans eux, les alertes sont notées dans le Journal seulement.
 - **Dépannage d'un écran** : `/diagnostic/reparer.html` efface ce que le navigateur garde pour le site (copie locale, données) ; `/diagnostic/lecteur.html?flux=…` affiche le lecteur avec un journal à l'écran.
 
+## Kakémono LED vertical (16 nov. 2026)
+
+Écran LED vertical sur roulettes (Phocea Media), piloté par un boîtier **Novastar Taurus** : page de **320 × 900 px** (densité 1), navigateur Chrome 73, animations fluides (60 i/s). Il se règle avec ViPlex Express (PC) ou ViPlex Handy : identifiant `admin`, mot de passe de l'étiquette du boîtier ; wifi du boîtier en mode Sta sur le wifi des écrans ; fuseau horaire à mettre sur Europe/Paris (Chine en sortie d'usine). Programme ViPlex : un seul composant « Page web » plein écran, adresse `https://tv.6mic-aix.fr/?flux=kakemono`. Page de test : `/diagnostic/kakemono`.
+
+- **Format par écran** (`flux.format`, migration 0011) : `paysage` (téléviseurs, scène 1920 × 1080) ou `kakemono` (scène 1080 × 3038, réduite par zoom à 320 × 900). Réglable dans « Flux et boucles ». Définitions partagées dans `Regles.FORMATS`.
+- **Contenus** : sur le kakémono passent les images, vidéos et pages web (plein écran) ; les gabarits paysage y sont ignorés (`Regles.pourFormat`, appliqué par le lecteur et par le back-office), avec un avertissement à la programmation. Gabarits verticaux dédiés : à venir.
+- **Visuels** : images verticales 640 × 1800 px ; vidéos verticales H.264, 640 × 1800 conseillé (1080 × 1920 au plus), contrôlées et converties en gardant leur forme.
+- **Surveillance** : le kakémono, mobile et souvent éteint, ne déclenche pas d'alerte « écran muet » (famille à part).
+
 ## Architecture
 
 - **Cloudflare Workers** avec ressources statiques : `public/` est servi tel quel, `src/worker.js` gère l'API.

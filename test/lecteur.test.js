@@ -29,24 +29,25 @@ const CONTENUS = {
   promo: { accroche: 'Ce soir', titre: 'Happy hour', fond: 'rose', mention: 'Avec modération', produits: [{ nom: 'Pinte', prix: '5', ancien: '7', photo }, { nom: 'Planche', prix: '12' }] },
   direction: { fond: 'noir', directions: [{ fleche: 'gauche', titre: 'Toilettes', picto: 'emoji', emoji: '🚻' }, { fleche: 'droite', titre: 'Vestiaire', picto: 'image', image: { src: '/medias/essai/picto.png' } }] }
 };
-function programmation(types, donnees) {
+function programmation(types, donnees, format) {
   const contenus = {}, diffusions = [];
   types.forEach((t, i) => {
     contenus['c-' + t] = { id: 'c-' + t, type: t, titre: 'Essai ' + t, donnees: donnees ? donnees(t) : CONTENUS[t], duree: null };
     diffusions.push({ id: 'd-' + t, contenu: 'c-' + t, debut: '2026-11-01', fin: '2026-11-30', jours: null, semaine: null, plages: null, prioritaire: 0, ordre: i });
   });
-  return { flux: { code: 'hall', nom: 'Hall' }, version: 7, defaut: null, contenus, diffusions,
+  return { flux: { code: 'hall', nom: 'Hall', format: format || 'paysage' }, version: 7, defaut: null, contenus, diffusions,
     reglages: { couleurs: { primaire: { valeur: '#e744a8' }, secondaire: { valeur: '#8e63ff' }, degrade: 'linear-gradient(90deg, #e744a8, #8e63ff)' },
       roles: [], mentions: [{ libelle: 'Complet', alerte: true }] } };
 }
 
 // ---------- un écran simulé ----------
-function ecran({ prog, serveur = 'ok', garde = null }) {
+function ecran({ prog, serveur = 'ok', garde = null, taille = null }) {
   const erreursPage = [];
   const vc = new VirtualConsole();
   vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) { erreursPage.push(e.message); } });
   const dom = new JSDOM(HTML, { url: 'https://tv.6mic-aix.fr/?flux=hall', runScripts: 'outside-only', pretendToBeVisual: true, virtualConsole: vc });
   const W = dom.window;
+  if (taille) { Object.defineProperty(W, 'innerWidth', { value: taille[0] }); Object.defineProperty(W, 'innerHeight', { value: taille[1] }); }
   const horloge = FakeTimers.withGlobal(W).install({ now: DEBUT, toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
   W.addEventListener('error', e => erreursPage.push(e.message));
   // ce que jsdom ne sait pas faire : lire une vidéo, charger une image
@@ -151,5 +152,27 @@ test('chien de garde : une boucle arrêtée par une erreur imprévue repart d\'e
   e.avancer(180);
   assert.ok(e.etat().erreurs.some(x => /affichage bloqué/.test(x)), 'le chien de garde a relancé l\'affichage');
   assert.ok(e.vues.size >= 2 && [...e.vues].some(v => v !== avant.split('#')[0]), 'les étapes s\'enchaînent de nouveau');
+  e.fermer();
+});
+
+test('kakémono vertical (320 × 900) : scène verticale, seuls les contenus plein écran passent', () => {
+  const e = ecran({ prog: programmation(['image', 'agenda', 'video', 'soiree', 'web'], null, 'kakemono'), taille: [320, 900] });
+  e.avancer(240);
+  assert.deepStrictEqual(e.planteES, []);
+  assert.deepStrictEqual(e.erreursPage, []);
+  assert.ok(/format-kakemono/.test(e.W.document.documentElement.className), 'format appliqué à la page');
+  const z = parseFloat(e.W.document.getElementById('scene').style.zoom);
+  assert.ok(Math.abs(z - 320 / 1080) < 0.01, 'scène 1080 × 3038 réduite à 320 de large : zoom ' + z);
+  for (const t of ['image', 'video', 'web']) assert.ok(e.vues.has('c-' + t), 'étape affichée : ' + t);
+  for (const t of ['agenda', 'soiree']) assert.ok(!e.vues.has('c-' + t), 'gabarit paysage écarté : ' + t);
+  assert.ok(!e.etat().erreurs.some(x => /JS |démarrage|chien de garde|gabarit/.test(x)), e.etat().erreurs.join(' | '));
+  e.fermer();
+});
+
+test('kakémono sans rien d\'affichable : veille, sans plantage', () => {
+  const e = ecran({ prog: programmation(['agenda', 'soiree'], null, 'kakemono'), taille: [320, 900] });
+  e.avancer(90);
+  assert.deepStrictEqual(e.planteES, []);
+  assert.strictEqual(e.etat().courante.cle, 'veille');
   e.fermer();
 });

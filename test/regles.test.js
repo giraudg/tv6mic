@@ -187,3 +187,13 @@ test('line-up : visible jusqu\'au soir de la date, heure de Paris transmise pour
   assert.strictEqual(e.duree, R.DUREES.lineup);
   assert.deepStrictEqual(cles(prog, '2026-11-22', '12:00'), ['veille']);   // le lendemain midi : passée
 });
+
+test('formats : le kakémono ne garde que les contenus plein écran', () => {
+  const prog = { contenus: { a: { id: 'a', type: 'image' }, b: { id: 'b', type: 'agenda' } }, diffusions: [{ contenu: 'a' }, { contenu: 'b' }], defaut: 'b' };
+  const k = R.pourFormat(prog, 'kakemono');
+  assert.deepStrictEqual(k.diffusions.map(d => d.contenu), ['a']);
+  assert.strictEqual(k.defaut, null);
+  assert.strictEqual(R.pourFormat(prog, 'paysage'), prog);
+  assert.ok(R.accepte('paysage', 'agenda') && R.accepte('kakemono', 'video') && !R.accepte('kakemono', 'carte'));
+  assert.strictEqual(R.format('inconnu').largeur, 1920);
+});

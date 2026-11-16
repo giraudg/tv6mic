@@ -1,6 +1,6 @@
 /* Écrans TV 6MIC : règles de programmation.
    Calcule, pour un flux et un instant, la liste des étapes à faire tourner.
-   Partagé par le lecteur des écrans et les tests (et plus tard le back-office).
+   Partagé par le lecteur des écrans, le back-office et les tests.
    ES5 uniquement : les écrans utilisent Chromium 56. */
 (function (racine, fabrique) {
   if (typeof module === 'object' && module.exports) { module.exports = fabrique(); }
@@ -184,10 +184,36 @@
     return false;
   }
 
+  /* ---- formats d'écran ----
+     paysage : téléviseurs 16:9 (scène 1920 × 1080), tous les types de contenus.
+     kakemono : écran LED vertical 320 × 900 (Novastar Taurus, nov. 2026), scène 1080 × 3038 ; seuls les contenus
+     plein écran y passent (images, vidéos, pages web), en attendant des gabarits dessinés pour ce format. */
+  var FORMATS = {
+    paysage: { largeur: 1920, hauteur: 1080, types: null },
+    kakemono: { largeur: 1080, hauteur: 3038, types: { image: 1, video: 1, web: 1 } }
+  };
+  function format(code) { return FORMATS.hasOwnProperty(code) ? FORMATS[code] : FORMATS.paysage; }
+  function accepte(codeFormat, type) { var t = format(codeFormat).types; return !t || t.hasOwnProperty(type); }
+  // Programmation d'un flux réduite aux contenus que son format sait afficher (les autres sont ignorés).
+  function pourFormat(prog, codeFormat) {
+    if (!prog || !format(codeFormat).types) { return prog; }
+    var contenus = prog.contenus || {}, r = {}, k, diffusions = [], i, c;
+    for (k in prog) { if (prog.hasOwnProperty(k)) { r[k] = prog[k]; } }
+    for (i = 0; i < (prog.diffusions || []).length; i++) {
+      c = contenus[prog.diffusions[i].contenu];
+      if (c && accepte(codeFormat, c.type)) { diffusions.push(prog.diffusions[i]); }
+    }
+    r.diffusions = diffusions;
+    c = prog.defaut && contenus[prog.defaut];
+    if (c && !accepte(codeFormat, c.type)) { r.defaut = null; }
+    return r;
+  }
+
   return {
     DUREES: DUREES, PAR_PAGE: PAR_PAGE, SERIE_MAX: SERIE_MAX,
     decalageParis: decalageParis, heureParis: heureParis, ajouterJours: ajouterJours, jourSemaine: jourSemaine,
     jourDeService: jourDeService, estActive: estActive, couvreJour: couvreJour, utilisable: utilisable,
-    etapes: etapes, suivante: suivante, contient: contient
+    etapes: etapes, suivante: suivante, contient: contient,
+    FORMATS: FORMATS, format: format, accepte: accepte, pourFormat: pourFormat
   };
 }));

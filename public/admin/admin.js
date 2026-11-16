@@ -106,7 +106,19 @@ function progFlux(code) {
   // Comme le serveur : un contenu par défaut archivé ne s'affiche plus.
   const defOk = def && def.statut === 'actif' ? def : null;
   if (defOk) contenus[defOk.id] = defOk;
-  return { contenus, diffusions, defaut: defOk ? defOk.id : null };
+  // Comme le lecteur : un écran n'affiche que les contenus que son format sait montrer (kakémono : plein écran seulement).
+  return R.pourFormat({ contenus, diffusions, defaut: defOk ? defOk.id : null }, formatDe(f));
+}
+const formatDe = f => (f && f.format) || 'paysage';
+const FORMATS_ECRAN = {
+  paysage: { nom: 'Téléviseur 16:9 (1920 × 1080)', logiciel: 'MagicINFO' },
+  kakemono: { nom: 'Kakémono LED vertical (320 × 900)', logiciel: 'ViPlex (composant « Page web »)' }
+};
+// Contenus programmés sur un écran mais que son format n'affiche pas (gabarits paysage sur le kakémono).
+function nonAffiches(f) {
+  if (!R.format(formatDe(f)).types) return [];
+  const ids = new Set(E.diffusions.filter(d => d.flux.includes(f.code)).map(d => d.contenu));
+  return [...ids].map(id => E.contenuParId.get(id)).filter(c => c && c.statut === 'actif' && !R.accepte(formatDe(f), c.type));
 }
 async function ecrire(action, message) {
   remplacer($('#sync'), h('i'), 'Enregistrement…');
@@ -384,7 +396,14 @@ function verdictVideo(a) {
     if ([66, 77, 100].includes(a.profil)) n('v', 'Profil ' + ({ 66: 'Baseline', 77: 'Main', 100: 'High' })[a.profil] + (a.niveau ? ', niveau ' + a.niveau : ''));
     else n('x', 'Profil H.264 ' + a.profil + ' (10 bits ou 4:2:2) : non lu par les écrans');
   }
-  if (a.largeur > 1920 || a.hauteur > 1080) n('x', a.largeur + ' × ' + a.hauteur + ' px : plus grand que les écrans (1920 × 1080)');
+  if (a.hauteur > a.largeur) {
+    // vidéo verticale, pour le kakémono (320 × 900 : 640 × 1800 conseillé) ; décodeurs limités à 1080 × 1920
+    const kakemono = Math.abs(a.largeur / a.hauteur - 320 / 900) < 0.02;
+    if (a.largeur > 1080 || a.hauteur > 1920) n('x', a.largeur + ' × ' + a.hauteur + ' px : trop grand (1080 × 1920 au plus en vertical)');
+    else if (a.hauteur < 900) n('a', a.largeur + ' × ' + a.hauteur + ' px : basse définition, image floue');
+    else n(kakemono ? 'v' : 'a', a.largeur + ' × ' + a.hauteur + ' px' + (kakemono ? ' : format du kakémono' : ' : vertical, mais pas au format du kakémono (bandes noires ; 640 × 1800 conseillé)'));
+  }
+  else if (a.largeur > 1920 || a.hauteur > 1080) n('x', a.largeur + ' × ' + a.hauteur + ' px : plus grand que les écrans (1920 × 1080)');
   else if (a.largeur < 1280 || a.hauteur < 720) n('a', a.largeur + ' × ' + a.hauteur + ' px : basse définition, image floue');
   else n('v', a.largeur + ' × ' + a.hauteur + ' px');
   if (a.ips) {
@@ -414,10 +433,13 @@ function posterVideo(f) {
     v.muted = true; v.preload = 'auto'; v.playsInline = true;
     v.onloadedmetadata = () => { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); };
     v.onseeked = () => {
-      const c = h('canvas', { width: 1920, height: 1080 }), x = c.getContext('2d');
-      x.fillStyle = '#000'; x.fillRect(0, 0, 1920, 1080);
-      const e = Math.min(1920 / v.videoWidth, 1080 / v.videoHeight), w = v.videoWidth * e, ht = v.videoHeight * e;
-      x.drawImage(v, (1920 - w) / 2, (1080 - ht) / 2, w, ht);
+      // paysage : cadre 1920 × 1080 ; vertical (kakémono) : à la forme de la vidéo, 1080 × 1920 au plus
+      const vert = v.videoHeight > v.videoWidth, k = Math.min(1, 1080 / v.videoWidth, 1920 / v.videoHeight);
+      const [cw, ch] = vert ? [Math.round(v.videoWidth * k), Math.round(v.videoHeight * k)] : [1920, 1080];
+      const c = h('canvas', { width: cw, height: ch }), x = c.getContext('2d');
+      x.fillStyle = '#000'; x.fillRect(0, 0, cw, ch);
+      const e = Math.min(cw / v.videoWidth, ch / v.videoHeight), w = v.videoWidth * e, ht = v.videoHeight * e;
+      x.drawImage(v, (cw - w) / 2, (ch - ht) / 2, w, ht);
       c.toBlob(b => { clearTimeout(m); fin(); sansProfilIcc(b).then(x => ok({ blob: x, duree: v.duration, largeur: v.videoWidth, hauteur: v.videoHeight })); }, 'image/jpeg', 0.85);
     };
     v.onerror = () => { clearTimeout(m); fin(); ko(new Error('Ce navigateur ne sait pas lire cette vidéo : utilisez Chrome ou Edge.')); };
@@ -448,10 +470,12 @@ async function convertirVideo(fichier, duree, progression) {
   }
   const stats = await piste.computePacketStats(150);
   const ips = ipsCible(stats.averagePacketRate);
-  // 16:9 jusqu'à 1920 × 1080 : taille gardée ; sinon cadre 1920 × 1080 (bandes noires si le format diffère)
+  // 16:9 jusqu'à 1920 × 1080 : taille gardée ; sinon cadre 1920 × 1080 (bandes noires si le format diffère).
+  // Vidéo verticale (kakémono) : sa forme est gardée, réduite au besoin à 1080 × 1920 au plus.
   const w = piste.displayWidth, ht = piste.displayHeight;
   const garde = Math.abs(w / ht - 16 / 9) < 0.02 && w <= 1920 && w >= 1280;
-  const [lw, lh] = garde ? [w - w % 2, ht - ht % 2] : [1920, 1080];
+  const kv = Math.min(1, 1080 / w, 1920 / ht), pair = x => Math.max(2, Math.round(x / 2) * 2);
+  const [lw, lh] = ht > w ? [pair(w * kv), pair(ht * kv)] : garde ? [w - w % 2, ht - ht % 2] : [1920, 1080];
   // débit : 5 Mbit/s en 1080p, au prorata des pixels ; abaissé pour une vidéo longue (75 Mo au plus)
   const secondes = duree || (await input.computeDuration()) || 0;
   let debit = Math.max(CONVERSION.debitMin, CONVERSION.debit * lw * lh / (1920 * 1080));
@@ -1654,7 +1678,7 @@ function vueEditeur(id, typeNouveau) {
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Image' }),
       champMedia({ genre: 'image', valeur: d.src ? d : null, change: v => { Object.assign(d, v || { src: null }); changer(); },
         cadre: () => Object.assign({ contenir: d.ajustement === 'ajuster', conseil: d.ajustement === 'ajuster' ? 'image entière, sans recadrage' : 'plein écran, recadrée si le format diffère' }, G.CADRES.image) }),
-      h('small', { text: 'JPEG, PNG ou WebP. Les visuels 1920 × 1080 de Declinator conviennent tels quels.' })));
+      h('small', { text: 'JPEG, PNG ou WebP. Les visuels 1920 × 1080 de Declinator conviennent tels quels. Pour le kakémono : visuel vertical de 640 × 1800 px.' })));
     const seg = h('div', { class: 'seg', role: 'group' }, [['remplir', 'Remplir l’écran (recadrer)'], ['ajuster', 'Image entière (bandes noires)']].map(([k, t]) =>
       h('button', { type: 'button', 'aria-pressed': String(d.ajustement === k), onclick: e => { d.ajustement = k; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer(); } }, t)));
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Cadrage' }), seg));
@@ -1818,7 +1842,11 @@ function dialogueDiffusion({ diffusion, contenu, jours, jour }) {
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Écrans' }),
         h('div', { class: 'ecrans-choix' },
           h('label', { class: 'coche tous' }, h('input', { type: 'checkbox', checked: x.flux.length === E.flux.length, onchange: e => { x.flux = e.target.checked ? E.flux.map(f => f.code) : []; rendre(); } }), 'Tous les écrans'),
-          E.flux.map(f => h('label', { class: 'coche' }, h('input', { type: 'checkbox', checked: x.flux.includes(f.code), onchange: e => { x.flux = e.target.checked ? [...x.flux, f.code] : x.flux.filter(k => k !== f.code); rendre(); } }), f.nom)))),
+          E.flux.map(f => h('label', { class: 'coche' }, h('input', { type: 'checkbox', checked: x.flux.includes(f.code), onchange: e => { x.flux = e.target.checked ? [...x.flux, f.code] : x.flux.filter(k => k !== f.code); rendre(); } }), f.nom))),
+        (() => {
+          const hors = c ? E.flux.filter(f => x.flux.includes(f.code) && !R.accepte(formatDe(f), c.type)) : [];
+          return hors.length ? h('p', { class: 'aide', text: hors.map(f => f.nom).join(', ') + ' : ce gabarit n’existe pas encore au format vertical, il n’y sera pas affiché. Sur le kakémono passent les images, vidéos et pages web.' }) : null;
+        })()),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Jours' }),
         h('div', { class: 'seg', role: 'group' },
           h('button', { type: 'button', 'aria-pressed': String(mode === 'periode'), onclick: () => { mode = 'periode'; rendre(); } }, 'Période'),
@@ -2090,26 +2118,32 @@ function carteFlux(f, ms) {
   const nom = h('input', { type: 'text', value: f.nom, maxLength: 40, 'aria-label': 'Nom de l’écran' });
   // Un contenu par défaut archivé reste listé (pour ne pas le perdre en silence) mais ne s'affiche plus.
   const defaut = h('select', { 'aria-label': 'Contenu par défaut' }, h('option', { value: '', text: 'Logo 6MIC sur fond noir' }),
-    E.contenus.filter(c => c.statut === 'actif' || c.id === f.contenu_defaut).map(c => h('option', { value: c.id, selected: c.id === f.contenu_defaut,
+    E.contenus.filter(c => c.id === f.contenu_defaut || (c.statut === 'actif' && R.accepte(formatDe(f), c.type))).map(c => h('option', { value: c.id, selected: c.id === f.contenu_defaut,
       text: TYPES[c.type] + ' : ' + c.titre + (c.statut === 'actif' ? '' : ' (archivé : logo affiché à la place)') })));
   const propose = h('input', { type: 'checkbox', checked: proposeDOffice(f) });
-  const sauver = () => ecrire(() => api('PUT', '/api/admin/flux/' + f.code, { nom: nom.value, contenu_defaut: defaut.value || null, propose: propose.checked }), 'Écran enregistré.')
+  const format = h('select', { 'aria-label': 'Format de l’écran' },
+    Object.entries(FORMATS_ECRAN).map(([k, x]) => h('option', { value: k, text: x.nom, selected: k === formatDe(f) })));
+  const sauver = () => ecrire(() => api('PUT', '/api/admin/flux/' + f.code, { nom: nom.value, contenu_defaut: defaut.value || null, propose: propose.checked, format: format.value }), 'Écran enregistré.')
     .then(() => { if (surVue('flux')) vueFlux(); }, () => {});
   nom.addEventListener('change', sauver);
   defaut.addEventListener('change', sauver);
   propose.addEventListener('change', sauver);
+  format.addEventListener('change', sauver);
+  const ecartes = nonAffiches(f);
   // Suppression : seulement un écran sans programmation (le serveur refuse sinon).
   const nbProg = E.diffusions.filter(d => d.flux.includes(f.code)).length;
   return h('article', { class: 'carte' },
     h('div', { class: 'carte-t' }, h('h2', { text: f.nom }), calc.prioritaire ? h('span', { class: 'puce prio', text: 'Prioritaire en cours' }) : etatEcran(f.code).puce),
     h('div', { class: 'carte-c' },
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Nom de l’écran' }), nom),
-      h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Adresse à saisir dans MagicINFO (ne change jamais)' }),
+      h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Format de l’écran' }), format),
+      h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Adresse à saisir dans ' + FORMATS_ECRAN[formatDe(f)].logiciel + ' (ne change jamais)' }),
         h('div', { class: 'adresse' }, h('code', { text: adresse }),
           h('button', { type: 'button', class: 'btn pt', onclick: () => navigator.clipboard.writeText(adresse).then(() => annoncer('Adresse copiée.'), () => annoncer(adresse)) }, 'Copier'))),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Quand rien n’est programmé' }), defaut),
       h('label', { class: 'coche propose' }, propose, 'Coché d’office quand on programme un contenu'),
-      h('div', { class: 'lbl', text: 'Boucle le ' + dateMoy(simu.date) + ' à ' + simu.heure }), liste),
+      h('div', { class: 'lbl', text: 'Boucle le ' + dateMoy(simu.date) + ' à ' + simu.heure }), liste,
+      ecartes.length ? h('p', { class: 'aide', text: 'Programmés mais non affichés sur ce kakémono (gabarits paysage) : ' + ecartes.map(c => '« ' + c.titre + ' »').join(', ') + '.' }) : null),
     h('div', { class: 'carte-p' },
       h('button', { type: 'button', class: 'btn pt', onclick: () => identifier(f.code) }, 'Identifier'),
       h('a', { class: 'btn pt', href: '/?flux=' + f.code + '&debug=1', target: '_blank', rel: 'noopener' }, 'Voir le flux ↗'),
@@ -2125,6 +2159,8 @@ function dialogueEcran() {
   const nom = h('input', { id: 'ne-nom', type: 'text', maxLength: 40, placeholder: 'Bar 5', autocomplete: 'off' });
   const code = h('input', { id: 'ne-code', type: 'text', maxLength: 30, placeholder: 'bar-5', autocomplete: 'off', autocapitalize: 'off', spellcheck: false });
   const propose = h('input', { type: 'checkbox', checked: true });
+  const format = h('select', { id: 'ne-format' }, Object.entries(FORMATS_ECRAN).map(([k, x]) => h('option', { value: k, text: x.nom })));
+  format.addEventListener('change', () => { if (format.value !== 'paysage') propose.checked = false; });
   const adresse = h('code');
   const maj = () => { adresse.textContent = location.origin + '/?flux=' + (code.value || '…'); };
   nom.addEventListener('input', () => { if (!codeModifie) code.value = versCode(nom.value); maj(); });
@@ -2133,7 +2169,7 @@ function dialogueEcran() {
   const ajouter = async () => {
     if (!nom.value.trim()) { annoncer('Donnez un nom à l’écran.', true); nom.focus(); return; }
     try {
-      await ecrire(() => api('POST', '/api/admin/flux', { nom: nom.value, code: code.value, propose: propose.checked }), 'Écran « ' + nom.value.trim() + ' » ajouté.');
+      await ecrire(() => api('POST', '/api/admin/flux', { nom: nom.value, code: code.value, propose: propose.checked, format: format.value }), 'Écran « ' + nom.value.trim() + ' » ajouté.');
     } catch (e) { if (e.status === 409) annoncer(e.message, true); return; }
     d.close();
     if (surVue('flux')) vueFlux();
@@ -2142,7 +2178,8 @@ function dialogueEcran() {
     corps: h('div', { class: 'nouvel-ecran' },
       h('div', { class: 'champ' }, h('label', { class: 'lbl', for: 'ne-nom', text: 'Nom de l’écran' }), nom),
       h('div', { class: 'champ' }, h('label', { class: 'lbl', for: 'ne-code', text: 'Code de l’adresse (ne changera plus)' }), code,
-        h('small', { text: 'Lettres minuscules sans accent, chiffres et tirets. Adresse à saisir dans MagicINFO :' }), h('div', { class: 'adresse' }, adresse)),
+        h('small', { text: 'Lettres minuscules sans accent, chiffres et tirets. Adresse à saisir dans MagicINFO (ou ViPlex pour un kakémono) :' }), h('div', { class: 'adresse' }, adresse)),
+      h('div', { class: 'champ' }, h('label', { class: 'lbl', for: 'ne-format', text: 'Format de l’écran' }), format),
       h('label', { class: 'coche' }, propose, 'Coché d’office quand on programme un contenu')),
     pied: [h('button', { type: 'button', class: 'btn', onclick: () => d.close() }, 'Annuler'),
       h('button', { type: 'button', class: 'btn btn-noir', onclick: ajouter }, 'Ajouter l’écran')] });

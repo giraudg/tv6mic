@@ -153,7 +153,7 @@ async function programme(req, env, ctx, code) {
   const db = env.DB;
   const maintenant = Date.now();
   const [flux, versionTexte] = await Promise.all([
-    db.prepare('SELECT code, nom, contenu_defaut, identifier_jusqua FROM flux WHERE code = ?').bind(code).first(),
+    db.prepare('SELECT code, nom, contenu_defaut, identifier_jusqua, format FROM flux WHERE code = ?').bind(code).first(),
     db.prepare("SELECT valeur FROM meta WHERE cle = 'version'").first('valeur')
   ]);
   if (!flux) return json({ erreur: 'Flux inconnu', code }, 404);
@@ -165,7 +165,7 @@ async function programme(req, env, ctx, code) {
     if (signal && typeof signal === 'object') ctx.waitUntil(enregistrerSignal(db, code, signal, maintenant, req).catch(e => console.error('signal', e)));
   }
 
-  const base = { flux: { code: flux.code, nom: flux.nom }, version, maintenant, identifier: flux.identifier_jusqua || 0 };
+  const base = { flux: { code: flux.code, nom: flux.nom, format: flux.format || 'paysage' }, version, maintenant, identifier: flux.identifier_jusqua || 0 };
   if (signal && Number(signal.version) === version && version > 0) return json({ ...base, inchange: true });
 
   // Diffusions de ce flux qui ne sont pas terminées (depuis hier, pour les soirées qui passent minuit).
@@ -483,7 +483,7 @@ async function connexion(req, env, url, secret) {
 async function etat(env, qui) {
   const db = env.DB;
   const [flux, contenus, diffusions, liens, ecrans, version, reglages] = await Promise.all([
-    db.prepare('SELECT code, nom, ordre, contenu_defaut, identifier_jusqua, propose FROM flux ORDER BY ordre, nom').all(),
+    db.prepare('SELECT code, nom, ordre, contenu_defaut, identifier_jusqua, propose, format FROM flux ORDER BY ordre, nom').all(),
     db.prepare('SELECT id, type, titre, donnees, duree, statut, cree_le, modifie_le FROM contenus ORDER BY modifie_le DESC').all(),
     db.prepare('SELECT * FROM diffusions ORDER BY debut, cree_le').all(),
     db.prepare('SELECT diffusion_id, flux_code FROM diffusion_flux').all(),
@@ -1058,6 +1058,13 @@ async function ordonner(req, env, qui) {
 /* ---- flux ---- */
 // Code d'un nouvel écran : il figure dans l'adresse saisie dans MagicINFO (?flux=bar-1) et ne change plus.
 const CODE_FLUX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// Formats d'écran (public/lecteur/regles.js, FORMATS) : téléviseur 16:9, ou kakémono LED vertical 320 × 900.
+const FORMATS_ECRAN = ['paysage', 'kakemono'];
+function formatEcran(v, actuel) {
+  if (v === undefined || v === null || v === '') return actuel || 'paysage';
+  if (!FORMATS_ECRAN.includes(v)) throw refus('Format d’écran inconnu.');
+  return v;
+}
 async function creerFlux(req, env, qui) {
   const b = await lireCorps(req);
   const nom = chaine(b.nom, 40, 'nom de l’écran');
@@ -1066,8 +1073,9 @@ async function creerFlux(req, env, qui) {
   if (code.length < 2 || code.length > 30 || !CODE_FLUX.test(code)) throw refus('Code de l’adresse : 2 à 30 caractères, lettres minuscules sans accent, chiffres et tirets (ex. bar-1).');
   if (code === 'tous') throw refus('Ce code est réservé.');
   if (await env.DB.prepare('SELECT 1 FROM flux WHERE code = ?').bind(code).first()) throw new ErreurHttp(409, 'Un écran utilise déjà le code « ' + code + ' ».');
-  await ecrire(env, qui, [env.DB.prepare('INSERT INTO flux (code, nom, ordre, propose) VALUES (?, ?, (SELECT COALESCE(MAX(ordre), 0) + 1 FROM flux), ?)')
-    .bind(code, nom, b.propose ? 1 : 0)], 'Écran ajouté', nom + ' (?flux=' + code + ')');
+  const format = formatEcran(b.format);
+  await ecrire(env, qui, [env.DB.prepare('INSERT INTO flux (code, nom, ordre, propose, format) VALUES (?, ?, (SELECT COALESCE(MAX(ordre), 0) + 1 FROM flux), ?, ?)')
+    .bind(code, nom, b.propose ? 1 : 0, format)], 'Écran ajouté', nom + ' (?flux=' + code + ')' + (format !== 'paysage' ? ', format ' + format : ''));
   return json({ ok: true, code });
 }
 async function modifierFlux(req, env, qui, code) {
@@ -1078,8 +1086,9 @@ async function modifierFlux(req, env, qui, code) {
   let defaut = b.contenu_defaut ? String(b.contenu_defaut) : null;
   if (defaut) await lireContenu(env, defaut);
   const propose = b.propose === undefined ? f.propose : (b.propose ? 1 : 0);
-  await ecrire(env, qui, [env.DB.prepare('UPDATE flux SET nom = ?, contenu_defaut = ?, propose = ? WHERE code = ?').bind(nom, defaut, propose, code)],
-    'Écran modifié', nom + (nom !== f.nom ? ' (ancien nom : ' + f.nom + ')' : ''));
+  const format = formatEcran(b.format, f.format);
+  await ecrire(env, qui, [env.DB.prepare('UPDATE flux SET nom = ?, contenu_defaut = ?, propose = ?, format = ? WHERE code = ?').bind(nom, defaut, propose, format, code)],
+    'Écran modifié', nom + (nom !== f.nom ? ' (ancien nom : ' + f.nom + ')' : '') + (format !== (f.format || 'paysage') ? ' · format ' + format : ''));
   return json({ ok: true });
 }
 // Retire un écran : seulement s'il n'a plus aucune programmation (pour ne rien perdre en silence).

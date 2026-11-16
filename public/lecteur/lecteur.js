@@ -3,12 +3,13 @@
    - fait tourner les étapes calculées par Regles (gabarits, images, vidéos) ;
    - garde les médias dans le stockage de l'écran (Cache API, 150 Mo au plus) ;
    - reprend après un rechargement de la page par MagicINFO, continue sans réseau.
+   - s'adapte au format de l'écran : téléviseur 16:9 ou kakémono LED vertical (320 × 900), cf. Regles.FORMATS.
    Options d'adresse : debug=1 (suivi technique), ident=1 (affiche le nom du flux 20 s).
    ES5 uniquement : les écrans utilisent Chromium 56. */
 (function () {
   'use strict';
 
-  var VERSION = '1.6.4';
+  var VERSION = '1.7.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -22,6 +23,7 @@
   };
 
   var scene, couches, videos, identNoeud = null, suiviNoeud = null;
+  var format = 'paysage', SW = 1920, SH = 1080;
   var prog = null, decalage = 0, demarreLe = Date.now(), chargements = 0;
   var enRoute = false, courante = null, actif = null, jeton = 0, zHaut = 10;
   var minuterie = null, garde = null, minuterieReseau = null, identJusqua = 0;
@@ -90,13 +92,24 @@
     return r;
   }
 
-  /* ---------- scène 1920 × 1080 ---------- */
+  /* ---------- scène : 1920 × 1080 (téléviseurs) ou 1080 × 3038 (kakémono vertical), réduite par zoom ---------- */
   function ajuster() {
-    var w = W.innerWidth || 1920, h = W.innerHeight || 1080, z = Math.min(w / 1920, h / 1080);
+    var w = W.innerWidth || SW, h = W.innerHeight || SH, z = Math.min(w / SW, h / SH);
     scene.style.zoom = z;
-    scene.style.left = Math.round((w - 1920 * z) / 2 / z) + 'px';
-    scene.style.top = Math.round((h - 1080 * z) / 2 / z) + 'px';
+    scene.style.left = Math.round((w - SW * z) / 2 / z) + 'px';
+    scene.style.top = Math.round((h - SH * z) / 2 / z) + 'px';
   }
+  // Le format vient du flux (back-office) ; avant le premier contact, de la forme de la page.
+  function appliquerFormat(code) {
+    if (!code || !Regles.FORMATS.hasOwnProperty(code)) { return; }
+    if (code === format && D.documentElement.className.indexOf('format-') >= 0) { return; }
+    var f = Regles.format(code);
+    format = code; SW = f.largeur; SH = f.hauteur;
+    D.documentElement.className = (D.documentElement.className.replace(/\s*format-[a-z]+/g, '') + ' format-' + code).replace(/^\s+/, '');
+    if (scene) { ajuster(); }
+  }
+  // Programmation vue par cet écran : sans les contenus que son format ne sait pas afficher.
+  function vue() { return Regles.pourFormat(prog, format); }
   function vider(n) { while (n.firstChild) { n.removeChild(n.firstChild); } }
   function estActif(c) { return !!(actif && c && actif.type === c.type && actif.index === c.index); }
   function noeudDe(c) { return c.type === 'couche' ? couches[c.index] : videos[c.index]; }
@@ -199,7 +212,7 @@
   // Après un rechargement de la page : rejoue l'étape interrompue là où elle en était
   // (3 fois au plus de suite, pour ne pas boucler sur un contenu qui ferait planter l'écran), sinon passe à la suivante.
   function reprendre(etat) {
-    var calc = Regles.etapes(prog, maintenant()), i, e, ecoule;
+    var calc = Regles.etapes(vue(), maintenant()), i, e, ecoule;
     if (etat && etat.cle && (etat.reprises || 0) < 3) {
       ecoule = (Date.now() - (etat.depuis || 0)) / 1000;
       for (i = 0; i < calc.etapes.length; i++) {
@@ -215,7 +228,7 @@
   // Étape suivante, en écartant pendant 2 min celles qui viennent d'échouer.
   function avancer(apres) {
     clearTimeout(minuterie); clearTimeout(garde);
-    var liste = Regles.etapes(prog, maintenant()).etapes, cle = apres !== undefined ? apres : (courante && courante.cle), e = null, i;
+    var liste = Regles.etapes(vue(), maintenant()).etapes, cle = apres !== undefined ? apres : (courante && courante.cle), e = null, i;
     for (i = 0; i <= liste.length; i++) {
       e = Regles.suivante(liste, cle);
       if (!(quarantaine[e.cle] > Date.now())) { break; }
@@ -488,7 +501,7 @@
     if (!enRoute || !courante) { return; }
     var h = Regles.heureParis(maintenant()), calc;
     if (h.minutes >= 300 && h.minutes < 310 && Date.now() - demarreLe > 3 * 3600000) { W.location.reload(); return; }
-    calc = Regles.etapes(prog, maintenant());
+    calc = Regles.etapes(vue(), maintenant());
     if (!Regles.contient(calc.etapes, courante.cle) && !(courante.cle === 'veille' && calc.etapes[0].cle === 'veille')) { avancer(); }
   }
 
@@ -533,6 +546,7 @@
         if (!r.inchange) { recevoir(r); }
         else if (Date.now() - dernierTri > 600000) { gererMedias(); }
         if (r.flux && prog) { prog.flux = r.flux; }
+        if (r.flux) { appliquerFormat(r.flux.format); }
         identifier(r.identifier || 0, r.flux && r.flux.nom);
       } catch (e) { noter('programmation reçue : ' + (e && e.message)); }
     }, function (statut) {
@@ -547,6 +561,7 @@
     inconnu = false;
     prog = { version: r.version, flux: r.flux, defaut: r.defaut || null, contenus: r.contenus || {}, diffusions: r.diffusions || [], reglages: r.reglages || null };
     ecrire(K.prog, JSON.stringify(prog));
+    if (r.flux) { appliquerFormat(r.flux.format); }
     try { Gabarits.appliquerReglages(prog.reglages); } catch (e) { noter('réglages : ' + e.message); }
     gererMedias();
     if (!enRoute) { demarrer(); } else { verifier(); }
@@ -578,13 +593,14 @@
         p = chemin(s[j]); if (!utiles[p]) { utiles[p] = (c.donnees && s[j] === c.donnees.src && c.donnees.taille) || 0; ordre.push(p); }
       }
     }
-    calc = Regles.etapes(prog, maintenant());
+    calc = Regles.etapes(vue(), maintenant());
     for (i = 0; i < calc.etapes.length; i++) { if (calc.etapes[i].contenu) { ajouter(calc.etapes[i].contenu); } }
-    for (i = 0; i < prog.diffusions.length; i++) {
-      d = prog.diffusions[i];
-      if (d.fin >= Regles.ajouterJours(h.date, -1) && d.debut <= limite && prog.contenus[d.contenu]) { ajouter(prog.contenus[d.contenu]); }
+    var v = vue();
+    for (i = 0; i < v.diffusions.length; i++) {
+      d = v.diffusions[i];
+      if (d.fin >= Regles.ajouterJours(h.date, -1) && d.debut <= limite && v.contenus[d.contenu]) { ajouter(v.contenus[d.contenu]); }
     }
-    if (prog.defaut && prog.contenus[prog.defaut]) { ajouter(prog.contenus[prog.defaut]); }
+    if (v.defaut && v.contenus[v.defaut]) { ajouter(v.contenus[v.defaut]); }
     W.caches.open(CACHE).then(function (cache) {
       return cache.keys().then(function (cles) {
         var presents = {}, k, p;
@@ -668,7 +684,7 @@
     suiviNoeud.textContent = [
       'flux ' + CODE + ' · lecteur ' + VERSION + ' · programmation v' + (prog ? prog.version : '–'),
       'heure de Paris ' + h.date + ' ' + Math.floor(h.minutes / 60) + ':' + ('0' + h.minutes % 60).slice(-2) + ' · décalage ' + decalage + ' ms',
-      'étape ' + (courante ? courante.cle + ' (' + courante.type + ', ' + courante.duree + ' s)' : '–'),
+      'format ' + format + ' (' + SW + '×' + SH + ') · étape ' + (courante ? courante.cle + ' (' + courante.type + ', ' + courante.duree + ' s)' : '–'),
       'vidéo ' + modeVideo + (preparee ? ' · préparée ' + preparee.cle : ''),
       'mémoire ' + (totalMemoire() / 1048576).toFixed(1) + ' Mo' + (telechargementEnCours ? ' · téléchargement…' : ''),
       (horsLigne ? 'HORS LIGNE' : 'en ligne') + ' · chargements ' + chargements + ' · page ' + W.innerWidth + '×' + W.innerHeight
@@ -680,6 +696,8 @@
     scene = D.getElementById('scene');
     couches = [D.getElementById('c0'), D.getElementById('c1')];
     videos = [D.getElementById('v0'), D.getElementById('v1')];
+    prog = CODE ? lireJSON(K.prog) : null;
+    appliquerFormat((prog && prog.flux && prog.flux.format) || ((W.innerHeight || 0) > (W.innerWidth || 1) * 1.4 ? 'kakemono' : 'paysage'));
     ajuster();
     W.addEventListener('resize', ajuster);
     chargements = (parseInt(lire(K.chargements), 10) || 0) + 1;
@@ -694,7 +712,6 @@
     if (SUIVI) { setInterval(majSuivi, 1000); }
     if (!CODE) { menu(); return; }
     memoire = lireJSON(K.medias) || {};
-    prog = lireJSON(K.prog);
     if (prog && prog.reglages) { try { Gabarits.appliquerReglages(prog.reglages); } catch (e) {} }
     // Le contact avec le serveur passe AVANT tout le reste et ne dépend de rien : un plantage de l'affichage
     // ne doit jamais empêcher l'écran de recevoir une programmation corrigée (Hall, 6-9 nov. 2026).

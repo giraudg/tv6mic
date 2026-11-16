@@ -13,7 +13,9 @@ const ERREURS_GRAVES = /démarrage|affichage bloqué|chien de garde|vérificatio
 const EXPEDITEUR = 'Écrans 6MIC <alertes@notifications.6mic-aix.fr>';
 const BACK_OFFICE = 'https://tv.6mic-aix.fr/admin/';
 
-export const famille = code => /^bar-/.test(code) ? 'bar' : 'hall';
+// Familles d'écrans qui servent de témoins les uns aux autres. Le kakémono, sur roulettes, souvent éteint ou déplacé,
+// est seul de sa famille : jamais d'alerte « muet » pour lui (ses erreurs graves sont signalées comme les autres).
+export const famille = code => /^bar-/.test(code) ? 'bar' : /^kakemono/.test(code) ? 'kakemono' : 'hall';
 const dernierContact = e => e.contact_le || e.vu_le || 0;
 
 /* Décision, sans effet de bord (testée seule) :

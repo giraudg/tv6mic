@@ -33,6 +33,11 @@ test('les écrans du bar ne servent pas de témoins aux écrans du hall, et inve
   assert.strictEqual(b.ouvrir.length, 1);
 });
 
+test('le kakémono (mobile, souvent éteint) ne déclenche pas d\'alerte « muet »', () => {
+  const r = S.decider({ maintenant: T, ecrans: [ecran('kakemono', 90), ecran('hall', 0), ecran('club', 1), ecran('regie', 0)] });
+  assert.strictEqual(r.ouvrir.length, 0);
+});
+
 test('une seule alerte par coupure, levée au retour de l\'écran', () => {
   const ouvertes = [{ id: 7, flux_code: 'hall', type: 'muet', debut: T - 60 * M }];
   const pendant = S.decider({ maintenant: T, ouvertes, ecrans: [ecran('hall', 60), ecran('club', 0), ecran('regie', 0)] });
