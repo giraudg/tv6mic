@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.9.0';
+  var VERSION = '1.10.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';
@@ -19,8 +19,10 @@
   var SUIVI = params.debug === '1';
   var K = {
     prog: 'tv6mic.prog.' + CODE, etat: 'tv6mic.etat.' + CODE, medias: 'tv6mic.medias',
-    decalage: 'tv6mic.decalage', chargements: 'tv6mic.chargements', video: 'tv6mic.video', garde: 'tv6mic.garde'
+    decalage: 'tv6mic.decalage', chargements: 'tv6mic.chargements', video: 'tv6mic.video', garde: 'tv6mic.garde', maj: 'tv6mic.maj'
   };
+  // Mise à jour du lecteur : le serveur annonce la version publiée ; si elle diffère, la page se recharge entre deux étapes.
+  var majAttendue = null;
 
   var scene, couches, videos, identNoeud = null, suiviNoeud = null;
   var format = 'paysage', SW = 1920, SH = 1080;
@@ -230,8 +232,19 @@
     avancer(etat ? etat.cle : null);
   }
   // Étape suivante, en écartant pendant 2 min celles qui viennent d'échouer.
+  // Recharge la page pour prendre la nouvelle version du lecteur, au plus une fois par quart d'heure pour une même
+  // version (si le navigateur resservait l'ancienne, l'écran ne doit pas se recharger en boucle).
+  function mettreAJour() {
+    var dejaTente = lireJSON(K.maj);
+    if (dejaTente && dejaTente.v === majAttendue && Date.now() - dejaTente.t < 900000) { return false; }
+    ecrire(K.maj, JSON.stringify({ v: majAttendue, t: Date.now() }));
+    tracer('mise à jour du lecteur ' + VERSION + ' → ' + majAttendue + ' : rechargement');
+    W.location.reload();
+    return true;
+  }
   function avancer(apres) {
     clearTimeout(minuterie); clearTimeout(garde);
+    if (majAttendue && mettreAJour()) { return; }
     var liste = Regles.etapes(vue(), maintenant()).etapes, cle = apres !== undefined ? apres : (courante && courante.cle), e = null, i;
     for (i = 0; i <= liste.length; i++) {
       e = Regles.suivante(liste, cle);
@@ -550,6 +563,7 @@
         if (!r.inchange) { recevoir(r); }
         else if (Date.now() - dernierTri > 600000) { gererMedias(); }
         if (r.flux && prog) { prog.flux = r.flux; }
+        if (r.lecteur && r.lecteur !== VERSION) { majAttendue = r.lecteur; }
         if (r.flux) { appliquerFormat(r.flux.format); }
         identifier(r.identifier || 0, r.flux && r.flux.nom);
       } catch (e) { noter('programmation reçue : ' + (e && e.message)); }

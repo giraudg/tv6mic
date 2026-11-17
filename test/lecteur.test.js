@@ -44,7 +44,7 @@ function programmation(types, donnees, format) {
 }
 
 // ---------- un écran simulé ----------
-function ecran({ prog, serveur = 'ok', garde = null, taille = null }) {
+function ecran({ prog, serveur = 'ok', garde = null, taille = null, lecteur = null }) {
   const erreursPage = [];
   const vc = new VirtualConsole();
   vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) { erreursPage.push(e.message); } });
@@ -69,7 +69,7 @@ function ecran({ prog, serveur = 'ok', garde = null, taille = null }) {
       const x = this;
       W.setTimeout(() => {
         x.readyState = 4;
-        if (serveur === 'ok') { x.status = 200; x.responseText = JSON.stringify(Object.assign({ maintenant: W.Date.now() }, prog)); }
+        if (serveur === 'ok') { x.status = 200; x.responseText = JSON.stringify(Object.assign({ maintenant: W.Date.now() }, lecteur ? { lecteur } : {}, prog)); }
         else { x.status = 0; x.responseText = ''; }
         if (x.onreadystatechange) { x.onreadystatechange(); }
         if (x.onload && x.status) { x.onload(); }
@@ -179,5 +179,19 @@ test('kakémono sans rien d\'affichable : veille, sans plantage', () => {
   e.avancer(90);
   assert.deepStrictEqual(e.planteES, []);
   assert.strictEqual(e.etat().courante.cle, 'veille');
+  e.fermer();
+});
+
+test('nouvelle version du lecteur publiée : rechargement entre deux étapes, une seule fois par quart d\'heure', () => {
+  const ajour = ecran({ prog: programmation(['image', 'carte']), lecteur: null });
+  ajour.avancer(60);
+  assert.ok(!ajour.etat().trace.some(x => /mise à jour du lecteur/.test(x)), 'pas de version annoncée : pas de rechargement');
+  ajour.fermer();
+  const e = ecran({ prog: programmation(['image', 'carte']), lecteur: '99.0.0' });
+  e.avancer(120);
+  const majs = e.etat().trace.filter(x => /mise à jour du lecteur .* → 99\.0\.0/.test(x));
+  assert.strictEqual(majs.length, 1, 'un seul rechargement tenté : ' + e.etat().trace.join(' | '));
+  assert.ok(JSON.parse(e.W.localStorage.getItem('tv6mic.maj')).v === '99.0.0');
+  assert.deepStrictEqual(e.planteES, []);
   e.fermer();
 });

@@ -149,6 +149,18 @@ const nouvelId = prefixe => prefixe + '-' + crypto.randomUUID().replace(/-/g, ''
 
 /* ================= écrans ================= */
 
+// Version du lecteur publiée (public/lecteur/lecteur.js), lue une fois par instance du worker (chaque mise en ligne
+// en démarre de nouvelles) : envoyée aux écrans, qui se rechargent d'eux-mêmes quand la leur est différente.
+let versionLecteurPubliee = null;
+async function versionLecteur(env) {
+  if (versionLecteurPubliee !== null) return versionLecteurPubliee;
+  try {
+    const r = await env.ASSETS.fetch(new Request('https://tv.6mic-aix.fr/lecteur/lecteur.js'));
+    const m = r.ok ? (await r.text()).match(/var VERSION = '([^']+)'/) : null;
+    versionLecteurPubliee = m ? m[1] : '';
+  } catch (e) { versionLecteurPubliee = ''; }
+  return versionLecteurPubliee;
+}
 async function programme(req, env, ctx, code) {
   const db = env.DB;
   const maintenant = Date.now();
@@ -165,7 +177,8 @@ async function programme(req, env, ctx, code) {
     if (signal && typeof signal === 'object') ctx.waitUntil(enregistrerSignal(db, code, signal, maintenant, req).catch(e => console.error('signal', e)));
   }
 
-  const base = { flux: { code: flux.code, nom: flux.nom, format: flux.format || 'paysage' }, version, maintenant, identifier: flux.identifier_jusqua || 0 };
+  const base = { flux: { code: flux.code, nom: flux.nom, format: flux.format || 'paysage' }, version, maintenant, identifier: flux.identifier_jusqua || 0,
+    lecteur: await versionLecteur(env) };
   if (signal && Number(signal.version) === version && version > 0) return json({ ...base, inchange: true });
 
   // Diffusions de ce flux qui ne sont pas terminées (depuis hier, pour les soirées qui passent minuit).
