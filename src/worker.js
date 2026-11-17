@@ -603,7 +603,9 @@ function cadrageValide(c) {
   const b = n => Math.round(Math.max(0, Math.min(100, n)) * 10) / 10;
   return b(x) === 50 && b(y) === 50 ? undefined : { x: b(x), y: b(y) };
 }
-const photoValide = (src, p) => src ? { src, largeur: nombre(p.largeur, 0, 20000), hauteur: nombre(p.hauteur, 0, 20000), cadrage: cadrageValide(p.cadrage) } : null;
+// cadrage : téléviseurs ; cadrageV : kakémono (cadres verticaux), le cadrage des téléviseurs à défaut.
+const photoValide = (src, p) => src ? { src, largeur: nombre(p.largeur, 0, 20000), hauteur: nombre(p.hauteur, 0, 20000), cadrage: cadrageValide(p.cadrage), cadrageV: cadrageValide(p.cadrageV) } : null;
+const MAX_DIRECTIONS = 6;   // panneau directionnel : 1 ou 2 en grand, 3 à 6 en bandes (gabarits.js)
 function validerDonnees(type, d, reglages) {
   if (!d || typeof d !== 'object') throw refus('Données manquantes.');
   if (type === 'soiree') {
@@ -689,24 +691,25 @@ function validerDonnees(type, d, reglages) {
       mention: chaine(d.mention, 120, 'mention'), produits };
   }
   if (type === 'direction') {
-    // Panneau directionnel : une ou deux directions { fleche, titre (service), detail, picto: emoji | image | '' }.
+    // Panneau directionnel : 1 à 6 directions { fleche, titre (service), detail, picto: emoji | image | '', photo d'illustration }.
     // Seul le pictogramme choisi est gardé (l'autre est effacé à l'enregistrement).
-    if (!Array.isArray(d.directions) || d.directions.length < 1 || d.directions.length > 2) throw refus('Un panneau compte une ou deux directions.');
+    if (!Array.isArray(d.directions) || d.directions.length < 1 || d.directions.length > MAX_DIRECTIONS) throw refus('Un panneau compte de une à ' + MAX_DIRECTIONS + ' directions.');
     const directions = d.directions.map((x, i) => {
       x = x && typeof x === 'object' ? x : {};
       const ou = ' de la direction ' + (i + 1);
       const picto = ['emoji', 'image'].indexOf(x.picto) >= 0 ? x.picto : '';
       const image = picto === 'image' ? photoValide(source(x.image, 'image' + ou, false), x.image || {}) : null;
       const emoji = picto === 'emoji' ? chaine(x.emoji, 32, 'émoji' + ou) : '';
+      const photo = photoValide(source(x.photo, 'photo' + ou, false), x.photo || {});
       return { fleche: FLECHES.indexOf(x.fleche) >= 0 ? x.fleche : 'droite', titre: chaine(x.titre, 40, 'service' + ou), detail: chaine(x.detail, 80, 'précision' + ou),
-        picto: image ? 'image' : emoji ? 'emoji' : '', emoji, image };
+        picto: image ? 'image' : emoji ? 'emoji' : '', emoji, image, photo };
     });
     return { fond: FONDS_SERIE.indexOf(d.fond) >= 0 ? d.fond : 'noir', directions };
   }
   if (type === 'image') {
     return {
       src: source(d.src, 'image', false), ajustement: d.ajustement === 'ajuster' ? 'ajuster' : 'remplir', fichier: chaine(d.fichier, 120, 'nom du fichier'),
-      cadrage: d.ajustement === 'ajuster' ? undefined : cadrageValide(d.cadrage),
+      cadrage: d.ajustement === 'ajuster' ? undefined : cadrageValide(d.cadrage), cadrageV: d.ajustement === 'ajuster' ? undefined : cadrageValide(d.cadrageV),
       taille: nombre(d.taille, 0, 1e10), largeur: nombre(d.largeur, 0, 20000), hauteur: nombre(d.hauteur, 0, 20000)
     };
   }
@@ -921,7 +924,10 @@ function sources(d) {
   if (d.photo && d.photo.src) r.push(d.photo.src);
   if (Array.isArray(d.dates)) for (const x of d.dates) if (x && x.photo && x.photo.src) r.push(x.photo.src);   // photos d'une série
   if (Array.isArray(d.produits)) for (const x of d.produits) if (x && x.photo && x.photo.src) r.push(x.photo.src);   // photos d'une promo
-  if (Array.isArray(d.directions)) for (const x of d.directions) if (x && x.image && x.image.src) r.push(x.image.src);   // pictogrammes d'un panneau directionnel
+  if (Array.isArray(d.directions)) for (const x of d.directions) {   // pictogrammes et photos d'un panneau directionnel
+    if (x && x.image && x.image.src) r.push(x.image.src);
+    if (x && x.photo && x.photo.src) r.push(x.photo.src);
+  }
   return r;
 }
 // Supprime de R2 les fichiers qu'aucun contenu n'utilise plus.

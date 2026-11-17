@@ -27,12 +27,15 @@ const CONTENUS = {
   web: { url: 'https://example.com/' },
   carte: { titre: 'Bar', colonnes: 0, fond: 'blanc', mention: 'Prix TTC', rubriques: [{ titre: 'Bières', formats: ['25 cl', '50 cl'], produits: [{ nom: 'Blonde', prix: ['3,5', '6'] }, { nom: 'IPA', prix: ['4', '7'], statut: 'rupture' }] }] },
   promo: { accroche: 'Ce soir', titre: 'Happy hour', fond: 'rose', mention: 'Avec modération', produits: [{ nom: 'Pinte', prix: '5', ancien: '7', photo }, { nom: 'Planche', prix: '12' }] },
-  direction: { fond: 'noir', directions: [{ fleche: 'gauche', titre: 'Toilettes', picto: 'emoji', emoji: '🚻' }, { fleche: 'droite', titre: 'Vestiaire', picto: 'image', image: { src: '/medias/essai/picto.png' } }] }
+  direction: { fond: 'noir', directions: [{ fleche: 'gauche', titre: 'Toilettes', picto: 'emoji', emoji: '🚻' }, { fleche: 'droite', titre: 'Vestiaire', picto: 'image', image: { src: '/medias/essai/picto.png' } }] },
+  // six directions, en bandes, avec photos d'illustration et cadrage vertical
+  bandes: { fond: 'violet', directions: ['gauche', 'droite', 'haut', 'bas', 'haut-gauche', 'bas-droite'].map((f, i) => ({ fleche: f, titre: 'Service ' + (i + 1), detail: i % 2 ? 'Précision' : '',
+    picto: i === 2 ? 'emoji' : '', emoji: '🚻', photo: { src: '/medias/essai/photo.jpg', largeur: 1600, hauteur: 900, cadrage: { x: 30, y: 50 }, cadrageV: { x: 70, y: 40 } } })) }
 };
 function programmation(types, donnees, format) {
   const contenus = {}, diffusions = [];
   types.forEach((t, i) => {
-    contenus['c-' + t] = { id: 'c-' + t, type: t, titre: 'Essai ' + t, donnees: donnees ? donnees(t) : CONTENUS[t], duree: null };
+    contenus['c-' + t] = { id: 'c-' + t, type: t === 'bandes' ? 'direction' : t, titre: 'Essai ' + t, donnees: donnees ? donnees(t) : CONTENUS[t], duree: null };
     diffusions.push({ id: 'd-' + t, contenu: 'c-' + t, debut: '2026-11-01', fin: '2026-11-30', jours: null, semaine: null, plages: null, prioritaire: 0, ordre: i });
   });
   return { flux: { code: 'hall', nom: 'Hall', format: format || 'paysage' }, version: 7, defaut: null, contenus, diffusions,
@@ -164,7 +167,7 @@ test('kakémono vertical (320 × 900) : scène verticale, gabarits verticaux et 
   assert.ok(/format-kakemono/.test(e.W.document.documentElement.className), 'format appliqué à la page');
   const z = parseFloat(e.W.document.getElementById('scene').style.zoom);
   assert.ok(Math.abs(z - 320 / 1080) < 0.01, 'scène 1080 × 3038 réduite à 320 de large : zoom ' + z);
-  for (const t of ['image', 'video', 'web', 'soiree', 'serie', 'lineup', 'direction']) assert.ok(e.vues.has('c-' + t), 'étape affichée : ' + t);
+  for (const t of ['image', 'video', 'web', 'soiree', 'serie', 'lineup', 'direction', 'bandes']) assert.ok(e.vues.has('c-' + t), 'étape affichée : ' + t);
   for (const t of ['agenda', 'carte', 'promo']) assert.ok(!e.vues.has('c-' + t), 'gabarit réservé aux téléviseurs écarté : ' + t);
   assert.strictEqual(e.W.Gabarits.vertical(), true, 'gabarits en mise en page verticale');
   assert.ok(!e.etat().erreurs.some(x => /JS |démarrage|chien de garde|gabarit/.test(x)), e.etat().erreurs.join(' | '));

@@ -208,6 +208,10 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000; margin: 
 @media (hover: none) { .media-vide small { display: none; } }
 .occupe .media-vignette { cursor: default; }
 .media-vignette.recadrable { cursor: grab; touch-action: none; }
+/* vignettes de recadrage côte à côte : téléviseurs, puis kakémono (vertical) */
+.media-fig { display: grid; gap: 4px; justify-items: start; align-content: start; }
+.media-fig[hidden] { display: none; }
+.media-legende { font-size: 12px; color: var(--gris); }
 .media-vignette.recadrable.glisse { cursor: grabbing; }
 .media-vignette.recadrable:focus-visible { outline: 3px solid var(--violet); outline-offset: 2px; }
 .astuce-cadrage { font-style: italic; }

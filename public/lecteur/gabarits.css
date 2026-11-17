@@ -446,6 +446,24 @@
 .g-d-2 .g-d-detail { margin-top: 16px; font-size: 40px; }
 .g-d-2 .g-d-logo { height: 52px; bottom: 44px; right: 60px; }
 
+/* Directionnel : photo d'illustration par direction (vestiaire, bar, salle…), assombrie pour garder le texte lisible */
+.g-d-photo { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #111 center / cover no-repeat; }
+.g-d-ombre { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  background: linear-gradient(180deg, rgba(11, 10, 13, .5) 0%, rgba(11, 10, 13, .62) 55%, rgba(11, 10, 13, .78) 100%); }
+.g-d-photos .g-s-rayons { display: none; }
+
+/* Directionnel en bandes (3 à 6 directions) : une bande par direction, flèche à gauche, texte à droite.
+   Positions et tailles calculées par gabarits.js (bandes de 1080/n px de haut sur les téléviseurs). */
+.g-d-bandes .g-d-moitie { left: 0; width: 1920px; }
+.g-d-bandes .g-d-moitie + .g-d-moitie { box-shadow: inset 0 4px 0 rgba(255, 255, 255, .28); }
+.g-d-bandes .g-d-m2:before, .g-d-bandes .g-d-m4:before, .g-d-bandes .g-d-m6:before { content: ''; position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, .14); }
+.g-d-bandes .g-d-illustree:before { display: none; }
+.g-d-bandes .g-d-infos { top: 0; -webkit-align-items: center; align-items: center; }
+.g-d-bandes .g-d-picto { margin-right: 40px; }
+.g-d-bandes .g-d-titre { font-size: 120px; }
+.g-d-bandes .g-d-detail { margin-top: 10px; font-size: 40px; }
+.g-d-5 .g-d-detail, .g-d-6 .g-d-detail { margin-top: 6px; font-size: 32px; }
+
 
 /* ===== Kakémono vertical : soirée, série, line-up, directionnel =====
    Scène 1080 × 3038 affichée en 320 × 900 (tout est 3,4 fois plus petit à l'écran) : corps de 54 px au moins
@@ -456,9 +474,9 @@
 /* Soirée : photo en haut (1080 × 2000) fondue dans le noir, date, nom et infos en bas, QR de billetterie dessous */
 .format-kakemono .g-soiree { background: #0b0a0d; }
 .format-kakemono .g-soiree .g-photo { width: 1080px; height: 2000px; }
-.format-kakemono .g-soiree .g-voile { width: 1080px; height: 2000px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, .5) 0%, rgba(0, 0, 0, 0) 14%, rgba(11, 10, 13, 0) 50%, rgba(11, 10, 13, .88) 82%, #0b0a0d 100%); }
-.format-kakemono .g-mention { left: auto; right: 72px; top: 112px; padding: 22px 32px 18px; font-size: 52px; }
+.format-kakemono .g-soiree .g-voile { width: 1080px; height: 2160px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .5) 0%, rgba(0, 0, 0, 0) 13%, rgba(11, 10, 13, 0) 46%, rgba(11, 10, 13, .88) 76%, #0b0a0d 92.6%, #0b0a0d 100%); }
+.format-kakemono .g-mention { left: 72px; right: auto; top: 270px; padding: 22px 32px 18px; font-size: 52px; }
 .format-kakemono .g-bloc { left: 72px; bottom: 150px; width: 936px; }
 .format-kakemono .g-avec-qr .g-bloc { width: 936px; bottom: 690px; }
 .format-kakemono .g-date { padding: 24px 34px 18px; font-size: 84px; line-height: 1.02; white-space: pre-line; }
@@ -537,3 +555,9 @@
 .format-kakemono .g-d-2 .g-d-titre { font-size: 180px; }
 .format-kakemono .g-d-2 .g-d-detail { margin-top: 24px; font-size: 60px; }
 .format-kakemono .g-d-logo, .format-kakemono .g-d-1 .g-d-moitie ~ .g-d-logo, .format-kakemono .g-d-2 .g-d-logo { left: auto; right: 72px; top: auto; bottom: 80px; height: 90px; }
+
+/* Kakémono : directionnel en bandes (bandeau du logo en haut, 220 px) */
+.format-kakemono .g-d-bandes .g-d-moitie { width: 1080px; }
+.format-kakemono .g-d-bandes .g-d-detail { margin-top: 14px; font-size: 54px; }
+.format-kakemono .g-d-5 .g-d-detail, .format-kakemono .g-d-6 .g-d-detail { font-size: 48px; }
+.format-kakemono .g-d-bandes .g-d-logo { left: 72px; right: auto; top: 64px; bottom: auto; height: 100px; }

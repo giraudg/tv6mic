@@ -41,6 +41,8 @@
     i.src = LOGO; i.alt = '6MIC';
     return i;
   }
+  // Point de focus d'une photo : cadrageV (kakémono, cadre vertical) s'il existe, sinon cadrage (téléviseurs).
+  function cadrageDe(p) { return p ? (vertical() && p.cadrageV ? p.cadrageV : p.cadrage) : null; }
   // cadrage { x, y } : position de la photo dans son cadre, en % (comme background-position) ; centrée sinon.
   function fond(noeud, src, url, cadrage) {
     if (src) { noeud.style.backgroundImage = 'url("' + url(src).replace(/"/g, '%22') + '")'; }
@@ -166,9 +168,10 @@
   function soiree(etape, url) {
     var c = etape.contenu, d = c.donnees || {}, g = el('div', 'g g-soiree');
     var photo = el('div', 'g-photo'), bloc = el('div', 'g-bloc'), nom, q, deco;
-    fond(photo, d.photo && d.photo.src, url, d.photo && d.photo.cadrage);
+    var cp = cadrageDe(d.photo);
+    fond(photo, d.photo && d.photo.src, url, cp);
     // le zoom lent part du point gardé dans le cadre (même pourcentage que la position)
-    if (d.photo && d.photo.cadrage) { photo.style.webkitTransformOrigin = photo.style.transformOrigin = d.photo.cadrage.x + '% ' + d.photo.cadrage.y + '%'; }
+    if (cp) { photo.style.webkitTransformOrigin = photo.style.transformOrigin = cp.x + '% ' + cp.y + '%'; }
     photo.style.webkitAnimationDuration = photo.style.animationDuration = Math.max(8, (etape.duree || 10) + 2) + 's';
     g.appendChild(photo);
     g.appendChild(el('div', 'g-voile'));
@@ -478,15 +481,35 @@
     if (f === 'gauche' || f === 'haut-gauche' || f === 'bas-gauche') { return 'g'; }
     return n === 2 ? 'c' : 'g';
   }
+  // Bandes (3 à 6 directions) : zone occupée, en px de scène. Kakémono : bandeau du logo en haut (220 px).
+  var MAX_DIRECTIONS = 6;
+  function zoneBandes() { return vertical() ? { l: 1080, haut: 220, h: 2818, m: 72 } : { l: 1920, haut: 0, h: 1080, m: 80 }; }
+  // Cadre de la photo d'illustration d'une direction (pour le recadrage dans le back-office).
+  function cadreDirection(n, format) {
+    n = Math.max(1, Math.min(MAX_DIRECTIONS, n || 1));
+    if (format === 'kakemono') { return n === 1 ? { largeur: 1080, hauteur: 3038 } : n === 2 ? { largeur: 1080, hauteur: 1519 } : { largeur: 1080, hauteur: Math.round(2818 / n) }; }
+    return n === 1 ? { largeur: 1920, hauteur: 1080 } : n === 2 ? { largeur: 960, hauteur: 1080 } : { largeur: 1920, hauteur: Math.round(1080 / n) };
+  }
   function direction(etape, url) {
-    var c = etape.contenu, d = c.donnees || {}, liste = (d.directions || []).slice(0, 2), n = Math.max(1, liste.length), i, x, moitie, f, rot, src, titres = [];
-    var g = el('div', 'g g-direction g-f-' + (FONDS_SERIE[d.fond] ? d.fond : 'noir') + ' g-d-' + n);
+    var c = etape.contenu, d = c.donnees || {}, liste = (d.directions || []).slice(0, MAX_DIRECTIONS), n = Math.max(1, liste.length), i, x, moitie, f, rot, src, titres = [];
+    var bandes = n >= 3, z = zoneBandes(), hb = bandes ? z.h / n : 0, cote = 0, avecPhoto = false;
+    var g = el('div', 'g g-direction g-f-' + (FONDS_SERIE[d.fond] ? d.fond : 'noir') + ' g-d-' + n + (bandes ? ' g-d-bandes' : ''));
     g.appendChild(el('div', 'g-s-rayons'));
+    if (bandes) { cote = Math.round(Math.min(hb * 0.6, vertical() ? 300 : 250)); }
     for (i = 0; i < n; i++) {
       x = liste[i] || {};
       f = FLECHES.hasOwnProperty(x.fleche) ? x.fleche : 'droite';
       rot = FLECHES[f];
       moitie = el('div', 'g-d-moitie g-d-m' + (i + 1) + ' g-d-cote-' + coteFleche(f, n));
+      // photo d'illustration (vestiaire, bar, salle…) : en fond de la direction, assombrie pour garder le texte lisible
+      if (x.photo && x.photo.src) {
+        var ph = el('div', 'g-d-photo');
+        fond(ph, x.photo.src, url, cadrageDe(x.photo));
+        moitie.appendChild(ph);
+        moitie.appendChild(el('div', 'g-d-ombre'));
+        moitie.className += ' g-d-illustree';
+        avecPhoto = true;
+      }
       var fleche = el('div', 'g-d-fleche a a0');
       fleche.style.webkitTransform = fleche.style.transform = 'rotate(' + rot + 'deg)';
       var pousse = el('div', 'g-d-pousse');
@@ -507,27 +530,44 @@
       if (x.detail) { texte.appendChild(el('div', 'g-d-detail a a3', x.detail)); }
       infos.appendChild(texte);
       moitie.appendChild(infos);
+      if (bandes) {
+        // une bande par direction : flèche à gauche, pictogramme et texte à droite, centrés dans la hauteur
+        var top = Math.round(z.haut + i * hb), hauteur = Math.round(z.haut + (i + 1) * hb) - top, delai = (0.1 + i * 0.12).toFixed(2) + 's';
+        moitie.style.top = top + 'px'; moitie.style.height = hauteur + 'px';
+        fleche.style.left = z.m + 'px'; fleche.style.top = Math.round((hauteur - cote) / 2) + 'px'; fleche.style.width = fleche.style.height = cote + 'px';
+        infos.style.left = (z.m + cote + 56) + 'px'; infos.style.width = (z.l - z.m * 2 - cote - 56) + 'px'; infos.style.height = hauteur + 'px';
+        if (src) { picto.style.width = picto.style.height = Math.round(Math.min(hauteur * 0.42, 190)) + 'px'; }
+        fleche.style.webkitAnimationDelay = fleche.style.animationDelay = delai;
+        infos.style.webkitAnimationDelay = infos.style.animationDelay = delai;
+      }
       g.appendChild(moitie);
     }
-    g.appendChild(logo('g-logo g-d-logo a a4'));
+    if (avecPhoto) { g.className += ' g-d-photos'; }
+    // logo : en bas (1 ou 2 directions) ; en bandes, dans le bandeau du kakémono, et pas sur les téléviseurs (pas de place)
+    if (!bandes || vertical()) { g.appendChild(logo('g-logo g-d-logo a a4')); }
     return { noeud: g, ajuster: function () {
-      var k, t, m, bloc;
-      // kakémono : une direction, zone de 1440 px sous la flèche ; deux, une moitié de 1519 px chacune (zone de 700 px)
-      var v = vertical(), max = v ? (n === 1 ? 260 : 180) : (n === 1 ? 210 : 140), min = v ? (n === 1 ? 110 : 84) : (n === 1 ? 90 : 64);
-      var zone = v ? (n === 1 ? 1440 : 700) : (n === 1 ? 920 : 400);
+      var k, t, m, bloc, v = vertical(), max, min, zone, lignes;
+      if (bandes) {
+        // bandes : titre selon la hauteur de bande, le bloc tient dans 86 % de la bande
+        max = Math.round(Math.min(hb * (v ? 0.34 : 0.4), v ? 190 : 130)); min = Math.round(max * 0.55); zone = hb * 0.86; lignes = v ? 2 : 1;
+      } else {
+        // kakémono : une direction, zone de 1440 px sous la flèche ; deux, une moitié de 1519 px chacune (zone de 700 px)
+        max = v ? (n === 1 ? 260 : 180) : (n === 1 ? 210 : 140); min = v ? (n === 1 ? 110 : 84) : (n === 1 ? 90 : 64);
+        zone = v ? (n === 1 ? 1440 : 700) : (n === 1 ? 920 : 400); lignes = v && n === 1 ? 3 : 2;
+      }
       for (k = 0; k < titres.length; k++) {
-        ajusterTexte(titres[k], max, min, v && n === 1 ? 3 : 2);
+        ajusterTexte(titres[k], max, min, lignes);
         // le bloc (pictogramme, service, précision) doit tenir dans sa zone : 920 px de haut (une direction), 400 (deux)
         bloc = titres[k].parentNode.parentNode;
         t = parseFloat(titres[k].style.fontSize) || 100;
-        for (m = 0; m < 20 && t > (v ? min * 0.7 : 60) && hauteurBloc(bloc) > zone; m++) { t -= 8; titres[k].style.fontSize = t + 'px'; }
+        for (m = 0; m < 20 && t > (v || bandes ? min * 0.7 : 60) && hauteurBloc(bloc) > zone; m++) { t -= bandes ? 4 : 8; titres[k].style.fontSize = t + 'px'; }
       }
     } };
     function hauteurBloc(b) {
       var h = 0, j, e;
       for (j = 0; j < b.childNodes.length; j++) {
         e = b.childNodes[j];
-        h = n === 1 || vertical() ? h + e.offsetHeight + (parseFloat(window.getComputedStyle(e).marginBottom) || 0) : Math.max(h, e.offsetHeight);
+        h = !bandes && (n === 1 || vertical()) ? h + e.offsetHeight + (parseFloat(window.getComputedStyle(e).marginBottom) || 0) : Math.max(h, e.offsetHeight);
       }
       return h;
     }
@@ -557,6 +597,18 @@
     promo2: { largeur: 816, hauteur: 460 },     // deux offres : photo de chaque carte
     direction: { largeur: 480, hauteur: 480 }   // pictogramme d'un panneau directionnel (affiché entier, sur fond blanc)
   };
+  // Kakémono (scène 1080 × 3038) : cadres des photos dans les mises en page verticales.
+  var CADRES_V = {
+    soiree: { largeur: 1080, hauteur: 2000 },   // haut de l'écran, fondu au noir en bas
+    lineup: { largeur: 1080, hauteur: 1250 },   // haut de l'écran
+    image: { largeur: 1080, hauteur: 3038 }     // plein écran
+  };
+  // Série verticale : affiches empilées ; photo à gauche du texte dès 3 dates, au-dessus pour 1 ou 2 (cf. serie()).
+  function cadreSerieV(n) {
+    n = Math.max(1, n);
+    var h = Math.floor((1958 - (n - 1) * 40) / n);
+    return n >= 3 ? { largeur: Math.min(440, Math.round(h * 0.75)), hauteur: h } : { largeur: 936, hauteur: h - 480 };
+  }
   // Série : 1680 px partagés entre les affiches (écart 48 px), 816 px au plus ; photo 3:4, 470 px de haut au plus.
   function cadreSerie(n) {
     n = Math.max(1, n);
@@ -593,7 +645,7 @@
       photo = el('div', 'g-s-photo' + (x.photo && x.photo.src ? '' : ' g-s-vide'));
       photo.style.height = hauteur + 'px';
       if (vertical()) { photo.style.width = largeur + 'px'; }
-      if (x.photo && x.photo.src) { fond(photo, x.photo.src, url, x.photo.cadrage); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
+      if (x.photo && x.photo.src) { fond(photo, x.photo.src, url, cadrageDe(x.photo)); } else { photo.appendChild(el('div', 'g-s-vide-m')); }
       if (x.mention) { photo.appendChild(el('div', 'g-s-mention' + (mentionAlerte(x.mention) ? ' g-rouge' : ''), x.mention)); }
       carte.appendChild(photo);
       corps = el('div', 'g-s-corps');
@@ -658,7 +710,7 @@
     }
     // panneau de droite : photo, sinon aplat dégradé avec les faisceaux
     var panneau = el('div', 'g-l-panneau a a0' + (d.photo && d.photo.src ? '' : ' g-l-sansphoto'));
-    if (d.photo && d.photo.src) { fond(panneau, d.photo.src, url, d.photo.cadrage); } else { panneau.appendChild(el('div', 'g-l-motif')); }
+    if (d.photo && d.photo.src) { fond(panneau, d.photo.src, url, cadrageDe(d.photo)); } else { panneau.appendChild(el('div', 'g-l-motif')); }
     g.appendChild(panneau);
     g.appendChild(el('div', 'g-l-fondu'));
     g.appendChild(logo('g-logo a a0'));
@@ -706,7 +758,7 @@
   /* 3. Image importée */
   function image(etape, url) {
     var d = etape.contenu.donnees || {}, g = el('div', 'g g-image' + (d.ajustement === 'ajuster' ? ' g-contenir' : ''));
-    fond(g, d.src, url, d.ajustement === 'ajuster' ? null : d.cadrage);
+    fond(g, d.src, url, d.ajustement === 'ajuster' ? null : cadrageDe(d));
     return { noeud: g };
   }
 
@@ -733,6 +785,7 @@
     soiree: soiree, lineup: lineup, agenda: agenda, serie: serie, image: image, web: web, carte: carte, promo: promo, direction: direction, prixTexte: prixTexte, emojiSrc: emojiSrc, FLECHES: FLECHES, FLECHE_SVG: FLECHE_SVG, veille: veille, identification: identification,
     FONDS_SERIE: FONDS_SERIE, ROLES_LINEUP: ROLES_LINEUP, NIVEAUX_LINEUP: NIVEAUX_LINEUP, niveauPassage: niveauPassage, niveauParDefaut: niveauParDefaut, vedetteDe: vedetteDe, minutesSoiree: minutesSoiree, CADRES: CADRES, cadreSerie: cadreSerie,
     dateLongue: dateLongue, heureTexte: heureTexte, el: el, utiliserFormat: utiliserFormat, vertical: vertical,
+    cadrageDe: cadrageDe, cadreDirection: cadreDirection, MAX_DIRECTIONS: MAX_DIRECTIONS, CADRES_V: CADRES_V, cadreSerieV: cadreSerieV,
     MOTIFS: MOTIFS, POSITIONS: POSITIONS, COULEURS: COULEURS, MOTIF_DEFAUT: MOTIF_DEFAUT, TEINTES: TEINTES, TEINTE: TEINTE, motifDe: motifDe,
     appliquerReglages: appliquerReglages, utiliserReglages: utiliserReglages, variablesCouleurs: variablesCouleurs, libelleRole: libelleRole,
     mentionAlerte: mentionAlerte, nomCouleur: nomCouleur, teinteDe: teinteDe, melanger: melanger, contraste: contraste

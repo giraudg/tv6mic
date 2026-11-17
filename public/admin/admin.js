@@ -544,7 +544,44 @@ function typeFichier(f) { return f.type || TYPE_PAR_EXT[(f.name.split('.').pop()
    cadre : { largeur, hauteur, contenir?, conseil? } (ou une fonction qui le renvoie) = où l'écran affiche
    l'image ; la vignette en prend le format (on y voit le recadrage) et le champ le rappelle.
    On peut glisser un fichier sur le champ ; surplus(fichiers) reçoit les fichiers en trop d'un dépôt multiple. */
-function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 150], surplus }) {
+// Écran au format kakémono dans la liste des écrans : les photos ont alors aussi un cadrage vertical (cadrageV).
+const kakemonoActif = () => E.flux.some(f => formatDe(f) === 'kakemono');
+/* Point fort d'une photo (sujet), pour proposer un cadrage à l'import : là où se concentrent les contrastes
+   (visage, vêtements, lumières), en privilégiant le centre. Rend { x, y } en fractions de l'image, ou null. */
+async function pointFort(blob) {
+  const bmp = await createImageBitmap(blob);
+  const W = 64, H = Math.max(8, Math.round(64 * bmp.height / bmp.width));
+  const c = h('canvas', { width: W, height: H }), x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(bmp, 0, 0, W, H);
+  if (bmp.close) bmp.close();
+  const d = x.getImageData(0, 0, W, H).data, n = W * H, L = new Float32Array(n), S = new Float32Array(n), En = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    L[i] = 0.299 * r + 0.587 * g + 0.114 * b; S[i] = mx ? (mx - mn) / mx : 0;
+  }
+  for (let y = 1; y < H - 1; y++) for (let k = 1; k < W - 1; k++) {
+    const i = y * W + k;
+    En[i] = Math.hypot(L[i + 1] - L[i - 1], L[i + W] - L[i - W]) * (0.6 + 0.4 * S[i]);
+  }
+  const seuil = Float32Array.from(En).sort()[Math.floor(n * 0.85)];
+  let sx = 0, sy = 0, sw = 0;
+  for (let y = 1; y < H - 1; y++) for (let k = 1; k < W - 1; k++) {
+    const i = y * W + k;
+    if (En[i] < seuil || !En[i]) continue;
+    const w = En[i] * (1 - 0.35 * Math.min(1, Math.hypot(k / W - 0.5, y / H - 0.45) * 1.4));
+    sx += w * k; sy += w * y; sw += w;
+  }
+  return sw ? { x: (sx / sw + 0.5) / W, y: (sy / sw + 0.5) / H } : null;
+}
+// Cadrage (position en %, comme background-position) qui centre le point p dans le cadre c, ou null s'il n'y a rien à recadrer.
+function cadrageVers(p, img, c) {
+  if (!p || !img || !img.largeur || !c) return null;
+  const k = Math.max(c.largeur / img.largeur, c.hauteur / img.hauteur), w = c.largeur / k, ht = c.hauteur / k;
+  const axe = (f, total, vu) => total - vu > total * 0.03 ? Math.max(0, Math.min(100, Math.round((f * total - vu / 2) / (total - vu) * 1000) / 10)) : 50;
+  const r = { x: axe(p.x, img.largeur, w), y: axe(p.y, img.hauteur, ht) };
+  return r.x === 50 && r.y === 50 ? null : r;
+}
+function champMedia({ genre, valeur, facultatif, change, cadre, cadreV, boite = [200, 150], surplus }) {
   const video = genre === 'video';
   const racine = h('div', { class: 'media depot' });
   const vide = h('span', { class: 'media-vide' }, h('b'), h('small', { text: video ? 'Glisser une vidéo ici' : 'Glisser une image ici' }));
@@ -563,70 +600,86 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
   const bouton = h('button', { type: 'button', class: 'btn', onclick: () => entree.click(), disabled: !E.r2 },
     video ? 'Choisir une vidéo…' : 'Choisir une image…');
   const retirer = facultatif ? h('button', { type: 'button', class: 'btn btn-danger pt', onclick: () => { change(null); montrer(null); } }, 'Retirer') : null;
-  const recentrer = h('button', { type: 'button', class: 'btn pt', hidden: true, onclick: () => recadrer(null) }, 'Recentrer');
+  const recentrer = h('button', { type: 'button', class: 'btn pt', hidden: true, onclick: () => {
+    courant = Object.assign({}, courant, { cadrage: null, cadrageV: null }); change(courant); majPositions();
+  } }, 'Recentrer');
   let courant = null, dims = null;
   const cadreActuel = () => typeof cadre === 'function' ? cadre() : cadre;
+  // cadre vertical (kakémono) : seulement pour les images, et s'il existe un écran de ce format
+  const cadreVActuel = () => !video && cadreV && kakemonoActif() ? (typeof cadreV === 'function' ? cadreV() : cadreV) : null;
+  const vignetteK = h('div', { class: 'media-vignette media-vignette-k', 'aria-hidden': 'true' });
+  const legendeTV = h('small', { class: 'media-legende', text: 'Téléviseurs' });
+  const figureK = h('div', { class: 'media-fig', hidden: true }, vignetteK, h('small', { class: 'media-legende', text: 'Kakémono' }));
 
   /* Recadrage : la vignette a le format de l'écran ; on y fait glisser l'image (ou on la déplace aux flèches)
-     pour choisir la partie visible. Gardé en pourcentages comme background-position : { x, y }, 50 % 50 % = centré. */
-  const posDe = v => v && v.cadrage ? v.cadrage : { x: 50, y: 50 };
+     pour choisir la partie visible. Gardé en pourcentages comme background-position : { x, y }, 50 % 50 % = centré.
+     Une vignette par format : « cadrage » pour les téléviseurs, « cadrageV » pour le kakémono. */
   const borne = n => Math.max(0, Math.min(100, Math.round(n * 10) / 10));
-  // Ce qui dépasse de la vignette sur chaque axe (px), ou null si l'image n'est pas recadrée (vidéo, image entière…).
-  function plages() {
-    const img = courant && !video && courant.src ? (courant.largeur ? courant : dims) : null, c = cadreActuel();
-    if (!img || !c || c.contenir) return null;
-    // taille affichée, ou celle que majCadre a fixée (le champ n'est pas encore dans la page au premier rendu)
-    const w = vignette.clientWidth || parseFloat(vignette.style.width) || 0, hh = vignette.clientHeight || parseFloat(vignette.style.height) || 0;
-    if (!w || !hh) return null;
-    const k = Math.max(w / img.largeur, hh / img.hauteur), p = { x: img.largeur * k - w, y: img.hauteur * k - hh };
-    return p.x >= 1 || p.y >= 1 ? p : null;
+  function recadreur(vig, cle, cadreFn) {
+    const posDe = () => courant && courant[cle] ? courant[cle] : (cle === 'cadrageV' && courant && courant.cadrage ? courant.cadrage : { x: 50, y: 50 });
+    // Ce qui dépasse de la vignette sur chaque axe (px), ou null si l'image n'est pas recadrée (vidéo, image entière…).
+    function plages() {
+      const img = courant && !video && courant.src ? (courant.largeur ? courant : dims) : null, c = cadreFn();
+      if (!img || !c || c.contenir) return null;
+      // taille affichée, ou celle que majCadre a fixée (le champ n'est pas encore dans la page au premier rendu)
+      const w = vig.clientWidth || parseFloat(vig.style.width) || 0, hh = vig.clientHeight || parseFloat(vig.style.height) || 0;
+      if (!w || !hh) return null;
+      const k = Math.max(w / img.largeur, hh / img.hauteur), p = { x: img.largeur * k - w, y: img.hauteur * k - hh };
+      return p.x >= 1 || p.y >= 1 ? p : null;
+    }
+    function majPosition() {
+      const p = posDe(), pl = plages();
+      vig.style.backgroundPosition = p.x + '% ' + p.y + '%';
+      vig.classList.toggle('recadrable', !!pl);
+      vig.tabIndex = pl ? 0 : -1;
+      if (pl) { vig.removeAttribute('aria-hidden'); vig.setAttribute('aria-label', 'Recadrer l’image' + (cle === 'cadrageV' ? ' pour le kakémono' : '') + ' : faites-la glisser, ou utilisez les flèches du clavier'); }
+      else { vig.setAttribute('aria-hidden', 'true'); vig.removeAttribute('aria-label'); }
+      return !!(pl && courant && courant[cle]);
+    }
+    function recadrer(p) {
+      // null : centré (le champ est vidé, pour ne pas garder la position d'une image précédente)
+      const v = Object.assign({}, courant, { [cle]: p && (p.x !== 50 || p.y !== 50) ? { x: borne(p.x), y: borne(p.y) } : null });
+      courant = v; change(v); majPositions();
+    }
+    let glisse = null;
+    vig.addEventListener('pointerdown', ev => {
+      const pl = plages();
+      if (!pl || occupe) return;
+      ev.preventDefault();
+      vig.setPointerCapture(ev.pointerId);
+      glisse = { x0: ev.clientX, y0: ev.clientY, p: posDe(), pl, pos: null };
+      vig.classList.add('glisse');
+    });
+    vig.addEventListener('pointermove', ev => {
+      if (!glisse) return;
+      const g = glisse, dx = ev.clientX - g.x0, dy = ev.clientY - g.y0;
+      if (!g.pos && Math.abs(dx) + Math.abs(dy) < 3) return;
+      // glisser vers la droite montre la gauche de l'image : la position diminue
+      g.pos = { x: g.pl.x >= 1 ? borne(g.p.x - dx / g.pl.x * 100) : g.p.x, y: g.pl.y >= 1 ? borne(g.p.y - dy / g.pl.y * 100) : g.p.y };
+      vig.style.backgroundPosition = g.pos.x + '% ' + g.pos.y + '%';
+    });
+    const finGlisse = () => {
+      if (!glisse) return;
+      const g = glisse; glisse = null;
+      vig.classList.remove('glisse');
+      if (g.pos) recadrer(g.pos);
+    };
+    vig.addEventListener('pointerup', finGlisse);
+    vig.addEventListener('pointercancel', finGlisse);
+    vig.addEventListener('keydown', ev => {
+      const pl = plages(), pas = ev.shiftKey ? 10 : 2, p = posDe();
+      const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
+      if (!pl || !d) return;
+      ev.preventDefault();
+      recadrer({ x: pl.x >= 1 ? borne(p.x + d[0] * pas) : p.x, y: pl.y >= 1 ? borne(p.y + d[1] * pas) : p.y });
+    });
+    return { plages, majPosition };
   }
-  function majPosition() {
-    const p = posDe(courant), pl = plages();
-    vignette.style.backgroundPosition = p.x + '% ' + p.y + '%';
-    vignette.classList.toggle('recadrable', !!pl);
-    vignette.tabIndex = pl ? 0 : -1;
-    if (pl) { vignette.removeAttribute('aria-hidden'); vignette.setAttribute('aria-label', 'Recadrer l’image : faites-la glisser, ou utilisez les flèches du clavier'); }
-    else { vignette.setAttribute('aria-hidden', 'true'); vignette.removeAttribute('aria-label'); }
-    recentrer.hidden = !(pl && courant && courant.cadrage);
+  const rTV = recadreur(vignette, 'cadrage', cadreActuel), rK = recadreur(vignetteK, 'cadrageV', cadreVActuel);
+  function majPositions() {
+    const a = rTV.majPosition(), b = !figureK.hidden && rK.majPosition();
+    recentrer.hidden = !(a || b);
   }
-  function recadrer(p) {
-    // null : centré (le champ est vidé, pour ne pas garder la position d'une image précédente)
-    const v = Object.assign({}, courant, { cadrage: p && (p.x !== 50 || p.y !== 50) ? { x: borne(p.x), y: borne(p.y) } : null });
-    courant = v; change(v); majPosition();
-  }
-  let glisse = null;
-  vignette.addEventListener('pointerdown', ev => {
-    const pl = plages();
-    if (!pl || occupe) return;
-    ev.preventDefault();
-    vignette.setPointerCapture(ev.pointerId);
-    glisse = { x0: ev.clientX, y0: ev.clientY, p: posDe(courant), pl, pos: null };
-    vignette.classList.add('glisse');
-  });
-  vignette.addEventListener('pointermove', ev => {
-    if (!glisse) return;
-    const g = glisse, dx = ev.clientX - g.x0, dy = ev.clientY - g.y0;
-    if (!g.pos && Math.abs(dx) + Math.abs(dy) < 3) return;
-    // glisser vers la droite montre la gauche de l'image : la position diminue
-    g.pos = { x: g.pl.x >= 1 ? borne(g.p.x - dx / g.pl.x * 100) : g.p.x, y: g.pl.y >= 1 ? borne(g.p.y - dy / g.pl.y * 100) : g.p.y };
-    vignette.style.backgroundPosition = g.pos.x + '% ' + g.pos.y + '%';
-  });
-  const finGlisse = () => {
-    if (!glisse) return;
-    const g = glisse; glisse = null;
-    vignette.classList.remove('glisse');
-    if (g.pos) recadrer(g.pos);
-  };
-  vignette.addEventListener('pointerup', finGlisse);
-  vignette.addEventListener('pointercancel', finGlisse);
-  vignette.addEventListener('keydown', ev => {
-    const pl = plages(), pas = ev.shiftKey ? 10 : 2, p = posDe(courant);
-    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
-    if (!pl || !d) return;
-    ev.preventDefault();
-    recadrer({ x: pl.x >= 1 ? borne(p.x + d[0] * pas) : p.x, y: pl.y >= 1 ? borne(p.y + d[1] * pas) : p.y });
-  });
   // Le format du cadre peut changer (nombre de dates d'une série, cadrage d'une image) : l'éditeur rappelle majCadre.
   function majCadre() {
     const c = cadreActuel();
@@ -635,18 +688,27 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
     Object.assign(vignette.style, { width: w + 'px', height: Math.round(w / r) + 'px', aspectRatio: 'auto', backgroundSize: c.contenir ? 'contain' : 'cover' });
     vide.firstChild.textContent = c.largeur + ' × ' + c.hauteur;
     const img = courant && !video ? (courant.largeur ? courant : dims) : null;
+    const cV = cadreVActuel(), avecK = !!(cV && courant && courant.src);
+    figureK.hidden = !avecK; legendeTV.hidden = !avecK;
+    if (avecK) {
+      const rv = cV.largeur / cV.hauteur, hk = Math.max(boite[1], 150), wk = Math.max(40, Math.round(hk * rv));
+      Object.assign(vignetteK.style, { width: wk + 'px', height: hk + 'px', aspectRatio: 'auto', backgroundSize: cV.contenir ? 'contain' : 'cover' });
+    }
     remplacer(format,
-      h('p', {}, h('b', { text: 'À l’écran : ' + c.largeur + ' × ' + c.hauteur + ' px' }), ', ' + nomFormat(c.largeur, c.hauteur) + (c.conseil ? ' · ' + c.conseil : '')),
-      img && h('ul', { class: 'controle' }, verdictCadre(img, c).map(([e, t]) => h('li', { class: e, text: t }))));
+      h('p', {}, h('b', { text: (avecK ? 'Téléviseurs : ' : 'À l’écran : ') + c.largeur + ' × ' + c.hauteur + ' px' }), ', ' + nomFormat(c.largeur, c.hauteur) + (c.conseil ? ' · ' + c.conseil : '')),
+      img && h('ul', { class: 'controle' }, verdictCadre(img, c).map(([e, t]) => h('li', { class: e, text: t }))),
+      avecK && h('p', {}, h('b', { text: 'Kakémono : ' + cV.largeur + ' × ' + cV.hauteur + ' px' }), ', ' + nomFormat(cV.largeur, cV.hauteur)),
+      avecK && img && h('ul', { class: 'controle' }, verdictCadre(img, cV).filter(([e, t]) => !/petite/.test(t)).map(([e, t]) => h('li', { class: e, text: t }))));
     format.hidden = false;
-    majPosition();
-    if (plages()) format.append(h('p', { class: 'astuce-cadrage', text: 'Faites glisser l’image dans la vignette pour choisir la partie visible à l’écran.' }));
+    majPositions();
+    if (rTV.plages() || (avecK && rK.plages())) format.append(h('p', { class: 'astuce-cadrage', text: 'Faites glisser l’image dans ' + (avecK ? 'chaque vignette' : 'la vignette') + ' pour choisir la partie visible à l’écran' + (avecK ? ' : téléviseurs et kakémono ont chacun leur cadrage.' : '.') }));
   }
   racine.majCadre = majCadre;
   function montrer(v) {
     courant = v; dims = null;
     const src = v && (video ? v.poster : v.src);
     vignette.style.backgroundImage = src ? 'url("' + src + '")' : '';
+    vignetteK.style.backgroundImage = src && !video ? 'url("' + src + '")' : '';
     vide.hidden = !!src;
     if (retirer) retirer.hidden = !v;
     info.textContent = !v ? (video ? 'Aucune vidéo.' : 'Aucune image.')
@@ -673,7 +735,11 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
         const p = await preparerImage(f);
         info.textContent = 'Envoi…';
         const r = await televerser(p.blob, f.name, progresser);
-        const v = { src: r.src, largeur: p.largeur, hauteur: p.hauteur, taille: r.taille, fichier: nomSansExtension(f.name), cadrage: null };
+        const v = { src: r.src, largeur: p.largeur, hauteur: p.hauteur, taille: r.taille, fichier: nomSansExtension(f.name), cadrage: null, cadrageV: null };
+        // cadrage proposé : le sujet repéré dans la photo, au centre de chaque cadre (modifiable en faisant glisser)
+        const pf = await pointFort(p.blob).catch(() => null), c0 = cadreActuel(), cV = cadreVActuel();
+        if (pf && c0 && !c0.contenir) v.cadrage = cadrageVers(pf, v, c0);
+        if (pf && cV) v.cadrageV = cadrageVers(pf, v, cV);
         change(v); montrer(v);
         const c = cadreActuel(), flou = c && verdictCadre(v, c).find(([e, t]) => e === 'a' && /petite/.test(t));
         if (flou) annoncer(flou[1], true);
@@ -750,7 +816,7 @@ function champMedia({ genre, valeur, facultatif, change, cadre, boite = [200, 15
     if (f) importer(f);
   });
   if (!E.r2) racine.classList.add('occupe');
-  racine.append(h('div', { class: 'media-ligne' }, vignette, h('div', { class: 'actions' }, bouton, recentrer, retirer)), format, info, barre, annulerConv, choix, controle, encart, entree);
+  racine.append(h('div', { class: 'media-ligne' }, h('div', { class: 'media-fig' }, vignette, legendeTV), figureK, h('div', { class: 'actions' }, bouton, recentrer, retirer)), format, info, barre, annulerConv, choix, controle, encart, entree);
   montrer(valeur);
   if (!E.r2) racine.append(h('p', { class: 'erreur', text: 'Import impossible : le stockage Cloudflare R2 n’est pas encore activé.' }));
   return racine;
@@ -1304,9 +1370,10 @@ function champsCarte(d, changer) {
   ];
 }
 
-/* Directionnel : une ou deux directions (deux : l'écran est partagé, la 1re à gauche). Pour chacune : la flèche
-   (rose des vents à 8 directions), le service, une précision, et un pictogramme : émoji (suggestions ou collé,
-   dessiné à l'écran avec les émojis Twemoji livrés avec l'application), image importée, ou aucun. */
+/* Directionnel : 1 à 6 directions (deux : l'écran est partagé, la 1re à gauche ; trois et plus : une bande chacune).
+   Pour chacune : la flèche (rose des vents à 8 directions), le service, une précision, un pictogramme (émoji des
+   suggestions ou collé, dessiné avec les émojis Twemoji livrés avec l'application, image importée, ou aucun) et une
+   photo d'illustration facultative, en fond (vestiaire, billetterie, salle, bar…). */
 const GLYPHES_FLECHE = { droite: '→', gauche: '←', haut: '↑', bas: '↓', 'haut-droite': '↗', 'haut-gauche': '↖', 'bas-droite': '↘', 'bas-gauche': '↙' };
 const NOMS_FLECHE = { droite: 'vers la droite', gauche: 'vers la gauche', haut: 'tout droit (vers le haut)', bas: 'vers le bas',
   'haut-droite': 'en haut à droite', 'haut-gauche': 'en haut à gauche', 'bas-droite': 'en bas à droite', 'bas-gauche': 'en bas à gauche' };
@@ -1321,9 +1388,18 @@ const EMOJIS_SIGNALETIQUE = [
 ];
 function champsDirection(d, changer) {
   d.directions = d.directions || [];
-  let reserve = null;   // seconde direction retirée : retrouvée si l'on repasse à deux
+  const reserve = [];   // directions retirées (en baissant le nombre) : retrouvées si l'on remonte
   const zone = h('div', { class: 'directions-ed' });
   const fleche = f => { const i = h('span', { class: 'fleche-ed' }); i.innerHTML = G.FLECHE_SVG; i.style.transform = 'rotate(' + G.FLECHES[f] + 'deg)'; return i; };
+  const n = () => Math.max(1, d.directions.length);
+  // Ordre d'affichage : de gauche à droite (deux directions, de haut en bas sur le kakémono), de haut en bas à partir de trois.
+  const nomBloc = i => n() === 1 ? 'Direction' : n() === 2 ? (i === 0 ? 'Moitié gauche · en haut sur le kakémono' : 'Moitié droite · en bas sur le kakémono') : 'Direction ' + (i + 1);
+  function deplacer(i, sens) {
+    const j = i + sens;
+    if (j < 0 || j >= d.directions.length) return;
+    [d.directions[i], d.directions[j]] = [d.directions[j], d.directions[i]];
+    remplir(); changer();
+  }
   function bloc(x, i) {
     x.picto = x.picto === undefined ? (x.image ? 'image' : 'emoji') : x.picto;
     const rose = h('div', { class: 'rose', role: 'group', 'aria-label': 'Flèche' }, ROSE.map(f => f
@@ -1357,10 +1433,17 @@ function champsDirection(d, changer) {
         x.picto = k; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); montrer(); changer();
       } }, t)));
     montrer();
+    // photo d'illustration, en fond de la direction (vestiaire, billetterie, salle, bar…)
+    const photo = champMedia({ genre: 'image', valeur: x.photo || null, facultatif: true, boite: [200, 120],
+      change: v => { x.photo = v; changer(); },
+      cadre: () => Object.assign({ conseil: 'en fond de la direction, assombrie sous le texte' }, G.cadreDirection(n())),
+      cadreV: () => G.cadreDirection(n(), 'kakemono') });
     const carte = h('div', { class: 'direction-ed depot' },
       h('div', { class: 'direction-tete' },
-        h('b', { text: d.directions.length > 1 ? (i === 0 ? 'Moitié gauche' : 'Moitié droite') : 'Direction' }),
-        d.directions.length > 1 && i === 0 && h('button', { type: 'button', class: 'btn pt', onclick: () => { d.directions.reverse(); remplir(); changer(); } }, '⇄ Inverser les moitiés')),
+        h('b', { text: nomBloc(i) }),
+        n() > 1 && h('div', { class: 'actions' },
+          h('button', { type: 'button', class: 'btn pt', disabled: i === 0, title: 'Monter', 'aria-label': 'Monter cette direction', onclick: () => deplacer(i, -1) }, '↑'),
+          h('button', { type: 'button', class: 'btn pt', disabled: i === n() - 1, title: 'Descendre', 'aria-label': 'Descendre cette direction', onclick: () => deplacer(i, 1) }, '↓'))),
       h('div', { class: 'direction-corps' },
         h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Flèche' }), rose),
         h('div', { class: 'direction-champs' },
@@ -1368,34 +1451,39 @@ function champsDirection(d, changer) {
             oninput: e => { x.titre = e.target.value; changer(); } }),
           h('input', { type: 'text', value: x.detail || '', maxLength: 80, placeholder: 'Précision facultative (ex. Au fond du couloir, 1er étage)', 'aria-label': 'Précision',
             oninput: e => { x.detail = e.target.value; changer(); } }),
-          h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Pictogramme' }), seg, panEmoji, panImage))));
-    carte._recevoir = f => { if (x.picto !== 'image') { x.picto = 'image'; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.textContent === 'Image'))); montrer(); } const m = panImage.querySelector('.media'); if (m && m._recevoir) m._recevoir(f); };
+          h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Pictogramme' }), seg, panEmoji, panImage),
+          h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo d’illustration (facultative)' }), photo))));
+    // un fichier déposé sur la carte : la photo d'illustration (le pictogramme a son propre emplacement)
+    carte._recevoir = f => { if (photo._recevoir) photo._recevoir(f); };
     return carte;
   }
   function remplir() {
     remplacer(zone, d.directions.map(bloc));
     nombre.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.n) === d.directions.length)));
+    aideNombre.textContent = n() === 1 ? 'Une direction : grande flèche, pictogramme et service.'
+      : n() === 2 ? 'Deux directions : l’écran est partagé en deux moitiés (en haut et en bas sur le kakémono), chacune avec sa flèche et son service.'
+        : n() + ' directions : une bande par direction, de haut en bas, avec sa flèche, son pictogramme et sa photo. Sur les téléviseurs, les bandes sont basses : textes courts conseillés.';
   }
-  const nombre = h('div', { class: 'seg', role: 'group', 'aria-label': 'Nombre de directions' }, [[1, 'Une direction'], [2, 'Deux directions (écran partagé)']].map(([n, t]) =>
-    h('button', { type: 'button', 'data-n': n, onclick: () => {
-      if (n === d.directions.length) return;
-      if (n === 2) {
-        const a = d.directions[0];
-        if (a.fleche === 'droite') a.fleche = 'gauche';
-        d.directions.push(reserve || { fleche: 'droite', titre: '', detail: '', picto: 'emoji', emoji: '', image: null });
-      } else reserve = d.directions.pop();
+  const SUIVANTES = ['gauche', 'droite', 'haut', 'bas-droite', 'bas-gauche', 'haut-droite'];   // flèche proposée selon la place
+  const aideNombre = h('small');
+  const nombre = h('div', { class: 'seg', role: 'group', 'aria-label': 'Nombre de directions' }, Array.from({ length: G.MAX_DIRECTIONS }, (_, k) => k + 1).map(m =>
+    h('button', { type: 'button', 'data-n': m, onclick: () => {
+      if (m === d.directions.length) return;
+      if (d.directions.length === 1 && m >= 2 && d.directions[0].fleche === 'droite') d.directions[0].fleche = 'gauche';
+      while (d.directions.length < m) d.directions.push(reserve.pop() || { fleche: SUIVANTES[d.directions.length] || 'droite', titre: '', detail: '', picto: 'emoji', emoji: '', image: null, photo: null });
+      while (d.directions.length > m) reserve.push(d.directions.pop());
       remplir(); changer();
-    } }, t)));
+    } }, String(m))));
   remplir();
   const fondSeg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Couleur de fond' }, ['noir', 'rose', 'violet', 'degrade'].map(k =>
     h('button', { type: 'button', 'aria-pressed': String((d.fond || 'noir') === k), onclick: e => {
       d.fond = k; fondSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer();
     } }, h('i', { class: 'pastille p-' + k }), G.nomCouleur(k))));
   return [
-    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Panneau' }), nombre,
-      h('small', { text: 'Deux directions : l’écran est partagé en deux moitiés, chacune avec sa flèche et son service.' })),
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Nombre de directions' }), nombre, aideNombre),
     h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Directions' }), zone),
-    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Couleur de fond' }), fondSeg)
+    h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Couleur de fond' }), fondSeg,
+      h('small', { text: 'Visible là où une direction n’a pas de photo.' }))
   ];
 }
 
@@ -1487,7 +1575,7 @@ function champsSerie(d, changer) {
     remplacer(lignes, ...d.dates.map((x, i) => {
       const pm = mentionsChoix().includes(x.mention) || !x.mention;
       const media = champMedia({ genre: 'image', valeur: x.photo, facultatif: true, change: v => { x.photo = v; changer(); },
-        cadre: cadrePhoto, boite: [168, 150], surplus: reste => repartir(i, reste) });
+        cadre: cadrePhoto, cadreV: () => G.cadreSerieV(nAffiches()), boite: [168, 150], surplus: reste => repartir(i, reste) });
       // toute la carte de la date reçoit les images déposées
       const carte = h('div', { class: 'date-serie depot' + (x.date && x.date < auj() ? ' passee' : '') },
         h('span', { class: 'num', text: String(i + 1) }),
@@ -1580,7 +1668,7 @@ function champsLineup(d, changer) {
         h('small', { text: 'Rangés par heure à l’écran ; un passage après minuit (00:30) compte pour la même soirée. 8 passages au plus. Mise en valeur : « Auto » suit le rôle (la tête d’affiche en vedette) ; Vedette, Forte, Normale ou Discrète la fixent, par exemple pour une co-tête d’affiche ou une info pratique.' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo de la tête d’affiche (facultative)' }),
         champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
-          cadre: Object.assign({ conseil: 'côté droit de l’écran, bord gauche fondu au noir : sujet au centre ou à droite' }, G.CADRES.lineup) }),
+          cadre: Object.assign({ conseil: 'côté droit de l’écran, bord gauche fondu au noir : sujet au centre ou à droite' }, G.CADRES.lineup), cadreV: G.CADRES_V.lineup }),
         h('small', { text: 'Sans photo : aplat dégradé du 6MIC.' })));
   }
   rendre();
@@ -1637,7 +1725,7 @@ function vueEditeur(id, typeNouveau) {
       h('div', { class: 'grille2' }, texte('date', 'Date', { type: 'date', aide: 'La soirée disparaît des écrans le lendemain à 6 h.' }), texte('heure', 'Heure', { type: 'time' })),
       h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Photo' }),
         champMedia({ genre: 'image', valeur: d.photo, facultatif: true, change: v => { d.photo = v; changer(); },
-          cadre: Object.assign({ conseil: 'plein écran, sujet à droite : le texte occupe la gauche' }, G.CADRES.soiree) })),
+          cadre: Object.assign({ conseil: 'plein écran, sujet à droite : le texte occupe la gauche' }, G.CADRES.soiree), cadreV: G.CADRES_V.soiree })),
       texte('infos', 'Infos', { multi: true, max: 300, aide: 'Deux ou trois lignes : ouverture des portes, tarifs, première partie…' }));
     const autre = !!d.mention && !mentionsChoix().includes(d.mention);
     const libre = h('input', { type: 'text', id: 'f-mention-libre', value: autre ? d.mention : '', maxLength: 40, hidden: !autre, placeholder: 'Mention', oninput: e => { d.mention = e.target.value; changer(); } });
@@ -1692,7 +1780,8 @@ function vueEditeur(id, typeNouveau) {
   } else if (ed.type === 'image') {
     champs.push(h('div', { class: 'champ' }, h('span', { class: 'lbl', text: 'Image' }),
       champMedia({ genre: 'image', valeur: d.src ? d : null, change: v => { Object.assign(d, v || { src: null }); changer(); },
-        cadre: () => Object.assign({ contenir: d.ajustement === 'ajuster', conseil: d.ajustement === 'ajuster' ? 'image entière, sans recadrage' : 'plein écran, recadrée si le format diffère' }, G.CADRES.image) }),
+        cadre: () => Object.assign({ contenir: d.ajustement === 'ajuster', conseil: d.ajustement === 'ajuster' ? 'image entière, sans recadrage' : 'plein écran, recadrée si le format diffère' }, G.CADRES.image),
+        cadreV: () => Object.assign({ contenir: d.ajustement === 'ajuster' }, G.CADRES_V.image) }),
       h('small', { text: 'JPEG, PNG ou WebP. Les visuels 1920 × 1080 de Declinator conviennent tels quels. Pour le kakémono : visuel vertical de 640 × 1800 px.' })));
     const seg = h('div', { class: 'seg', role: 'group' }, [['remplir', 'Remplir l’écran (recadrer)'], ['ajuster', 'Image entière (bandes noires)']].map(([k, t]) =>
       h('button', { type: 'button', 'aria-pressed': String(d.ajustement === k), onclick: e => { d.ajustement = k; seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); changer(); } }, t)));
