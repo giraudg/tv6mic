@@ -3,6 +3,29 @@
    Les règles de programmation (Regles) et les gabarits (Gabarits) sont ceux du lecteur des écrans. */
 const R = window.Regles, G = window.Gabarits;
 
+// Fichiers partagés avec le lecteur restés dans une ancienne version (cache du navigateur) : un rechargement,
+// puis, si ça ne suffit pas, un message clair plutôt qu'une erreur incompréhensible (iPhone, 17 nov. 2026).
+(function verifierFichiersPartages() {
+  const cle = 'tv6mic.rechargeAdmin';
+  const ok = R && typeof R.accepte === 'function' && typeof R.pourFormat === 'function'
+    && G && typeof G.utiliserFormat === 'function' && typeof G.cadrageDe === 'function';
+  let deja = null;
+  try { deja = sessionStorage.getItem(cle); } catch (e) { /* stockage indisponible */ }
+  if (ok) { try { sessionStorage.removeItem(cle); } catch (e) { /* rien */ } return; }
+  if (!deja) {
+    try { sessionStorage.setItem(cle, '1'); } catch (e) { /* rien */ }
+    location.reload();
+  } else {
+    const p = document.createElement('p');
+    p.className = 'erreur';
+    p.style.cssText = 'margin:24px;font-size:18px';
+    p.textContent = 'Le navigateur a gardé une ancienne version des fichiers du back-office. '
+      + 'Videz les données du site tv.6mic-aix.fr dans les réglages du navigateur, puis rouvrez cette page.';
+    document.body.prepend(p);
+  }
+  throw new Error('fichiers du back-office en ancienne version');
+})();
+
 /* ================= outils ================= */
 function h(tag, attrs, ...enfants) {
   const n = document.createElement(tag);

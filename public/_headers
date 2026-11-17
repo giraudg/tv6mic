@@ -19,3 +19,14 @@
 
 /emoji/*
   Cache-Control: public, max-age=2592000
+
+# Lecteur et back-office : toujours revalidés auprès du serveur (réponse 304 légère si rien n'a changé),
+# pour qu'un navigateur ne mélange jamais une vieille version de regles.js avec un admin.js récent.
+/lecteur/*
+  Cache-Control: no-cache
+
+/admin/*
+  Cache-Control: no-cache
+
+/vendor/qrcode.js
+  Cache-Control: no-cache

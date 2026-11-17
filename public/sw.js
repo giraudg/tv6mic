@@ -41,10 +41,19 @@ self.addEventListener('fetch', function (e) {
   var req = e.request, url = new URL(req.url), cle = null;
   if (req.method !== 'GET' || url.origin !== self.location.origin) { return; }
   if (req.mode === 'navigate' && (url.pathname === '/' || url.pathname === '/index.html')) { cle = '/'; }
-  else if (FICHIERS.indexOf(url.pathname) >= 0) { cle = url.pathname; }
+  else if (FICHIERS.indexOf(url.pathname) >= 0 && pourLeLecteur(req)) { cle = url.pathname; }
   if (!cle) { return; }
   e.respondWith(reseauPuisCopie(req, cle));
 });
+
+// La copie ne sert qu'au lecteur des écrans (page « / »). Le back-office et le diagnostic chargent aussi
+// regles.js et gabarits.js : sur un iPhone qui avait ouvert le lecteur, le back-office a reçu un vieux
+// regles.js de la copie avec un admin.js récent (« R.accepte is not a function », 17 nov. 2026).
+// Sans référent connu (vieux navigateur), on garde la copie : c'est le lecteur qu'elle protège.
+function pourLeLecteur(req) {
+  if (!req.referrer) { return true; }
+  try { var p = new URL(req.referrer).pathname; return p === '/' || p === '/index.html'; } catch (e) { return true; }
+}
 
 // Réseau d'abord (pour recevoir les mises à jour du lecteur), copie locale si le réseau ne répond pas en 5 s.
 function reseauPuisCopie(req, cle) {
