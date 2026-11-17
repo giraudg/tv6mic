@@ -609,7 +609,19 @@ function champMedia({ genre, valeur, facultatif, change, cadre, cadreV, boite = 
   const cadreVActuel = () => !video && cadreV && kakemonoActif() ? (typeof cadreV === 'function' ? cadreV() : cadreV) : null;
   const vignetteK = h('div', { class: 'media-vignette media-vignette-k', 'aria-hidden': 'true' });
   const legendeTV = h('small', { class: 'media-legende', text: 'Téléviseurs' });
-  const figureK = h('div', { class: 'media-fig', hidden: true }, vignetteK, h('small', { class: 'media-legende', text: 'Kakémono' }));
+  // Cadrage automatique du kakémono pour une photo déjà importée (le sujet repéré, centré dans le cadre vertical)
+  const autoK = h('button', { type: 'button', class: 'btn pt', title: 'Repérer le sujet de la photo et le centrer dans le cadre du kakémono', onclick: async () => {
+    if (!courant || !courant.src || occupe) return;
+    autoK.disabled = true;
+    try {
+      const img = courant.largeur ? courant : dims, pf = await pointFort(await (await fetch(courant.src)).blob());
+      const c = cadrageVers(pf, img, cadreVActuel());
+      courant = Object.assign({}, courant, { cadrageV: c || { x: 50, y: 50 } }); change(courant); majPositions();
+      annoncer(pf ? 'Cadrage du kakémono : sujet centré. Faites glisser la vignette pour l’ajuster.' : 'Sujet non repéré : faites glisser la vignette du kakémono.', !pf);
+    } catch (e) { annoncer('Cadrage automatique impossible : ' + e.message, true); }
+    finally { autoK.disabled = false; }
+  } }, 'Cadrer automatiquement');
+  const figureK = h('div', { class: 'media-fig', hidden: true }, vignetteK, h('small', { class: 'media-legende', text: 'Kakémono' }), autoK);
 
   /* Recadrage : la vignette a le format de l'écran ; on y fait glisser l'image (ou on la déplace aux flèches)
      pour choisir la partie visible. Gardé en pourcentages comme background-position : { x, y }, 50 % 50 % = centré.
