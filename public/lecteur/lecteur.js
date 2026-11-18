@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  var VERSION = '1.10.0';
+  var VERSION = '1.11.0';
   var W = window, D = document;
   var INTERVALLE = 30000;
   var CACHE = 'tv6mic-medias-1';

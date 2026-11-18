@@ -25,12 +25,14 @@
   }
   function parties(date) {
     var p = String(date).split('-'), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
-    return { j: d.getUTCDay(), n: d.getUTCDate(), m: d.getUTCMonth() };
+    return { j: d.getUTCDay(), n: d.getUTCDate(), m: d.getUTCMonth(), a: d.getUTCFullYear() };
   }
-  function dateLongue(date) {
+  // L'année figure sur toutes les dates : la programmation s'étend sur plusieurs années (2026, 2027, 2028…).
+  function dateJour(date) {
     var p = parties(date);
     return JOURS[p.j] + ' ' + (p.n === 1 ? '1er' : p.n) + ' ' + MOIS[p.m];
   }
+  function dateLongue(date) { return dateJour(date) + ' ' + parties(date).a; }
   function heureTexte(h) {
     if (!h) { return ''; }
     var p = String(h).split(':'), m = parseInt(p[1], 10) || 0;
@@ -179,7 +181,11 @@
     if (deco) { g.appendChild(deco); }
     g.appendChild(logo('g-logo a a0'));
     if (d.mention) { g.appendChild(el('div', 'g-mention a a0' + (mentionAlerte(d.mention) ? ' g-rouge' : ''), d.mention)); }
-    if (d.date) { bloc.appendChild(el('div', 'g-date a a1', dateLongue(d.date) + (d.heure ? (vertical() ? '\n' : ' · ') + heureTexte(d.heure) : ''))); }
+    if (d.date) {
+      bloc.appendChild(el('div', 'g-date a a1', vertical()
+        ? dateJour(d.date) + '\n' + parties(d.date).a + (d.heure ? ' · ' + heureTexte(d.heure) : '')
+        : dateLongue(d.date) + (d.heure ? ' · ' + heureTexte(d.heure) : '')));
+    }
     nom = el('div', 'g-nom a a2', d.nom || c.titre);
     bloc.appendChild(nom);
     if (d.infos) { bloc.appendChild(el('div', 'g-infos a a3', d.infos)); }
@@ -224,6 +230,7 @@
       quand.appendChild(el('span', 'g-j', JOURS_COURTS[p.j]));
       quand.appendChild(el('b', '', p.n));
       quand.appendChild(el('span', 'g-m', MOIS_COURTS[p.m]));
+      quand.appendChild(el('span', 'g-a', p.a));
       ligne.appendChild(quand);
       nom = el('div', 'g-quoi', x.nom);
       noms.push(nom);
@@ -581,11 +588,13 @@
     var p = String(date).split('-'), d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + 1));
     return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
   }
-  function quandSerie(x, service) {
-    var p = parties(x.date), h = x.heure ? ' · ' + heureTexte(x.heure) : '';
-    if (service && x.date === service) { return { texte: 'Ce soir' + h, proche: true }; }
-    if (service && x.date === lendemain(service)) { return { texte: 'Demain' + h, proche: true }; }
-    return { texte: JOURS_COURTS[p.j] + ' ' + (p.n === 1 ? '1er' : p.n) + ' ' + MOIS_COURTS[p.m] + h, proche: false };
+  function quandSerie(x, service, n) {
+    var p = parties(x.date), heure = x.heure ? heureTexte(x.heure) : '', jour;
+    var proche = service && x.date === service ? 'Ce soir' : (service && x.date === lendemain(service) ? 'Demain' : '');
+    if (proche) { return { texte: proche + (heure ? (vertical() ? '\n' : ' · ') + heure : ''), proche: true }; }
+    jour = JOURS_COURTS[p.j] + ' ' + (p.n === 1 ? '1er' : p.n) + ' ' + MOIS_COURTS[p.m];
+    if (vertical()) { return { texte: jour + '\n' + p.a + (heure ? ' · ' + heure : ''), proche: false }; }
+    return { texte: jour + ' ' + p.a + (heure ? (n >= 4 ? '\n' : ' · ') + heure : ''), proche: false };
   }
   // Cadre de la photo à l'écran, en pixels : le back-office l'indique à l'import et y recadre ses vignettes.
   var CADRES = {
@@ -637,7 +646,7 @@
     tete.appendChild(el('div', 'g-s-marque a a1'));
     g.appendChild(tete);
     for (i = 0; i < dates.length; i++) {
-      x = dates[i]; q = quandSerie(x, etape.service);
+      x = dates[i]; q = quandSerie(x, etape.service, n);
       carte = el('div', 'g-s-carte');
       carte.style.width = (vertical() ? 936 : largeur) + 'px';
       if (vertical()) { carte.style.height = hCarte + 'px'; }
@@ -649,7 +658,7 @@
       if (x.mention) { photo.appendChild(el('div', 'g-s-mention' + (mentionAlerte(x.mention) ? ' g-rouge' : ''), x.mention)); }
       carte.appendChild(photo);
       corps = el('div', 'g-s-corps');
-      corps.appendChild(el('div', 'g-s-quand' + (q.proche ? ' g-s-proche' : ''), vertical() ? q.texte.replace(' · ', '\n') : q.texte));
+      corps.appendChild(el('div', 'g-s-quand' + (q.proche ? ' g-s-proche' : ''), q.texte));
       nom = el('div', 'g-s-nom', x.nom || '');
       noms.push(nom);
       corps.appendChild(nom);
@@ -661,11 +670,10 @@
       ajusterTexte(titre, vertical() ? 200 : 136, vertical() ? 96 : 72, vertical() ? 2 : 1);
       for (var k = 0; k < noms.length; k++) {
         ajusterTexte(noms[k], tailleNom, vertical() ? 56 : 34, vertical() && n >= 3 ? 3 : 2);
-        // kakémono : le texte (date sur deux lignes + nom) doit tenir dans la hauteur de l'affiche
-        if (vertical()) {
-          var corpsK = noms[k].parentNode, t = parseFloat(noms[k].style.fontSize) || tailleNom, lim = n >= 3 ? hCarte : 480, e = 0;
-          while (e < 24 && t > 50 && corpsK.scrollHeight > lim) { t -= 6; e++; noms[k].style.fontSize = t + 'px'; }
-        }
+        // le texte (date, parfois sur deux lignes, puis nom) doit tenir dans la hauteur de l'affiche
+        var corpsK = noms[k].parentNode, t = parseFloat(noms[k].style.fontSize) || tailleNom, e = 0;
+        var lim = vertical() ? (n >= 3 ? hCarte : 480) : corpsK.clientHeight, mini = vertical() ? 50 : 30, pas = vertical() ? 6 : 3;
+        while (e < 24 && t > mini && corpsK.scrollHeight > lim) { t -= pas; e++; noms[k].style.fontSize = t + 'px'; }
       }
     } };
   }
@@ -715,7 +723,7 @@
     g.appendChild(el('div', 'g-l-fondu'));
     g.appendChild(logo('g-logo a a0'));
     var entete = el('div', 'g-l-tete');
-    entete.appendChild(el('div', 'g-l-quand a a0', (jourJ ? 'Ce soir' : (d.date ? dateLongue(d.date) : 'Programme de la soirée')) + (d.lieu ? ' · ' + d.lieu : '')));
+    entete.appendChild(el('div', 'g-l-quand a a0', (jourJ ? 'Ce soir' : (d.date ? dateLongue(d.date) : 'Programme de la soirée')) + (d.lieu ? (vertical() ? '\n' : ' · ') + d.lieu : '')));
     var titre = el('div', 'g-l-titre a a1', d.titre || tete || c.titre);
     entete.appendChild(titre);
     g.appendChild(entete);

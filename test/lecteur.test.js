@@ -174,6 +174,15 @@ test('kakémono vertical (320 × 900) : scène verticale, gabarits verticaux et 
   e.fermer();
 });
 
+test('dates des gabarits : l\'année figure toujours (programmation sur plusieurs années)', () => {
+  const e = ecran({ prog: programmation(['soiree'], null), taille: [1920, 1080] });
+  e.avancer(5);
+  const G = e.W.Gabarits;
+  assert.strictEqual(G.dateLongue('2027-12-05'), 'dimanche 5 décembre 2027');
+  assert.strictEqual(G.dateLongue('2028-03-01'), 'mercredi 1er mars 2028');
+  e.fermer();
+});
+
 test('kakémono sans rien d\'affichable : veille, sans plantage', () => {
   const e = ecran({ prog: programmation(['agenda', 'carte'], null, 'kakemono'), taille: [320, 900] });
   e.avancer(90);

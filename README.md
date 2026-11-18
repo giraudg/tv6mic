@@ -112,6 +112,10 @@ Après le Hall resté noir du 6 au 9 novembre (lecteur 1.6.0 planté au démarra
 
 Le serveur annonce à chaque contact la version du lecteur publiée (`lecteur`, lue dans `public/lecteur/lecteur.js`). Un écran dont la version diffère se recharge de lui-même, entre deux étapes (jamais au milieu d'une vidéo), au plus une fois par quart d'heure pour une même version (`tv6mic.maj`). Les changements de programmation, eux, arrivent au contact suivant (30 s au plus) et s'affichent au prochain passage de l'étape. Pense-bête : à chaque modification du lecteur ou des gabarits, monter `VERSION` dans `lecteur.js`.
 
+## L'année sur toutes les dates (18 nov. 2026)
+
+La programmation s'étend sur plusieurs années : soirée, série, agenda et line-up affichent l'année avec la date. Sur le kakémono, elle passe à la ligne avec l'heure (« samedi 5 décembre » puis « 2027 · 20 h 30 ») ; sur une série de 4 affiches, l'heure passe sous la date. Lecteur 1.11.0.
+
 ## Kakémono LED vertical (16 nov. 2026)
 
 Écran LED vertical sur roulettes (Phocea Media), piloté par un boîtier **Novastar Taurus** : page de **320 × 900 px** (densité 1), navigateur Chrome 73, animations fluides (60 i/s). Il se règle avec ViPlex Express (PC) ou ViPlex Handy : identifiant `admin`, mot de passe de l'étiquette du boîtier ; wifi du boîtier en mode Sta sur le wifi des écrans ; fuseau horaire à mettre sur Europe/Paris (Chine en sortie d'usine). Programme ViPlex : un seul composant « Page web » plein écran, adresse `https://tv.6mic-aix.fr/?flux=kakemono`. Page de test : `/diagnostic/kakemono`.

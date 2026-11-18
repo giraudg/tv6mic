@@ -139,11 +139,12 @@
 .g-ligne { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; height: 118px;
   border-bottom: 2px solid var(--g-trait); opacity: 0; }
 .joue .g-ligne { -webkit-animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; animation: g-glisse .8s .3s cubic-bezier(.2, .7, .2, 1) both; }
-/* largeur : jour (108) + numéro (70) + mois le plus large (« mars », « janv. » : 105) + 39 px d'air avant le nom */
-.g-quand { -webkit-flex: none; flex: none; width: 322px; font-family: var(--g-cond); font-weight: 700; font-size: 48px; line-height: 1;
+/* largeur : jour (108) + numéro (70) + mois et année (« sept. 2027 » : 260 en police de secours) + air avant le nom */
+.g-quand { -webkit-flex: none; flex: none; width: 470px; font-family: var(--g-cond); font-weight: 700; font-size: 48px; line-height: 1;
   text-transform: uppercase; white-space: nowrap; color: var(--g-gris); }
 .g-quand .g-j { display: inline-block; width: 108px; }
 .g-quand b { display: inline-block; width: 70px; font-weight: 700; color: #fff; }
+.g-quand .g-a { margin-left: .22em; }
 /* padding-top : place des accents des capitales (É, À…) ; la marge négative garde le nom centré sur la ligne */
 .g-quoi { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; margin-top: -.16em; padding-top: .16em;
   font-family: var(--g-cond); font-weight: 700; font-size: 76px; line-height: .92; text-transform: uppercase;
@@ -153,7 +154,7 @@
 /* 4 dates ou moins : lignes plus hautes et texte plus grand */
 .g-court .g-liste { top: 300px; }
 .g-court .g-ligne { height: 150px; }
-.g-court .g-quand { width: 400px; font-size: 60px; }
+.g-court .g-quand { width: 560px; font-size: 60px; }
 .g-court .g-quand .g-j { width: 135px; }
 .g-court .g-quand b { width: 88px; }
 .g-court .g-quoi { font-size: 92px; }
@@ -191,11 +192,13 @@
 .g-s-corps { height: 150px; padding: 22px 24px 20px; overflow: hidden; }
 .g-s-quand { font-size: 24px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .g-s-3 .g-s-quand { font-size: 30px; }
+/* 4 affiches : l'heure passe sous la date (avec l'année, la ligne ne tiendrait plus) */
+.g-s-4 .g-s-quand { white-space: pre-line; }
 .g-s-proche { color: var(--g-primaire); }
 /* padding-top : place des accents des capitales (É, È) que couperait overflow: hidden avec line-height < 1 */
 .g-s-nom { margin-top: 4px; padding-top: .14em; font-family: var(--g-cond); font-weight: 700; font-size: 66px; line-height: .92; text-transform: uppercase; overflow: hidden; }
 /* hauteur du texte sous la photo = date + 14 px + deux lignes de nom (taille max × 0,92 × 2), selon le nombre d'affiches */
-.g-s-4 .g-s-corps { height: 160px; }
+.g-s-4 .g-s-corps { height: 186px; }
 .g-s-3 .g-s-corps { height: 170px; }
 .g-s-1 .g-s-corps, .g-s-2 .g-s-corps { height: 190px; }
 .g-s-1 .g-s-quand, .g-s-2 .g-s-quand { font-size: 36px; }
@@ -511,7 +514,7 @@
 .format-kakemono .g-l-fondu { left: 0; top: 500px; width: 1080px; height: 762px;
   background: linear-gradient(180deg, rgba(11, 10, 13, 0) 0%, rgba(11, 10, 13, .85) 65%, #0b0a0d 100%); }
 .format-kakemono .g-l-tete { left: 72px; top: 1060px; width: 936px; }
-.format-kakemono .g-l-quand { padding: 18px 28px 14px; font-size: 50px; }
+.format-kakemono .g-l-quand { padding: 18px 28px 14px; font-size: 50px; white-space: pre-line; }
 .format-kakemono .g-l-titre { margin-top: 18px; font-size: 190px; white-space: normal; }
 .format-kakemono .g-l-liste { left: 72px; top: 1580px; width: 936px; }
 .format-kakemono .g-l-trait { left: 257px; width: 6px; }
